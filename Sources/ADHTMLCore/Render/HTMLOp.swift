@@ -18,6 +18,11 @@ public enum HTMLOp: Sendable {
     case raw([UInt8])
     /// `</name>` — a closing tag.
     case closeTag(StaticString)
+    /// Opens a hydration island root: `<div data-adh-island data-adh-id="…" data-adh-on="…">`. The
+    /// `scope` (cells reachable for this island) is read by the wire serializer, not the byte emit.
+    case islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID])
+    /// Closes a hydration island root (`</div>`).
+    case islandClose
 }
 
 /// A flat, ordered list of ``HTMLOp``s produced by lowering an ``HTML`` tree. Walked iteratively by

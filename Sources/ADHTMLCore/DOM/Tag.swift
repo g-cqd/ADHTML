@@ -26,6 +26,7 @@ public enum Tags {
     public enum Span: HTMLTag { public static let name: StaticString = "span" }
     public enum P: HTMLTag { public static let name: StaticString = "p" }
     public enum A: HasHref { public static let name: StaticString = "a" }
+    public enum Button: HTMLTag { public static let name: StaticString = "button" }
     public enum Br: HTMLTag {
         public static let name: StaticString = "br"
         public static let isVoid = true

@@ -25,10 +25,10 @@ public enum Renderer {
         var depth = 0
         for op in program.ops {
             switch op {
-                case .openTagStart:
+                case .openTagStart, .islandOpen:
                     depth += 1
                     if depth > maxDepth { throw RenderError.maxDepthExceeded(maxDepth) }
-                case .voidTagEnd, .closeTag:
+                case .voidTagEnd, .closeTag, .islandClose:
                     depth -= 1
                 default:
                     break
@@ -61,6 +61,14 @@ public enum Renderer {
                 sink.writeByte(0x2F)  // /
                 sink.writeStatic(name)
                 sink.writeByte(0x3E)  // >
+            case .islandOpen(let id, let on, _):
+                sink.writeStatic("<div data-adh-island data-adh-id=\"")
+                Escaper.write(id.raw, context: .attribute, into: &sink)
+                sink.writeStatic("\" data-adh-on=\"")
+                Escaper.write(on.attributeValue, context: .attribute, into: &sink)
+                sink.writeStatic("\">")
+            case .islandClose:
+                sink.writeStatic("</div>")
         }
     }
 }

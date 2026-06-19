@@ -72,6 +72,11 @@ public func a<Content: HTML>(@HTMLBuilder _ content: () -> Content) -> HTMLEleme
     HTMLElement(content: content())
 }
 
+/// A `<button>` containing `content`.
+public func button<Content: HTML>(@HTMLBuilder _ content: () -> Content) -> HTMLElement<Tags.Button, Content> {
+    HTMLElement(content: content())
+}
+
 /// A void `<br>`.
 public func br() -> HTMLElement<Tags.Br, EmptyHTML> {
     HTMLElement(content: EmptyHTML())

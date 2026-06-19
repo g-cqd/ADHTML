@@ -43,13 +43,14 @@ func adPackage(env: String, url: String) -> Package.Dependency {
     return .package(url: url, branch: "main")
 }
 let adfoundationDependency = adPackage(env: "ADFOUNDATION_PATH", url: "https://github.com/g-cqd/ADFoundation.git")
+let adjsonDependency = adPackage(env: "ADJSON_PATH", url: "https://github.com/g-cqd/ADJSON.git")
 
-// Default graph: ADFoundation (ADFCore byte/ASCII/hash primitives), swift-collections
-// (OrderedCollections → deterministic attribute order), swift-syntax (macro target only). ADJSONCore
-// joins ADHTMLCore with the wire serializer (RFC-0003); for now ADJSON/ADServe are pulled only by the
-// gated ADHTMLNIO bridge. swift-collections `DequeModule` joins with the dynamic-AST/wire serializer.
+// Default graph (all Foundation-free): ADFoundation (ADFCore byte/ASCII/hash primitives), ADJSON
+// (ADJSONCore — the wire-state serializer's JSON emit + JSONMergePatch, RFC-0003/0007), swift-collections
+// (OrderedCollections → deterministic attribute + wire key order), swift-syntax (macro target only).
 var packageDependencies: [Package.Dependency] = [
     adfoundationDependency,
+    adjsonDependency,
     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "603.0.0"),
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0"),
 ]
@@ -64,8 +65,8 @@ if isDev {
 }
 if isNIO {
     packageDependencies.append(.package(url: "https://github.com/apple/swift-nio.git", from: "2.50.0"))
-    packageDependencies.append(adPackage(env: "ADJSON_PATH", url: "https://github.com/g-cqd/ADJSON.git"))
-    // The ADServe response/bridge dependency wires in when the adapter is implemented (ADR-0012).
+    // ADJSON is already a default dependency (the wire serializer); the ADServe response/bridge
+    // dependency wires in when the adapter is implemented (ADR-0012).
 }
 if isMarkdown {
     packageDependencies.append(.package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0"))
@@ -81,6 +82,7 @@ if isSRI {
 
 let orderedCollections: Target.Dependency = .product(name: "OrderedCollections", package: "swift-collections")
 let adfCore: Target.Dependency = .product(name: "ADFCore", package: "ADFoundation")
+let adjsonCore: Target.Dependency = .product(name: "ADJSONCore", package: "ADJSON")
 
 // Build-time formatting enforcement attaches to the library only in dev/CI (gated like ADJSON).
 let buildPlugins: [Target.PluginUsage] =
@@ -114,7 +116,7 @@ let package = Package(
         // (ASCII/hash/byte primitives) — both Foundation-free with no transitive package deps.
         .target(
             name: "ADHTMLCore",
-            dependencies: [orderedCollections, adfCore],
+            dependencies: [orderedCollections, adfCore, adjsonCore],
             swiftSettings: strictSettings,
             plugins: buildPlugins),
 
