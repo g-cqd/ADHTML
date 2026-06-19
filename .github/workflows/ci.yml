@@ -1,0 +1,163 @@
+# Lint -> build -> test in one gated job, then fan out (Linux, platform matrix, benchmarks, fuzz, docs)
+# only after the gate passes. Mirrors the AD* family CI (e.g. ADJSON). AD* sibling dependencies resolve
+# from github.com/g-cqd (the manifest default when <DEP>_PATH is unset), exactly like the rest of the
+# family's CI.
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["**/*.md", "LICENSE", ".gitignore", "docs/**", "ClientRuntime/**"]
+  pull_request:
+    paths-ignore: ["**/*.md", "LICENSE", ".gitignore", "docs/**", "ClientRuntime/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  build-test:
+    name: Lint, build & test (macOS)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Show toolchain
+        run: swift --version
+      - name: Cache SwiftPM
+        uses: actions/cache@v5
+        with:
+          path: |
+            .build
+            ~/Library/Caches/org.swift.swiftpm
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.swift') }}-${{ hashFiles('Sources/**', 'Tests/**') }}
+          restore-keys: |
+            spm-${{ runner.os }}-${{ hashFiles('Package.swift') }}-
+            spm-${{ runner.os }}-
+      - name: Lint (toolchain swift-format, strict)
+        run: swift format lint --strict --recursive --configuration .swift-format Sources Tests Benchmarks
+      - name: Build
+        run: swift build
+      - name: Build the macro plugin
+        run: swift build --product ADHTMLMacros || swift build --target ADHTMLMacros
+      - name: Test (with coverage)
+        run: swift test --enable-code-coverage
+
+  linux:
+    name: Build & test (Linux)
+    needs: build-test
+    # ADHTMLCore is Foundation-free; building it on Linux guards portability. Advisory while the
+    # tools-version tracks a toolchain only the nightly container ships.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    container: swiftlang/swift:nightly-main-jammy
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - name: Show toolchain
+        run: swift --version
+      - name: Build Foundation-free core
+        run: swift build --target ADHTMLCore
+      - name: Build & test full package
+        run: swift test
+
+  platforms:
+    name: Build (${{ matrix.platform }})
+    needs: build-test
+    if: github.event_name != 'pull_request'
+    runs-on: macos-26
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [iOS, tvOS, watchOS, visionOS]
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Build for ${{ matrix.platform }}
+        run: >-
+          xcodebuild build
+          -scheme ADHTML
+          -destination "generic/platform=${{ matrix.platform }}"
+          -skipMacroValidation
+          -skipPackagePluginValidation
+
+  benchmarks:
+    name: Benchmark (macOS, release)
+    needs: build-test
+    # ordo-one suite, on main / dispatch only (noisy on shared runners); advisory.
+    if: github.event_name != 'pull_request'
+    runs-on: macos-26
+    continue-on-error: true
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install jemalloc (package-benchmark malloc metrics)
+        run: brew install jemalloc
+      - name: Run the benchmark suite
+        env:
+          ADHTML_DEV: "1"
+        run: |
+          set -o pipefail
+          swift package --allow-writing-to-package-directory benchmark --format markdown | tee bench.md
+      - name: Publish results to the job summary
+        if: always()
+        run: cat bench.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
+  fuzz:
+    name: Fuzz (libFuzzer, Linux)
+    needs: build-test
+    # `-sanitize=fuzzer` is a Linux capability of the toolchain (the Darwin SDK rejects it). Time-boxed,
+    # advisory (nightly container). A crash uploads its reproducer; commit it as a regression test.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    container: swiftlang/swift:nightly-main-jammy
+    continue-on-error: true
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Build fuzz target
+        env:
+          ADHTML_FUZZ: "1"
+        run: swift build --product ADHTMLFuzz
+      - name: Run fuzzer (time-boxed)
+        env:
+          ADHTML_FUZZ: "1"
+        run: |
+          BIN="$(swift build --product ADHTMLFuzz --show-bin-path)/ADHTMLFuzz"
+          mkdir -p corpus
+          printf '<a href="javascript:alert(1)">x</a>' > corpus/seed.html
+          "$BIN" corpus -max_total_time=180 -timeout=10 -rss_limit_mb=2048 -artifact_prefix=crash-
+      - name: Upload crash reproducers
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: crash-*
+          if-no-files-found: ignore
+
+  docs-check:
+    name: Build docs (link check)
+    needs: build-test
+    runs-on: macos-26
+    env:
+      ADHTML_DEV: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Build DocC (warnings as errors)
+        run: |
+          swift package --allow-writing-to-directory "$PWD/_docs_check" \
+            generate-documentation \
+            --enable-experimental-combined-documentation \
+            --target ADHTMLCore --target ADHTML \
+            --disable-indexing --warnings-as-errors \
+            --output-path "$PWD/_docs_check"

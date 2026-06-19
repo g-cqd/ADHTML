@@ -1,0 +1,9 @@
+{
+    "devEnv": "ADHTML_DEV",
+    "shippedTargets": ["Sources/ADHTML", "Sources/ADHTMLCore"],
+    "strtodBan": true,
+    "forceUnwrapBan": true,
+    "prngBan": true,
+    "untypedThrowsBan": true,
+    "wallClockBan": true
+}

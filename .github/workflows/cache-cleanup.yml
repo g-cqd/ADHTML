@@ -1,0 +1,61 @@
+# Bounds the repository's GitHub Actions cache so it can't creep toward the 10 GB hard limit (where
+# GitHub starts LRU-evicting the warm caches CI depends on). Keeps the most-recently-used caches up to a
+# budget and clears a PR's caches as soon as it closes. Mirrors the AD* family.
+name: Cache cleanup
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: cache-cleanup
+  cancel-in-progress: false
+
+jobs:
+  prune:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete caches for the closed PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          REF: refs/pull/${{ github.event.pull_request.number }}/merge
+        run: |
+          echo "Deleting caches scoped to $REF"
+          gh cache list --repo "$REPO" --ref "$REF" --limit 100 --json id --jq '.[].id' \
+            | while read -r id; do
+                [ -n "$id" ] && gh cache delete "$id" --repo "$REPO" || true
+              done
+
+      - name: Prune caches to stay under budget
+        if: github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BUDGET_BYTES: "6442450944"
+        run: |
+          gh cache list --repo "$REPO" --limit 1000 \
+            --json id,key,sizeInBytes,lastAccessedAt > caches.json
+          total=$(jq '[.[].sizeInBytes] | add // 0' caches.json)
+          count=$(jq 'length' caches.json)
+          echo "Current usage: $(( total / 1024 / 1024 )) MiB across $count caches"
+          jq -r --argjson budget "$BUDGET_BYTES" '
+            sort_by(.lastAccessedAt) | reverse
+            | reduce .[] as $c ({sum: 0, ids: []};
+                .sum += $c.sizeInBytes
+                | if .sum > $budget then .ids += [$c.id] else . end)
+            | .ids[]' caches.json \
+          | while read -r id; do
+              [ -n "$id" ] && { echo "Deleting over-budget cache $id"; gh cache delete "$id" --repo "$REPO" || true; }
+            done
