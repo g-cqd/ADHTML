@@ -7,13 +7,15 @@ code in small, one-concern commits.
 
 ## Local dependency resolution
 
-ADHTML depends on sibling `AD*` packages (`ADFoundation`, and — as subsystems land — `ADJSON`,
-`ADServe`). Each is resolved from a local checkout when its `<DEP>_PATH` env var is set, else from
-`github.com/g-cqd`. With the siblings checked out next to this repo:
+ADHTML depends on sibling `AD*` packages — `ADFoundation` (ADFCore) and `ADJSON` (ADJSONCore, the wire
+serializer), with `ADServe` added when the NIO bridge lands. Each resolves from a local checkout when
+its `<DEP>_PATH` env var is set, else from `github.com/g-cqd`. With the siblings checked out next to
+this repo:
 
 ```sh
 export ADFOUNDATION_PATH=../ADFoundation
-# (later) export ADJSON_PATH=../ADJSON   ADSERVE_PATH=../ADServe
+export ADJSON_PATH=../ADJSON
+export ADCONCURRENCY_PATH=../ADConcurrency   # pulled transitively by ADJSON
 ```
 
 ## One-time setup
@@ -26,12 +28,24 @@ git config core.hooksPath .githooks
 
 The toolchain's bundled `swift format` powers the plugins; no extra tools needed.
 
+## Build system & toolchain
+
+**Build with `--build-system native`.** ADHTML has a `.macro` target (`ADHTMLMacros`). The newer
+default `swiftbuild` engine on the current Xcode-beta toolchain mislinks the macro module into
+dependent test bundles (`swift test` fails to link with undefined `SwiftSyntax` symbols) — a
+SwiftPM/toolchain bug, not an ADHTML one. The classic **`native`** build system handles macros
+correctly, so all `swift build` / `swift test` / `swift package` commands take `--build-system native`
+(CI does too). Drop the flag once the swiftbuild macro/test-link bug is fixed (ADR-0008).
+
+The toolchain is pinned to **Swift 6.4** via [`.swift-version`](.swift-version). swiftly users can run
+`swiftly install 6.4 && swiftly use 6.4` to manage it; otherwise select an Xcode whose Swift is 6.4.
+
 ## Everyday commands
 
 ```sh
-swift build                 # build the library
-swift test                  # run the test suite (golden render, escaping, XSS vectors)
-swift test --enable-code-coverage
+swift build --build-system native                          # build (see "Build system" above)
+swift test  --build-system native                          # run the test suite
+swift test  --build-system native --enable-code-coverage
 
 swift package format        # format in place (add --allow-writing-to-package-directory if prompted)
 swift package lint          # formatting gate + shipped-library discipline (what CI runs)

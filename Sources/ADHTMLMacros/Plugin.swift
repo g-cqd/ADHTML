@@ -1,12 +1,11 @@
-// The compiler-plugin entry for ADHTML's macros (ADR-0008). The macro set (`#attr`, `@Component`,
-// `@State`, `#html`) is designed but NOT yet wired: on the current Xcode-beta toolchain, a test target
-// that transitively depends on a `.macro` target fails to link (the macro module is pulled into the
-// test bundle — a SwiftPM/toolchain issue, not an ADHTML one). The target stays a valid, compiling
-// placeholder so the gating + graph are locked; macros activate once that issue is resolved.
+// The compiler-plugin entry for ADHTML's macros (ADR-0008). swift-syntax is isolated to this `.macro`
+// target. NOTE: the package builds with `--build-system native` (the classic build system); the newer
+// `swiftbuild` engine on the current Xcode-beta toolchain mislinks a `.macro` module into dependent
+// test bundles. See CONTRIBUTING / the umbrella target comment.
 internal import SwiftCompilerPlugin
 internal import SwiftSyntaxMacros
 
 @main
 struct ADHTMLMacrosPlugin: CompilerPlugin {
-    let providingMacros: [any Macro.Type] = []
+    let providingMacros: [any Macro.Type] = [AttributeNameMacro.self]
 }

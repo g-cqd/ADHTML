@@ -107,8 +107,11 @@ let package = Package(
         .macro(
             name: "ADHTMLMacros",
             dependencies: [
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
                 .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+                .product(name: "SwiftDiagnostics", package: "swift-syntax"),
             ],
             swiftSettings: strictSettings),
 
@@ -120,13 +123,13 @@ let package = Package(
             swiftSettings: strictSettings,
             plugins: buildPlugins),
 
-        // Umbrella: re-exports the core, adds document assembly. The macro declarations + the
-        // ADHTMLMacros dependency are DEFERRED: on the current Xcode-beta toolchain, a test target that
-        // transitively depends on a `.macro` target fails to link (the macro module is pulled into the
-        // test bundle). The macros land once that SwiftPM/toolchain issue is resolved (ADR-0008).
+        // Umbrella: re-exports the core, declares the macros (impl in ADHTMLMacros), adds document
+        // assembly. Build with `--build-system native`: the newer `swiftbuild` engine on the current
+        // Xcode-beta toolchain mislinks the `.macro` module into dependent test bundles (a SwiftPM/
+        // toolchain issue, not ADHTML's). `native` handles macros correctly (ADR-0008; CONTRIBUTING).
         .target(
             name: "ADHTML",
-            dependencies: ["ADHTMLCore"],
+            dependencies: ["ADHTMLCore", "ADHTMLMacros"],
             swiftSettings: strictSettings,
             plugins: buildPlugins),
 

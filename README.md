@@ -78,9 +78,16 @@ resolves them from `github.com/g-cqd`):
 
 ```sh
 export ADFOUNDATION_PATH=../ADFoundation
-swift build
-swift test
+export ADJSON_PATH=../ADJSON
+export ADCONCURRENCY_PATH=../ADConcurrency
+swift build --build-system native
+swift test  --build-system native
 ```
+
+**Use `--build-system native`.** ADHTML has a `.macro` target; the newer default `swiftbuild` engine on
+the current toolchain mislinks the macro module into test bundles, while the classic `native` build
+system handles macros correctly (see [CONTRIBUTING](CONTRIBUTING.md); drop the flag once the swiftbuild
+bug is fixed). The toolchain is pinned to **Swift 6.4** via [`.swift-version`](.swift-version).
 
 Deployment floor: macOS 15 / iOS 18 / tvOS 18 / watchOS 11 / visionOS 2 (pinned by stdlib
 `Synchronization.Mutex`). `Span` is adopted (it back-deploys); `InlineArray`/`UTF8Span` are

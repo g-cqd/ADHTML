@@ -41,12 +41,14 @@ jobs:
             spm-${{ runner.os }}-
       - name: Lint (toolchain swift-format, strict)
         run: swift format lint --strict --recursive --configuration .swift-format Sources Tests Benchmarks
+      # The package has a `.macro` target. The newer `swiftbuild` engine on the current toolchain
+      # mislinks the macro module into dependent test bundles, so we use `native` (the classic build
+      # system), which handles macros correctly. Revisit once the swiftbuild macro/test-link bug is
+      # fixed (see CONTRIBUTING / ADR-0008).
       - name: Build
-        run: swift build
-      - name: Build the macro plugin
-        run: swift build --product ADHTMLMacros || swift build --target ADHTMLMacros
+        run: swift build --build-system native
       - name: Test (with coverage)
-        run: swift test --enable-code-coverage
+        run: swift test --build-system native --enable-code-coverage
 
   linux:
     name: Build & test (Linux)
@@ -62,9 +64,9 @@ jobs:
       - name: Show toolchain
         run: swift --version
       - name: Build Foundation-free core
-        run: swift build --target ADHTMLCore
+        run: swift build --build-system native --target ADHTMLCore
       - name: Build & test full package
-        run: swift test
+        run: swift test --build-system native
 
   platforms:
     name: Build (${{ matrix.platform }})
@@ -106,7 +108,7 @@ jobs:
           ADHTML_DEV: "1"
         run: |
           set -o pipefail
-          swift package --allow-writing-to-package-directory benchmark --format markdown | tee bench.md
+          swift package --build-system native --allow-writing-to-package-directory benchmark --format markdown | tee bench.md
       - name: Publish results to the job summary
         if: always()
         run: cat bench.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
@@ -126,12 +128,12 @@ jobs:
       - name: Build fuzz target
         env:
           ADHTML_FUZZ: "1"
-        run: swift build --product ADHTMLFuzz
+        run: swift build --build-system native --product ADHTMLFuzz
       - name: Run fuzzer (time-boxed)
         env:
           ADHTML_FUZZ: "1"
         run: |
-          BIN="$(swift build --product ADHTMLFuzz --show-bin-path)/ADHTMLFuzz"
+          BIN="$(swift build --build-system native --product ADHTMLFuzz --show-bin-path)/ADHTMLFuzz"
           mkdir -p corpus
           printf '<a href="javascript:alert(1)">x</a>' > corpus/seed.html
           "$BIN" corpus -max_total_time=180 -timeout=10 -rss_limit_mb=2048 -artifact_prefix=crash-
@@ -155,7 +157,7 @@ jobs:
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
       - name: Build DocC (warnings as errors)
         run: |
-          swift package --allow-writing-to-directory "$PWD/_docs_check" \
+          swift package --build-system native --allow-writing-to-directory "$PWD/_docs_check" \
             generate-documentation \
             --enable-experimental-combined-documentation \
             --target ADHTMLCore --target ADHTML \
