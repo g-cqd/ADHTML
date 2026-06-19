@@ -120,9 +120,10 @@ let package = Package(
             swiftSettings: strictSettings,
             plugins: buildPlugins),
 
-        // Umbrella: re-exports the core, adds document assembly. It will depend on ADHTMLMacros once it
-        // *uses* a macro (ADR-0008); a library that depends on a macro target it does not use gets the
-        // plugin mislinked into consumers, so the dependency is added with the first macro, not before.
+        // Umbrella: re-exports the core, adds document assembly. The macro declarations + the
+        // ADHTMLMacros dependency are DEFERRED: on the current Xcode-beta toolchain, a test target that
+        // transitively depends on a `.macro` target fails to link (the macro module is pulled into the
+        // test bundle). The macros land once that SwiftPM/toolchain issue is resolved (ADR-0008).
         .target(
             name: "ADHTML",
             dependencies: ["ADHTMLCore"],
