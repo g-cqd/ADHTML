@@ -13,16 +13,16 @@ public protocol HTMLByteSink {
 extension HTMLByteSink {
     /// Append an array of bytes.
     @inlinable public mutating func write(_ bytes: [UInt8]) {
-        bytes.withUnsafeBufferPointer { write($0) }
+        bytes.withUnsafeBufferPointer { unsafe write($0) }
     }
     /// Append a static string's UTF-8 (entity literals, tag names).
     @inlinable public mutating func writeStatic(_ string: StaticString) {
-        string.withUTF8Buffer { write($0) }
+        string.withUTF8Buffer { unsafe write($0) }
     }
     /// Append a string's UTF-8 verbatim (caller ensures it is already safe in context).
     @inlinable public mutating func writeUTF8(_ string: String) {
         var copy = string
-        copy.withUTF8 { write($0) }
+        copy.withUTF8 { unsafe write($0) }
     }
 }
 
@@ -35,7 +35,7 @@ public struct ArraySink: HTMLByteSink {
     }
     public mutating func writeByte(_ byte: UInt8) { bytes.append(byte) }
     public mutating func write(_ buffer: UnsafeBufferPointer<UInt8>) {
-        bytes.append(contentsOf: buffer)
+        unsafe bytes.append(contentsOf: buffer)
     }
     /// Empty the buffer while keeping its allocation — lets the async renderer reuse one chunk buffer.
     public mutating func reset() { bytes.removeAll(keepingCapacity: true) }

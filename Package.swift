@@ -15,6 +15,13 @@ let strictSettings: [SwiftSetting] = [
     .enableUpcomingFeature("MemberImportVisibility")
 ]
 
+// ADHTMLCore additionally enables strict memory safety (SE-0458) + the compile-time-only `Lifetimes`
+// feature (no runtime-floor impact; mirrors ADFoundation's kernel settings), so the engine's few unsafe
+// ops are `unsafe`-annotated + lifetime-proven rather than convention-documented. Span/RawSpan back-deploy
+// below the macOS-15 floor; UTF8Span / InlineArray (2025-SDK-gated) deliberately stay out.
+let coreSettings: [SwiftSetting] =
+    strictSettings + [.strictMemorySafety(), .enableExperimentalFeature("Lifetimes")]
+
 // Compile-time type-check timing warnings (flag slow expressions / function bodies). These use unsafe
 // flags, which would block version-based dependency resolution if placed on the library, so they live
 // only on internal (non-exported) test + benchmark + fuzz targets.
@@ -135,7 +142,7 @@ let package = Package(
         .target(
             name: "ADHTMLCore",
             dependencies: [orderedCollections, adfCore, adjsonCore],
-            swiftSettings: strictSettings,
+            swiftSettings: coreSettings,
             plugins: buildPlugins),
 
         // Umbrella: re-exports the core, declares the macros (impl in ADHTMLMacros), adds document

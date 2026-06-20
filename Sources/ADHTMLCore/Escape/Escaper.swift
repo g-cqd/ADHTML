@@ -45,7 +45,7 @@ public enum Escaper {
             while index < count {
                 // SWAR: skip whole 8-byte words with no escapable byte; jump straight to the first one.
                 while index + 8 <= count {
-                    let mask = Self.escapeStopMask(raw.loadLE64(index), escapeQuotes: escapeQuotes)
+                    let mask = Self.escapeStopMask(unsafe raw.loadLE64(index), escapeQuotes: escapeQuotes)
                     if mask == 0 {
                         index += 8
                         continue
@@ -56,7 +56,7 @@ public enum Escaper {
                 guard index < count else { break }
 
                 let entity: StaticString?
-                switch buffer[index] {
+                switch unsafe buffer[index] {
                     case 0x26: entity = "&amp;"  // &
                     case 0x3C: entity = "&lt;"  // <
                     case 0x3E: entity = "&gt;"  // >
@@ -65,13 +65,17 @@ public enum Escaper {
                     default: entity = nil
                 }
                 if let entity {
-                    if index > runStart { sink.write(UnsafeBufferPointer(rebasing: buffer[runStart ..< index])) }
+                    if index > runStart {
+                        unsafe sink.write(UnsafeBufferPointer(rebasing: buffer[runStart ..< index]))
+                    }
                     sink.writeStatic(entity)
                     runStart = index + 1
                 }
                 index += 1
             }
-            if count > runStart { sink.write(UnsafeBufferPointer(rebasing: buffer[runStart ..< count])) }
+            if count > runStart {
+                unsafe sink.write(UnsafeBufferPointer(rebasing: buffer[runStart ..< count]))
+            }
         }
     }
 

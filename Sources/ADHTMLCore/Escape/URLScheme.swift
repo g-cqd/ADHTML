@@ -11,14 +11,14 @@ public enum URLScheme {
         return copy.withUTF8 { buffer -> Bool in
             var index = 0
             // Skip leading whitespace / control bytes (defends `\tjavascript:` style obfuscation).
-            while index < buffer.count, buffer[index] <= 0x20 { index += 1 }
+            while index < buffer.count, unsafe buffer[index] <= 0x20 { index += 1 }
 
             // Scan for a scheme: alphanumerics + `+`/`-`/`.` up to a ':'. Stop early at a path/query/
             // fragment delimiter — that means the URL is relative (no scheme), which is safe.
             var cursor = index
             var colon = -1
             while cursor < buffer.count {
-                let byte = buffer[cursor]
+                let byte = unsafe buffer[cursor]
                 if byte == 0x3A {  // ':'
                     colon = cursor
                     break
@@ -31,7 +31,7 @@ public enum URLScheme {
             }
             guard colon >= 0 else { return true }  // no scheme → relative → safe
 
-            return schemeIsAllowed(buffer, start: index, end: colon)
+            return unsafe schemeIsAllowed(buffer, start: index, end: colon)
         }
     }
 
@@ -43,7 +43,7 @@ public enum URLScheme {
         lowered.reserveCapacity(end - start)
         var index = start
         while index < end {
-            let byte = buffer[index]
+            let byte = unsafe buffer[index]
             lowered.append(ASCII.isUppercase(byte) ? byte &+ 0x20 : byte)
             index += 1
         }
