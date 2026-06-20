@@ -12,12 +12,13 @@ compiles as one unit*. `swift build` is the template compiler.
 > context-aware escaping, fine-grained **reactivity**, resumable **islands + hydration**, the **wire
 > format**, the `@Component`/`@State`/`#attr` **macros**, streaming, **SRI**, and the 2.2 KiB **client
 > runtime** are all implemented and covered by **61 Swift tests** + the JS runtime suite (`ADR-0013` is
-> the authoritative status; the design corpus is 6 RFCs + 15 ADRs under [`docs/`](docs/)). The one piece
-> still **planned** is the **ADServe transport bridge** (`ADHTMLNIO`: streaming response + SSE), which
-> needs ADServe's view-support work (spare-parts-app ADR-0046). **Adopt it today via buffered SSR:**
-> render with `renderBytes()` (static) or `renderHydratable(arena:)` (islands + inline state + runtime)
-> and return the bytes as an ADServe `.html` / `.raw` (`text/html`) response — only live SSE
-> `patch`/`morph` updates wait on the bridge.
+> the authoritative status; the design corpus is 7 RFCs + 15 ADRs under [`docs/`](docs/)). The one piece
+> still **planned** is the small **`ADHTMLNIO` bridge** — a thin forwarder to ADServe's *already-shipped*
+> `.html` / `.stream` / `.sse` / `Static` / `CSPNonce` (a ground-truth audit found ADServe's transport
+> primitives complete; **no further ADServe work is required** — see [RFC-0007](docs/rfcs/0007-production-readiness-roadmap.md)).
+> **Adopt it today via buffered SSR:** render with `renderBytes()` (static) or `renderHydratable(arena:)`
+> (islands + inline state + runtime) and return the bytes as an ADServe `.html` (`text/html`) response —
+> only live SSE `patch`/`morph` updates wait on the bridge.
 
 ## Why
 
@@ -73,7 +74,7 @@ Text is **escaped by default** in the correct context; raw insertion is the sing
 | `ADHTMLMacros` | `.macro` target (`@Component`/`@State`/`#attr`) | — | **implemented** |
 | `ADHTMLSRI` | Subresource-Integrity hashing of the client runtime (swift-crypto) | `ADHTML_SRI` | **implemented** (gated) |
 | `ADHTMLFuzz` | libFuzzer harness for the escaper (Linux) | `ADHTML_FUZZ` | **implemented** (gated) |
-| `ADHTMLNIO` | NIO `ByteBuffer` byte-sink + ADServe response/SSE bridge | `ADHTML_NIO` | planned (ADServe, ADR-0012) |
+| `ADHTMLNIO` | NIO `ByteBuffer` byte-sink + ADServe response/SSE bridge | `ADHTML_NIO` | planned — thin forwarder; ADServe transport ready (RFC-0007) |
 | `ADHTMLMarkdown` | Markdown → ADHTML nodes (swift-markdown) | `ADHTML_MARKDOWN` | planned (placeholder) |
 | `ADHTMLObservability` | Render-path logging/metrics/tracing | `ADHTML_OBS` | planned (placeholder) |
 

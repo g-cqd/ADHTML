@@ -1,8 +1,19 @@
 # What ADHTML needs from ADServe
 
-- **Status**: Proposed (requirements)
-- **Date**: 2026-06-20
-- **Related**: ADHTML ADR-0012 (ADServe integration), ADR-0006 (client runtime), RFC-0003 (reactivity/hydration); spare-parts-app ADR-0046 (ADServe view & streaming support). Grounded in `ADServe/Sources/ADServeCore/ADServeCore.swift` + `HTTPServer.swift` + `Middleware.swift`.
+- **Status**: ✅ **Satisfied** — a ground-truth audit of ADServe (`feat/production-complete`, 105 tests
+  green, 2026-06-20) found **all six** capabilities below are **already implemented**. The remaining work
+  is the ADHTML-side **`ADHTMLNIO` bridge** (a thin forwarder), tracked in **RFC-0007** (production-
+  readiness roadmap, §3). This document is kept as the capability contract + verification checklist.
+- **Date**: 2026-06-20 (status corrected after audit; the original draft listed these as "Missing").
+- **Related**: ADHTML ADR-0012, ADR-0006, RFC-0003, **RFC-0007**. Grounded in the actual ADServe
+  `ADServeCore.swift` (`ResponseContent`, `ResponseBodyWriter`, `SSEWriter`), `ServerDSL.swift`
+  (`Static`/`File`), `Middleware.swift` (`CSPNonce`). NOTE: there is **no ADR-0046 in ADServe** — its
+  design intent lives in code comments + commit milestones (M0–M3), not numbered ADRs.
+
+> **Correction:** the original draft of this file (and the §1–§6 "Add this" snippets below) predated
+> ADServe's M0–M3 work and described these as missing. They are **shipped** — ADServe even shaped
+> `ResponseBodyWriter.write(_ [UInt8])` to match ADHTML's `AsyncHTMLByteSink.write(_:)` 1:1 so the bridge
+> is a direct forwarder. Read §1–§6 as "the shipped contract," not "to-do."
 
 This is the contract ADHTML needs the **host** (ADServe) to provide. ADHTML renders bytes and emits a
 hydration wire format + a static client runtime; **ADServe transports them**. The split is deliberate
@@ -11,17 +22,18 @@ SSE, and static files.
 
 ## TL;DR
 
-| # | Capability | Why ADHTML needs it | ADServe today | Priority / effort |
+| # | Capability | Why ADHTML needs it | ADServe today | ADHTML-side bridge work |
 | --- | --- | --- | --- | --- |
-| 1 | `text/html` `MediaType` (+ `.html(_:)` convenience) | Serve rendered pages/fragments with the right content-type | **Missing** (`MediaType` has json/css/… not html) | **P0 / trivial** |
-| 2 | Streaming response (back-pressured byte sink) | Flush `<head>`/early markup + stream `AsyncForEach` rows (TTFB; bounded memory) | **Missing** (every response is one buffered `[UInt8]`) | **P1 / medium** |
-| 3 | Server-Sent Events (`text/event-stream`) | Push live `morph`/`patch` updates to islands (RFC-0003) | **Missing** | **P1 / medium** |
-| 4 | Guarded static-asset serving | Serve the `adh-runtime.min.js` (+ CSS, SVGs) with ETag/Cache-Control/SRI | **Missing** (no static handler) | **P1 / medium** |
-| 5 | Async handler path | #2 and #3 are inherently async (await the sequence; back-pressured writes) | Handler `run` is **sync** (`(HandlerInput) throws -> ResponseContent`) | **P1 / medium** |
-| 6 | Per-request CSP nonce | Allow the inline `<script type="application/adh-state+json">` + the runtime under a strict CSP | `SecurityHeaders` exists; no per-request nonce | **P1 / small** |
+| 1 | `text/html` `MediaType` (+ `.html(_:)`) | Serve pages/fragments with the right content-type | ✅ `MediaType.html` + `.html(_:status:)` | use it |
+| 2 | Streaming response (back-pressured byte sink) | Flush `<head>` + stream rows (TTFB; bounded memory) | ✅ `.stream` + `ResponseBodyWriter.write(_ [UInt8])` (matches our sink 1:1) | forward `AsyncHTMLByteSink` → writer |
+| 3 | Server-Sent Events (`text/event-stream`) | Push live `morph`/`patch` to islands (RFC-0003) | ✅ `.sse` + `SSEWriter` (framing, heartbeat, disconnect-cancel, limit) | drive frames from the change feed |
+| 4 | Guarded static-asset serving | Serve `adh-runtime.min.js` (+CSS/SVG) with ETag/304/SRI | ✅ `Static`/`File` (ETag/Range/precompressed/jail; `js`/`mjs`/`wasm` allow-listed) | `Static("/assets", root:)` |
+| 5 | Async handler path | #2/#3 are async | ✅ async lives in the `.stream`/`.sse` body closures + middleware (handlers stay sync by design) | render inside the async body |
+| 6 | Per-request CSP nonce | Inline state `<script>` + runtime under a strict CSP | ✅ `CSPNonce` middleware + `strictHydrationPolicy` + `CSPNonceKey` storage | read the nonce, stamp `<script nonce>` |
 
-P0 unblocks **buffered SSR today**; P1 unblocks the **streaming + live + interactive** stack. Until P1
-lands, ADHTML works fully via buffered `.raw(text/html)` (just no streaming/SSE/served-runtime).
+**All six are implemented in ADServe.** Buffered SSR works today via `.html(_:)`; streaming, live SSE,
+and served runtime work as soon as the **`ADHTMLNIO` bridge** (RFC-0007 §3) forwards bytes — no ADServe
+change required.
 
 ## 0. What already works (no ADServe change)
 
