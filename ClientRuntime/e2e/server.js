@@ -68,15 +68,67 @@ const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf<
 
 const PORT = Number(process.env.PORT ?? 3000);
 
+// The reactive-hypermedia (RFC-0019) Action-layer fixture: a live-search input that fetches a fragment
+// and morphs #rows, and an Island(connect:) that subscribes to an SSE morph stream. Exercises the real
+// network + real EventSource paths the happy-dom unit tests can't. The islands are in the inline state so
+// the delegated listener treats them as wired.
+const ACTIONS_STATE = JSON.stringify({
+  v: 1,
+  cells: [],
+  islands: [
+    { id: "search-isle", on: "load", scope: [] },
+    { id: "live", on: "load", scope: [] },
+  ],
+});
+const ACTIONS_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>actions</title></head><body>
+  <div data-adh-island data-adh-id="search-isle" data-adh-on="load">
+    <input id="q" name="q" data-adh-action="get" data-adh-url="/rows"
+           data-adh-trigger="input" data-adh-debounce="30" data-adh-target="rows">
+  </div>
+  <ul id="rows"><li id="r-initial">initial</li></ul>
+  <div data-adh-island data-adh-id="live" data-adh-on="load" data-adh-connect="/stream">
+    <span id="live-text">waiting</span>
+  </div>
+  <script type="application/adh-state+json" id="adh-state">${ACTIONS_STATE}</script>
+  <script type="module" src="/adh-runtime.min.js"></script>
+</body></html>`;
+
+/** Minimal HTML-escape for the reflected query (the fixture mirrors the server's escape-by-default). */
+function escapeHtml(value) {
+  return value.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+}
+
 Bun.serve({
   port: PORT,
   fetch(req) {
-    const path = new URL(req.url).pathname;
+    const url = new URL(req.url);
+    const path = url.pathname;
     if (path === "/") {
       return new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
     }
     if (path === "/perf") {
       return new Response(PERF_PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    if (path === "/actions") {
+      return new Response(ACTIONS_PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    if (path === "/rows") {
+      // Fragment: filtered rows reflecting the query (the morph target's new children).
+      const q = url.searchParams.get("q") ?? "";
+      const body = `<li id="r1">match: ${escapeHtml(q)}</li><li id="r2">row two</li>`;
+      return new Response(body, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    if (path === "/stream") {
+      // SSE: push one `morph` frame for island #live shortly after the runtime connects.
+      const stream = new ReadableStream({
+        start(controller) {
+          const data = JSON.stringify({ id: "live", html: '<span id="live-text">pushed</span>' });
+          setTimeout(() => controller.enqueue(new TextEncoder().encode(`event: morph\ndata: ${data}\n\n`)), 50);
+        },
+      });
+      return new Response(stream, {
+        headers: { "content-type": "text/event-stream", "cache-control": "no-cache" },
+      });
     }
     if (path === "/adh-runtime.min.js") {
       return new Response(Bun.file("adh-runtime.min.js"), { headers: { "content-type": "text/javascript" } });
