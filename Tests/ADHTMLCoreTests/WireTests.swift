@@ -2,10 +2,9 @@ import Testing
 
 @testable import ADHTMLCore
 
-@Suite("Wire serialization")
 struct WireTests {
-    @Test("a counter renders island markup plus a scoped state script")
-    func counterEndToEnd() throws {
+    @Test
+    func `a counter renders island markup plus a scoped state script`() throws {
         let arena = CellArena()
         let count = arena.signal(0)
         let view = Island("counter", on: .visible, scope: [count.id]) {
@@ -26,8 +25,8 @@ struct WireTests {
         #expect(html.hasSuffix("</script>"))
     }
 
-    @Test("non-island state never reaches the wire (the data-leak guard)")
-    func dataLeakGuard() throws {
+    @Test
+    func `non-island state never reaches the wire (the data-leak guard)`() throws {
         let arena = CellArena()
         _ = arena.signal("TOP_SECRET")  // not in any island scope
         let shown = arena.signal(7)
@@ -38,8 +37,8 @@ struct WireTests {
         #expect(html.contains(#""v":7"#))
     }
 
-    @Test("a computed pulls its dependencies into scope and re-indexes refs")
-    func computedReachability() throws {
+    @Test
+    func `a computed pulls its dependencies into scope and re-indexes refs`() throws {
         let arena = CellArena()
         let a = arena.signal(1)
         let doubled = arena.computed { a.value * 2 }
@@ -51,8 +50,8 @@ struct WireTests {
         #expect(html.contains(#""v":2"#))
     }
 
-    @Test("a </script> in state is escaped and cannot break out")
-    func scriptBreakout() throws {
+    @Test
+    func `a </script> in state is escaped and cannot break out`() throws {
         let arena = CellArena()
         let evil = arena.signal("</script><script>alert(1)</script>")
         let view = Island("i", scope: [evil.id]) { span { "" } }
@@ -63,8 +62,8 @@ struct WireTests {
         #expect(html.hasSuffix("</script>"))  // only the legitimate closer remains
     }
 
-    @Test("a nested-array cell value serializes (iterative WireValue -> JSON, no recursion)")
-    func nestedArrayValue() throws {
+    @Test
+    func `a nested-array cell value serializes (iterative WireValue -> JSON, no recursion)`() throws {
         let arena = CellArena()
         let matrix = arena.signal([[1, 2], [3]])
         let view = Island("i", scope: [matrix.id]) { span { "" } }
@@ -72,8 +71,8 @@ struct WireTests {
         #expect(html.contains(#""v":[[1,2],[3]]"#))
     }
 
-    @Test("array nesting past the depth cap throws (failure-safe, never a stack crash)")
-    func depthCap() {
+    @Test
+    func `array nesting past the depth cap throws (failure-safe, never a stack crash)`() {
         var deep: WireValue = .int(0)
         for _ in 0 ... (WireSerializer.maxValueDepth + 4) { deep = .array([deep]) }
         let cell = CellArena.Cell(id: CellID(0), kind: .signal, value: deep)
@@ -83,8 +82,8 @@ struct WireTests {
         }
     }
 
-    @Test("an event binding emits data-adh-on with behavior#cell#param")
-    func eventBinding() throws {
+    @Test
+    func `an event binding emits data-adh-on with behavior#cell#param`() throws {
         let arena = CellArena()
         let count = arena.signal(0)
         let view = Island("c", scope: [count.id]) {
