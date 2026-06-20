@@ -61,4 +61,16 @@ struct HTMLExtractTests {
         #expect([node].firstElement(matching: "#main") != nil)
         #expect([node].firstElement(matching: ".b") != nil)
     }
+
+    @Test func linkResolverThreadsIntoMarkdownSections() {
+        let extracted = HTMLDocument.extract(
+            "<main><h2>S</h2><p>see <a href=\"/x\">link</a> and <a href=\"http://ext\">ext</a></p></main>",
+            preserveStructure: true,
+            linkResolver: { href in
+                if href == "/x" { return "/docs/x" }  // rewrite internal
+                if href.hasPrefix("http://ext") { return nil }  // drop external, keep text
+                return href
+            })
+        #expect(extracted.sections[0].content == "see [link](/docs/x) and ext")
+    }
 }

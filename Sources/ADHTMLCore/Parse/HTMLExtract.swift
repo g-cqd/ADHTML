@@ -93,8 +93,10 @@ public enum HTMLDocument {
     ///   - containerSelector: an explicit content-container selector (`tag` / `.class` / `#id`); when
     ///     nil, falls back to `main`, `article`, `.content`, `#content`, `#contents`, then `body`.
     ///   - preserveStructure: render section bodies as Markdown (true) or plain text (false).
+    ///   - linkResolver: rewrites each `<a href>` when rendering Markdown (see `HTMLNode.markdown`).
     public static func extract(
-        _ html: String, containerSelector: String? = nil, preserveStructure: Bool = false
+        _ html: String, containerSelector: String? = nil, preserveStructure: Bool = false,
+        linkResolver: ((String) -> String?)? = nil
     ) -> HTMLExtractedContent {
         let roots = HTMLNode.parse(html)
 
@@ -118,7 +120,7 @@ public enum HTMLDocument {
             ?? roots.firstElement(matching: "body")?.children
             ?? roots
 
-        let sections = splitSections(body, preserveStructure: preserveStructure)
+        let sections = splitSections(body, preserveStructure: preserveStructure, linkResolver: linkResolver)
         return HTMLExtractedContent(title: title, description: description, sections: sections)
     }
 }
@@ -141,11 +143,13 @@ private func meta(_ roots: [HTMLNode], _ match: (HTMLNode) -> Bool) -> String? {
 }
 
 /// Split a body (the content container's children) at h2 (h3 fallback) into sections.
-private func splitSections(_ body: [HTMLNode], preserveStructure: Bool) -> [HTMLSection] {
+private func splitSections(
+    _ body: [HTMLNode], preserveStructure: Bool, linkResolver: ((String) -> String?)?
+) -> [HTMLSection] {
     let splitTag = body.elements(tag: "h2").isEmpty ? "h3" : "h2"
 
     func render(_ nodes: [HTMLNode]) -> String {
-        preserveStructure ? nodes.markdown() : nodes.plainText()
+        preserveStructure ? nodes.markdown(linkResolver: linkResolver) : nodes.plainText()
     }
 
     var sections: [HTMLSection] = []
