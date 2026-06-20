@@ -62,6 +62,32 @@ struct ExpressionOpsTests {
     }
 
     @Test
+    func `filter serializes a fl/p node with an element-bound predicate and filters the server value`()
+        throws
+    {
+        let arena = CellArena()
+        let items = arena.signal(["Apple", "apricot", "Banana"])  // id 0
+        let query = arena.signal("ap")  // id 1
+        // The combobox suggestion filter: items.filter { it.lowercased().contains(query.lowercased()) }.
+        let filtered = items.reactive.filter { $0.lowercased().contains(query.reactive.lowercased()) }
+        #expect(filtered.value == ["Apple", "apricot"])  // server-side filter via eager .value
+        #expect(
+            try rendered(filtered)
+                .contains(
+                    #""e":{"fl":{"c":0},"p":{"o":"has","l":{"u":"lc","x":{"el":1}},"r":{"u":"lc","x":{"c":1}}}}"#))
+    }
+
+    @Test
+    func `filtered count composes for a listMove bound`() {
+        let arena = CellArena()
+        let items = arena.signal(["a", "ab", "b"])
+        let query = arena.signal("a")
+        let filtered = items.reactive.filter { $0.contains(query.reactive) }
+        #expect(filtered.value == ["a", "ab"])
+        #expect(filtered.count.value == 2)  // .count over the filtered reactive — the keyboard-nav bound
+    }
+
+    @Test
     func `the unary and binary op sets are closed and match the client evaluator (parity)`() {
         #expect(UnaryOp.allCases.map(\.rawValue) == ["lc", "len"])
         #expect(

@@ -4,13 +4,14 @@
 // work + value stacks), matching the engine's no-recursion stance.
 
 /**
- * A serialized expression node: a cell ref `{c}`, a literal `{i|d|b|s}`, a binary `{o,l,r}`, or a unary
- * `{u,x}`.
- * @typedef {{c: number} | {i: number} | {d: number} | {b: boolean} | {s: string}
- *   | {o: string, l: WireExprJSON, r: WireExprJSON} | {u: string, x: WireExprJSON}} WireExprJSON
+ * A serialized expression node: a cell ref `{c}`, a literal `{i|d|b|s}`, a binary `{o,l,r}`, a unary
+ * `{u,x}`, the filter element `{el}`, or a filter `{fl,p}`.
+ * @typedef {{c: number} | {i: number} | {d: number} | {b: boolean} | {s: string} | {el: number}
+ *   | {o: string, l: WireExprJSON, r: WireExprJSON} | {u: string, x: WireExprJSON}
+ *   | {fl: WireExprJSON, p: WireExprJSON}} WireExprJSON
  */
 
-/** @typedef {{visit: WireExprJSON} | {fold: string} | {ufold: string}} Work */
+/** @typedef {{visit: WireExprJSON} | {fold: string} | {ufold: string} | {ffold: WireExprJSON}} Work */
 
 /** The binary op tokens this evaluator supports — must equal Swift `BinaryOp.rawValue` (parity test). */
 export const BINARY_OPS = ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "has"];
@@ -24,11 +25,13 @@ export const UNARY_OPS = ["lc", "len"];
 const MAX_EXPR_NODES = 4096;
 
 /** Evaluate `expr` over `cells`, reading each referenced cell via `.get()` so an enclosing effect
- * subscribes to it (reactive recompute). Iterative post-order.
+ * subscribes to it (reactive recompute). Iterative post-order. `element` is the bound item inside a
+ * `filter` predicate (the `{el}` node) — `filter` re-enters this evaluator per array item.
  * @param {WireExprJSON} expr
  * @param {Array<import("./signals").Signal<unknown>>} cells
+ * @param {unknown} [element]
  * @returns {unknown} */
-export function evalExpr(expr, cells) {
+export function evalExpr(expr, cells, element) {
   /** @type {Work[]} */
   const work = [{ visit: expr }];
   /** @type {unknown[]} */
@@ -44,10 +47,16 @@ export function evalExpr(expr, cells) {
       values.push(applyOp(item.fold, lhs, rhs));
     } else if ("ufold" in item) {
       values.push(applyUnary(item.ufold, values.pop()));
+    } else if ("ffold" in item) {
+      const array = values.pop();
+      const predicate = item.ffold;
+      values.push(Array.isArray(array) ? array.filter((el) => evalExpr(predicate, cells, el)) : array);
     } else {
       const node = item.visit;
       if ("o" in node) work.push({ fold: node.o }, { visit: node.r }, { visit: node.l });
       else if ("u" in node) work.push({ ufold: node.u }, { visit: node.x });
+      else if ("fl" in node) work.push({ ffold: node.p }, { visit: node.fl });
+      else if ("el" in node) values.push(element);
       else if ("c" in node) values.push(cells[node.c]?.get());
       else if ("i" in node) values.push(node.i);
       else if ("d" in node) values.push(node.d);

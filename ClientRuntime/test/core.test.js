@@ -156,6 +156,17 @@ test("evalExpr covers each binary op (parity with Swift BinaryOp.rawValue)", () 
   );
 });
 
+test("P5 filter keeps matching elements via an element-bound predicate (recomputes on query change)", () => {
+  const cells = [new Signal(["Apple", "apricot", "Banana"]), new Signal("ap")];
+  // items.filter(el => el.lowercased().contains(query.lowercased()))
+  const expr = { fl: { c: 0 }, p: { o: "has", l: { u: "lc", x: { el: 1 } }, r: { u: "lc", x: { c: 1 } } } };
+  expect(evalExpr(expr, cells)).toEqual(["Apple", "apricot"]);
+  cells[1].set("ban");
+  expect(evalExpr(expr, cells)).toEqual(["Banana"]);
+  // count of the filtered result (len over filter) — the listMove keyboard bound
+  expect(evalExpr({ u: "len", x: expr }, cells)).toBe(1);
+});
+
 test("evalExpr covers the P5 ops: lc/len unary, has binary (parity with Swift UnaryOp/BinaryOp)", () => {
   const cells = [new Signal("Hello"), new Signal(["a", "b", "c"])];
   expect(evalExpr({ u: "lc", x: { c: 0 } }, cells)).toBe("hello");

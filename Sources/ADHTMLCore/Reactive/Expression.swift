@@ -21,6 +21,11 @@ public enum WireExpr: Sendable, Equatable {
     indirect case binary(BinaryOp, WireExpr, WireExpr)
     /// A unary operation over one sub-expression (P5: `lowercased`, `count`).
     indirect case unary(UnaryOp, WireExpr)
+    /// The current element inside a `filter` predicate (P5) — the loop variable, bound per array item.
+    case element
+    /// Keep the array elements (first operand) for which the predicate (second operand) is truthy. The
+    /// predicate references ``element``; it is NOT pre-evaluated — the client runs it per item (P5).
+    indirect case filter(WireExpr, WireExpr)
 }
 
 /// The closed unary operator set (P5). Raw values are the wire tokens; the client evaluator mirrors them
@@ -68,6 +73,9 @@ extension WireExpr {
                     stack.append(rhs)
                 case .unary(_, let operand):
                     stack.append(operand)
+                case .filter(let array, let predicate):
+                    stack.append(array)
+                    stack.append(predicate)
                 default: break
             }
         }
@@ -192,6 +200,16 @@ extension Reactive where Value == [String] {
     /// Whether this array reactive contains `element` → `Reactive<Bool>` (exact-match / "add new" guard).
     public func contains(_ element: Reactive<String>) -> Reactive<Bool> {
         Reactive<Bool>(.binary(.contains, expr, element.expr), value.contains(element.value))
+    }
+
+    /// Keep the elements for which `predicate` (a closure over the current element) is true —
+    /// client-recomputable (P5). The predicate is built once with the element marker (for the wire) and
+    /// run per actual element (for the initial server value). The combobox suggestion filter:
+    /// `items.filter { $0.lowercased().contains(query.lowercased()) }`.
+    public func filter(_ predicate: (Reactive<String>) -> Reactive<Bool>) -> Reactive<[String]> {
+        let wirePredicate = predicate(Reactive<String>(.element, "")).expr
+        let filtered = value.filter { predicate(Reactive<String>(.element, $0)).value }
+        return Reactive<[String]>(.filter(expr, wirePredicate), filtered)
     }
 }
 

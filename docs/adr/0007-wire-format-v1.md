@@ -58,3 +58,9 @@ no `eval`:
   it directly.
 - `highlight(text, query)` is a runtime helper (not a wire node): it emits **escaped** text with the match
   wrapped in a literal `<mark>` — XSS-safe, no `RawHTML`, no user markup reaches the DOM (unit-tested).
+- **`filter` + `element`** (P5, the combobox filter): `{"fl":<array>,"p":<predicate>}` keeps the array
+  elements for which the predicate is truthy; the predicate references the current item as `{"el":1}`. The
+  predicate is **not** pre-evaluated — the client re-enters the evaluator per item with the element bound
+  (the evaluator gains an `element` parameter). Swift's eager `Reactive.value` computes the same filter
+  server-side (it runs the predicate builder per element), so SSR and the client agree. `count` over a
+  `filter` is the live bound for `listMove` keyboard navigation — the declarative combobox path.
