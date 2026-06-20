@@ -30,15 +30,16 @@ public enum WireSerializer {
         }
     }
 
-    /// Build the wire payload as a `JSONValue` (internal; `scriptBytes` is the public entry).
-    static func payload(cells: [CellArena.Cell], islands: [WireIsland]) -> JSONValue {
+    /// Build the wire payload as a `JSONValue` (internal; `scriptBytes` is the public entry). Throws if a
+    /// cell value's array nesting exceeds the serializer's depth cap (failure-safe, never a stack crash).
+    static func payload(cells: [CellArena.Cell], islands: [WireIsland]) throws(WireError) -> JSONValue {
         let reachable = reachableCells(cells: cells, islands: islands)
         let oldToNew = reindex(cellCount: cells.count, reachable: reachable)
 
         var cellsJSON: [JSONValue] = []
         cellsJSON.reserveCapacity(oldToNew.count)
         for index in 0 ..< cells.count where reachable.contains(index) {
-            cellsJSON.append(encodeCell(cells[index], oldToNew: oldToNew))
+            cellsJSON.append(try encodeCell(cells[index], oldToNew: oldToNew))
         }
 
         var islandsJSON: [JSONValue] = []
@@ -84,16 +85,18 @@ public enum WireSerializer {
 
     // MARK: - Encoding
 
-    private static func encodeCell(_ cell: CellArena.Cell, oldToNew: [Int: Int]) -> JSONValue {
+    private static func encodeCell(
+        _ cell: CellArena.Cell, oldToNew: [Int: Int]
+    ) throws(WireError) -> JSONValue {
         var object = OrderedDictionary<String, JSONValue>()
         switch cell.kind {
             case .signal:
                 object["$"] = .string("sig")
-                object["v"] = json(cell.value)
+                object["v"] = try json(cell.value)
             case .computed(let dependencies):
                 object["$"] = .string("cmp")
                 object["d"] = .array(remap(dependencies, oldToNew))
-                object["v"] = json(cell.value)
+                object["v"] = try json(cell.value)
         }
         return .object(object)
     }
@@ -110,15 +113,57 @@ public enum WireSerializer {
         ids.compactMap { oldToNew[Int($0.raw)] }.map { .int(Int64($0)) }
     }
 
-    /// Bridge a (shallow) cell value to ADJSON's `JSONValue`. Bounded by the value's own nesting.
-    private static func json(_ value: WireValue) -> JSONValue {
+    /// The deepest `WireValue` array nesting the serializer will encode. A value past this throws (a
+    /// failure-safe ceiling) instead of risking a deep walk — the array nesting is author-bounded, so
+    /// this is generous; the cap exists only so adversarial/buggy input can never run away.
+    static let maxValueDepth = 64
+
+    /// Bridge a cell value to ADJSON's `JSONValue`. Scalars convert directly (the overwhelming common
+    /// case); nested arrays are converted with an **explicit stack** (no recursion, ADR-0002) and a
+    /// depth cap. Post-order: a frame collects its converted children, then folds to a `.array` and
+    /// hands it to its parent.
+    private static func json(_ value: WireValue) throws(WireError) -> JSONValue {
+        if let leaf = scalarJSON(value) { return leaf }
+        guard case .array(let rootElements) = value else { return .null }  // unreachable: non-scalar = array
+
+        struct Frame {
+            let elements: [WireValue]
+            var index = 0
+            var built: [JSONValue] = []
+        }
+        var stack: [Frame] = [Frame(elements: rootElements)]
+        var result: JSONValue = .array([])
+
+        while let top = stack.indices.last {
+            if stack.count > Self.maxValueDepth {
+                throw WireError.encoding("wire value array nesting exceeds \(Self.maxValueDepth)")
+            }
+            if stack[top].index == stack[top].elements.count {
+                let folded = JSONValue.array(stack[top].built)
+                stack.removeLast()
+                if stack.isEmpty { result = folded } else { stack[stack.count - 1].built.append(folded) }
+                continue
+            }
+            let child = stack[top].elements[stack[top].index]
+            stack[top].index += 1
+            if let leaf = scalarJSON(child) {
+                stack[top].built.append(leaf)
+            } else if case .array(let childElements) = child {
+                stack.append(Frame(elements: childElements))
+            }
+        }
+        return result
+    }
+
+    /// A scalar `WireValue` as a `JSONValue`, or `nil` for `.array` (handled by the iterative folder).
+    private static func scalarJSON(_ value: WireValue) -> JSONValue? {
         switch value {
             case .null: .null
             case .bool(let bool): .bool(bool)
             case .int(let int): .int(int)
             case .double(let double): .number(double)
             case .string(let string): .string(string)
-            case .array(let array): .array(array.map(json))
+            case .array: nil
         }
     }
 }

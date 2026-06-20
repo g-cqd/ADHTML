@@ -63,6 +63,26 @@ struct WireTests {
         #expect(html.hasSuffix("</script>"))  // only the legitimate closer remains
     }
 
+    @Test("a nested-array cell value serializes (iterative WireValue -> JSON, no recursion)")
+    func nestedArrayValue() throws {
+        let arena = CellArena()
+        let matrix = arena.signal([[1, 2], [3]])
+        let view = Island("i", scope: [matrix.id]) { span { "" } }
+        let html = try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
+        #expect(html.contains(#""v":[[1,2],[3]]"#))
+    }
+
+    @Test("array nesting past the depth cap throws (failure-safe, never a stack crash)")
+    func depthCap() {
+        var deep: WireValue = .int(0)
+        for _ in 0 ... (WireSerializer.maxValueDepth + 4) { deep = .array([deep]) }
+        let cell = CellArena.Cell(id: CellID(0), kind: .signal, value: deep)
+        let island = WireIsland(id: "i", on: .load, scope: [CellID(0)])
+        #expect(throws: WireError.self) {
+            _ = try WireSerializer.payload(cells: [cell], islands: [island])
+        }
+    }
+
     @Test("an event binding emits data-adh-on with behavior#cell#param")
     func eventBinding() throws {
         let arena = CellArena()
