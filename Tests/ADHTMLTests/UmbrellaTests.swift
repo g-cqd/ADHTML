@@ -1,20 +1,19 @@
 import ADHTML
 import Testing
 
-@Suite("Umbrella")
 struct UmbrellaTests {
-    @Test("the re-exported DSL renders through the umbrella module")
-    func reexport() {
+    @Test
+    func `the re-exported DSL renders through the umbrella module`() {
         #expect(p { "x" }.render() == "<p>x</p>")
     }
 
-    @Test("HTMLDocument prefixes a doctype")
-    func document() {
+    @Test
+    func `HTMLDocument prefixes a doctype`() {
         #expect(HTMLDocument { div { "hi" } }.render() == "<!doctype html><div>hi</div>")
     }
 
-    @Test("the wire-format version is exposed")
-    func wireVersion() {
+    @Test
+    func `the wire-format version is exposed`() {
         #expect(ADHTMLCore.wireFormatVersion == 1)
     }
 }
