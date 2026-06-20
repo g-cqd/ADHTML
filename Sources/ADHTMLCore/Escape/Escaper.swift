@@ -32,19 +32,20 @@ public enum Escaper {
     /// HTML-entity-escape `value`. Always escapes `& < >`; also `" '` when `escapeQuotes` (attributes).
     /// A SWAR stop-mask fast-forwards over safe 8-byte words; each safe run is copied with a single bulk
     /// `write`, and an entity is emitted only at an escapable byte. Output is byte-identical to a per-byte
-    /// encoder. The one unsafe op — an unaligned `UInt64` load — is bounds-proven (`index + 8 <= count`),
-    /// confined to the `withUTF8` closure, and never escapes it (memory-safety checklist).
+    /// encoder. The unaligned word load goes through `ADFCore.loadLE64` — the family's audited, bounds-
+    /// caller-proven (`index + 8 <= count`) helper — so this file holds no hand-rolled raw-pointer
+    /// arithmetic; the raw view is confined to the `withUTF8` closure and never escapes it.
     static func writeEscaped(_ value: String, into sink: inout some HTMLByteSink, escapeQuotes: Bool) {
         var copy = value
         copy.withUTF8 { buffer in
-            guard let base = buffer.baseAddress else { return }
             let count = buffer.count
+            let raw = UnsafeRawBufferPointer(buffer)
             var runStart = 0
             var index = 0
             while index < count {
                 // SWAR: skip whole 8-byte words with no escapable byte; jump straight to the first one.
                 while index + 8 <= count {
-                    let word = UInt64(littleEndian: UnsafeRawPointer(base + index).loadUnaligned(as: UInt64.self))
+                    let word = raw.loadLE64(index)  // ADFCore: a single unaligned little-endian load
                     var mask = SWAR.equals(word, 0x26) | SWAR.equals(word, 0x3C) | SWAR.equals(word, 0x3E)
                     if escapeQuotes { mask |= SWAR.equals(word, 0x22) | SWAR.equals(word, 0x27) }
                     if mask == 0 {

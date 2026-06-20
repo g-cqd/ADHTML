@@ -54,6 +54,10 @@ let adtestkitDependency = adPackage(env: "ADTESTKIT_PATH", url: "https://github.
 var packageDependencies: [Package.Dependency] = [
     adfoundationDependency,
     adjsonDependency,
+    // ADTestKit is in the default graph now that the core + XSS test targets adopt it (property
+    // generators, allocation/round-trip oracles, constrained-stack no-recursion proofs). Test-only —
+    // library-product consumers never link it.
+    adtestkitDependency,
     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "603.0.0"),
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0")
 ]
@@ -71,10 +75,8 @@ if isNIO {
     // primitives (.html/.stream/.sse/Static/CSPNonce); ADHTMLNIO forwards ADHTML's AsyncHTMLByteSink to
     // ADServe's ResponseBodyWriter (both `[UInt8]`, shaped 1:1). Resolves from ADSERVE_PATH locally.
     packageDependencies.append(adPackage(env: "ADSERVE_PATH", url: "https://github.com/g-cqd/ADServe.git"))
-    // ADTestKit (AsyncEventProbe …) backs the gated ADHTMLNIOTests. Gated with the NIO target that uses
-    // it, so a default build doesn't resolve an unused dependency. Promote to the default graph when other
-    // test targets adopt it.
-    packageDependencies.append(adtestkitDependency)
+    // ADTestKit (AsyncEventProbe …) backs ADHTMLNIOTests; it now lives in the default graph (above), so
+    // the NIO block no longer appends it.
 }
 if isMarkdown {
     packageDependencies.append(.package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0"))
@@ -141,9 +143,15 @@ let package = Package(
             swiftSettings: strictSettings,
             plugins: buildPlugins),
 
-        .testTarget(name: "ADHTMLCoreTests", dependencies: ["ADHTMLCore"], swiftSettings: testSettings),
+        .testTarget(
+            name: "ADHTMLCoreTests",
+            dependencies: ["ADHTMLCore", .product(name: "ADTestKit", package: "ADTestKit")],
+            swiftSettings: testSettings),
         .testTarget(name: "ADHTMLTests", dependencies: ["ADHTML"], swiftSettings: testSettings),
-        .testTarget(name: "ADHTMLXSSTests", dependencies: ["ADHTMLCore"], swiftSettings: testSettings),
+        .testTarget(
+            name: "ADHTMLXSSTests",
+            dependencies: ["ADHTMLCore", .product(name: "ADTestKit", package: "ADTestKit")],
+            swiftSettings: testSettings),
 
         // The element/attribute table generator (ADR-0009). Run manually (`swift run ADHTMLCodegen`);
         // its output is committed under DOM/Generated. Not a product, so consumers never build it; it

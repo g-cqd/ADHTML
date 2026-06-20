@@ -172,7 +172,11 @@ export function connect(url, state, doc = document) {
     const data = /** @type {{cells?: Record<string, {v: unknown}>} | null} */ (parseEventData(event));
     if (!data) return;  // malformed frame -> drop the update, never throw out of the listener
     for (const [index, change] of Object.entries(data.cells ?? {})) {
-      state.cells[Number(index)]?.set(change.v);
+      // Bounds + integer guard: a non-index key (e.g. "__proto__"/"constructor") yields NaN and is
+      // ignored, and an out-of-range index can't write past the cell array. `state.cells` is a real Array
+      // (never an object literal), so this is defence-in-depth over an already-non-exploitable path.
+      const i = Number(index);
+      if (Number.isInteger(i) && i >= 0 && i < state.cells.length) state.cells[i]?.set(change.v);
     }
   });
   source.addEventListener("morph", (event) => {

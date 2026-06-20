@@ -14,6 +14,11 @@
 /** The binary op tokens this evaluator supports — must equal Swift `BinaryOp.rawValue` (parity test). */
 export const BINARY_OPS = ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||"];
 
+/** Failure-safe ceiling on the work the evaluator does for one formula — the client-side mirror of the
+ * server's `WireSerializer.maxValueDepth` cap. A well-formed `e` from the Swift DSL is tiny; this bounds an
+ * adversarial/oversized inline-state formula so a single recompute can't monopolize the main thread. */
+const MAX_EXPR_NODES = 4096;
+
 /** Evaluate `expr` over `cells`, reading each referenced cell via `.get()` so an enclosing effect
  * subscribes to it (reactive recompute). Iterative post-order.
  * @param {WireExprJSON} expr
@@ -26,7 +31,9 @@ export function evalExpr(expr, cells) {
   const values = [];
   /** @type {Work | undefined} */
   let item;
+  let steps = 0;
   while ((item = work.pop())) {
+    if (++steps > MAX_EXPR_NODES) return undefined;  // failure-safe: drop an oversized/adversarial formula
     if ("fold" in item) {
       const rhs = values.pop();
       const lhs = values.pop();

@@ -13,11 +13,13 @@ let hydrate;
 let actionTrigger;
 let ACTION_METHODS;
 let morph;
+let evalExpr;
 
 beforeAll(async () => {
   ({ hydrate } = await import("../src/runtime"));
   ({ actionTrigger, ACTION_METHODS } = await import("../src/action"));
   ({ morph } = await import("../src/morph"));
+  ({ evalExpr } = await import("../src/expr"));
 });
 
 /** The captured requests + the canned response for the current test. @type {{calls: any[]}} */
@@ -159,6 +161,31 @@ test("actionTrigger defaults: a <form> triggers on submit, anything else on clic
 test("ACTION_METHODS mirrors the Swift Action.methods verb set (parity)", () => {
   // Keep this identical to `Action.methods` in Sources/ADHTMLCore/Hydration/Action.swift.
   expect(ACTION_METHODS).toEqual(["get", "post", "put", "patch", "delete"]);
+});
+
+test("an oversized action response is dropped before the DOM is touched (failure-safe size cap)", async () => {
+  stubFetch("x".repeat(2 * 1024 * 1024 + 1));  // just over the 2 MiB cap
+  const doc = mount(`
+    <div data-adh-island data-adh-id="isle" data-adh-on="load">
+      <button data-adh-action="get" data-adh-url="/big" data-adh-target="rows">go</button>
+    </div>
+    <ul id="rows"><li id="keep">keep</li></ul>
+    <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
+
+  doc.querySelector("button").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  await flush();
+
+  expect(net.calls.length).toBe(1);  // it fetched...
+  expect(doc.getElementById("rows").innerHTML).toContain('id="keep"');  // ...but did not apply the oversized body
+});
+
+test("evalExpr bails (undefined) on an oversized formula — the node-count ceiling (DoS guard)", () => {
+  // A 5000-deep `+` chain exceeds MAX_EXPR_NODES (4096): the evaluator returns undefined instead of
+  // grinding. A small formula still evaluates — so the ceiling only trips on the adversarial case.
+  let formula = { i: 1 };
+  for (let depth = 0; depth < 5000; depth++) formula = { o: "+", l: formula, r: { i: 1 } };
+  expect(evalExpr(formula, [])).toBeUndefined();
+  expect(evalExpr({ o: "+", l: { i: 2 }, r: { i: 3 } }, [])).toBe(5);
 });
 
 test("morph-apply is inert — a <script> in the response never executes (RFC-0019 §6.3-J)", () => {

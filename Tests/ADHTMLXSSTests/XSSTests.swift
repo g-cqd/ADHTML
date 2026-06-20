@@ -79,4 +79,22 @@ struct XSSTests {
         #expect(!out.contains("<script"))
         #expect(out.contains("&quot;") && out.contains("&lt;"))
     }
+
+    // The `.css`/`.scriptJSON` value contexts are SAFE over-escape stubs (route through the attribute
+    // encoder until dedicated value encoders land, ADR-0003). Pin that contract: they must stay
+    // byte-identical to `.attribute` (so a future change can't silently weaken it) and never under-escape
+    // (no raw `<` or `"`), even on CSS/JS-specific breakers.
+    @Test(arguments: vectors + ["</style>", "</script>", "expression(", "*/", "`", "\u{2028}"])
+    func `css and scriptJSON contexts never under-escape (over-escape stub pinned)`(_ vector: String) {
+        func emit(_ context: EscapeContext) -> String {
+            var sink = ArraySink()
+            Escaper.write(vector, context: context, into: &sink)
+            return String(decoding: sink.bytes, as: UTF8.self)
+        }
+        let attribute = emit(.attribute)
+        #expect(emit(.css) == attribute)
+        #expect(emit(.scriptJSON) == attribute)
+        #expect(!emit(.css).contains("<"))
+        #expect(!emit(.css).contains("\""))
+    }
 }

@@ -13,6 +13,11 @@ import { morph, oobSwap } from "./morph";
  * the parity test only. @type {readonly string[]} */
 export const ACTION_METHODS = ["get", "post", "put", "patch", "delete"];
 
+/** Failure-safe ceiling on a single action response before it is applied to the DOM. A legitimate
+ * fragment is small; this drops an adversarial/oversized body (a server bug or a hostile origin) rather
+ * than feeding it to `<template>` parsing + morph — bounding the parse and the `oldById` map. */
+const MAX_RESPONSE_CHARS = 2 * 1024 * 1024;
+
 /** The event type that fires an action: explicit `data-adh-trigger`, else submit for a `<form>`, else click.
  * @param {Element} node @returns {string} */
 export function actionTrigger(node) {
@@ -102,5 +107,6 @@ async function perform(node, state, doc) {
   }
   if (!response.ok) return;
   const html = await response.text();
+  if (html.length > MAX_RESPONSE_CHARS) return;  // failure-safe: drop an oversized fragment, keep the page live
   applySwap(swap, html, targetId ? doc.getElementById(targetId) : null, doc);
 }

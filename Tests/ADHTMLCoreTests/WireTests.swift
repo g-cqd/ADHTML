@@ -24,15 +24,25 @@ struct WireTests {
         #expect(html.hasSuffix("</script>"))
     }
 
+    /// The exact inline-state JSON between the `adh-state` script tags — for byte-exact payload assertions
+    /// (a substring `.contains` would survive a key reorder, a wrong value elsewhere, or a missing field).
+    private static func inlineStatePayload(_ html: String) throws -> String {
+        // `firstRange(of:)` is stdlib (no Foundation — ADHTMLCore is Foundation-free, and the test target
+        // enables MemberImportVisibility). The payload escapes `<`, so the only literal `</script>` is the
+        // state closer.
+        let open = #"<script type="application/adh-state+json" id="adh-state">"#
+        let start = try #require(html.firstRange(of: open))
+        let rest = html[start.upperBound...]
+        let end = try #require(rest.firstRange(of: "</script>"))
+        return String(rest[..<end.lowerBound])
+    }
+
     @Test
-    func `a counter embeds a scoped state script`() throws {
-        let html = try renderedCounter()
-        #expect(html.contains(#"<script type="application/adh-state+json" id="adh-state">"#))
-        #expect(html.contains(#""v":1"#))
-        #expect(html.contains(#""$":"sig""#))
-        #expect(html.contains(#""id":"counter""#))
-        #expect(html.contains(#""on":"visible""#))
-        #expect(html.contains(#""scope":[0]"#))
+    func `a counter embeds the EXACT scoped state payload (not just substrings)`() throws {
+        let payload = try Self.inlineStatePayload(renderedCounter())
+        #expect(
+            payload == #"{"v":1,"cells":[{"$":"sig","v":0}],"#
+                + #""islands":[{"id":"counter","on":"visible","scope":[0]}]}"#)
     }
 
     @Test
@@ -82,14 +92,20 @@ struct WireTests {
     }
 
     @Test
-    func `array nesting past the depth cap throws (failure-safe, never a stack crash)`() {
-        var deep: WireValue = .int(0)
-        for _ in 0 ... (WireSerializer.maxValueDepth + 4) { deep = .array([deep]) }
-        let cell = CellArena.Cell(id: CellID(0), kind: .signal, value: deep)
-        let island = WireIsland(id: "i", on: .load, scope: [CellID(0)])
-        #expect(throws: WireError.self) {
-            _ = try WireSerializer.payload(cells: [cell], islands: [island])
+    func `array nesting is bounded exactly at the cap (failure-safe boundary, never a stack crash)`() {
+        func nested(_ depth: Int) -> WireValue {
+            var value: WireValue = .int(0)
+            for _ in 0 ..< depth { value = .array([value]) }
+            return value
         }
+        func serialize(_ value: WireValue) throws {
+            let cell = CellArena.Cell(id: CellID(0), kind: .signal, value: value)
+            _ = try WireSerializer.payload(cells: [cell], islands: [WireIsland(id: "i", on: .load, scope: [CellID(0)])])
+        }
+        let cap = WireSerializer.maxValueDepth
+        // At the cap: serializes. One deeper: throws (not a stack crash — the walk is iterative).
+        #expect(throws: Never.self) { try serialize(nested(cap)) }
+        #expect(throws: WireError.self) { try serialize(nested(cap + 1)) }
     }
 
     @Test

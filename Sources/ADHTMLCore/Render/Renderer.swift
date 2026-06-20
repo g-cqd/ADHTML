@@ -12,6 +12,12 @@ public enum RenderError: Error, Sendable, Equatable {
 
 /// Walks an ``HTMLProgram`` and writes HTML bytes. Stateless; the walk is iterative.
 public enum Renderer {
+    /// The default open-tag-depth ceiling for the dynamic/untrusted render paths (e.g.
+    /// ``HTML/renderHydratable(arena:maxDepth:)``). Far beyond any real document nesting (browsers
+    /// themselves cap around a few hundred), so it rejects only adversarial input. The non-recursive
+    /// emit can't overflow the stack regardless; this bounds pathological output as defense-in-depth.
+    public static let defaultMaxDepth = 512
+
     /// Emit `program` into `sink`. No depth ceiling — for trusted, statically-built views.
     public static func render(_ program: borrowing HTMLProgram, into sink: inout some HTMLByteSink) {
         for op in program.ops { emit(op, into: &sink) }
