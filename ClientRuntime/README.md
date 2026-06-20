@@ -48,11 +48,17 @@ bun run build       # minify + size-gate -> adh-runtime.min.js (committed, SRI-p
    focus/state by id, via `morph.ts`). Requires ADServe SSE support
    (`docs/integration/adserve-requirements.md`).
 
+## Testing
+
+- `bun run test` — DOM-free core (signals/wire/behaviors/expr) + the DOM layer under happy-dom.
+- `bun run e2e` — real-browser smoke (Playwright/chromium) over `e2e/server.ts`: real-layout
+  `IntersectionObserver` (the `visible` directive) and real event timing.
+- `bun run typecheck` / `bun run build` — strict `tsc`; minify + the gzip-budget gate.
+
 ## Known gaps (follow-ups)
 
-- **Full idiomorph-style reordering** in `morph.ts`: v1 reconciles positionally with id preference
-  (correct — the DOM ends matching the new HTML — and focus/state survive by id), but does not yet
-  reorder keyed children to minimize moves.
-- **Client computed recomputation**: Swift `Computed` formulas aren't serialized, so computed cells are
-  server-updated via SSE `patch` (or a future closed client-expression set), not recomputed in-browser.
+- **id-set morph reordering** preserves keyed nodes across sibling reorders (`morph.ts`); full
+  idiomorph-style cross-parent keyed moves are still a follow-up.
+- **Client computed recomputation** is implemented for the closed `Reactive` expression set (`expr.ts`);
+  an opaque Swift `computed { … }` closure still has no client formula (SSE-`patch` updated).
 - The served artifact's **Subresource-Integrity** hash is computed Swift-side (`ADHTMLSRI`, swift-crypto).

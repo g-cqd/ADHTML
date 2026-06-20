@@ -11,5 +11,5 @@
     "verbatimModuleSyntax": true,
     "types": ["bun"]
   },
-  "include": ["src", "test", "build.ts"]
+  "include": ["src", "test", "build.ts", "e2e", "playwright.config.ts"]
 }
