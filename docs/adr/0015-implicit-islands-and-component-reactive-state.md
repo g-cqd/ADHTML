@@ -71,10 +71,17 @@ Make **"interactive component"** the authoring unit and **"island"** an inferred
   `var total: Reactive<Int> { aSignal.reactive + bSignal.reactive }` and binds it; the bind registers a
   client-recomputable computed cell in the ambient arena. The `@Derived`-macro form + the wider expression
   set (`/`, comparisons, boolean, ternary) remain Phase D follow-ups.
-- **Known limitation:** result-builder inference does **not** apply to a *multi-statement* `body` when the
-  `Component` conformance is added by the macro extension, so an interactive component's `body` must be a
-  single root element (`var body: some HTML { div { … } }`) — idiomatic, but a wart vs. SwiftUI's bare
-  multi-statement `body`. Tracked as a follow-up (a macro/`@HTMLBuilder` fix).
+- **Known limitation — multi-statement `body` under `@Component`.** Confirmed by diagnostic: a **direct**
+  `struct X: Component { var body: some HTML { a; b } }` infers `@HTMLBuilder` and compiles, but the same
+  multi-statement `body` does **not** when the `Component` conformance is added by the `@Component`
+  *extension macro* (a Swift result-builder + macro-added-conformance limitation, not ADHTML-fixable in the
+  macro). Workarounds: give the component a single root element (`var body { div { … } }` — idiomatic), or
+  write `: Component` directly. Tracked in #45.
+- **`<body>`-element collision — solved by `Page`.** A full-page `Component` couldn't render `<body>` (the
+  element function is shadowed by the protocol's `body` property; the module-qualified form by the
+  `ADHTMLCore` namespace enum). New `Page(lang:head:content:)` (a free function → `head`/`body` resolve to
+  the element functions) assembles `<!doctype html><html><head>…</head><body>…</body></html>` from two
+  slots, so authors never write the scaffold and never hit the collision (RFC-0005 §3.6).
 - **Migration:** components authored with `@Component` + `@State` no longer write an explicit `Island`
   (they auto-island); `ComponentMacroTests` migrated. Manual `: Component` conformances (PerfProbe,
   benchmarks, `StateContextTests`/`StreamingTests`) keep `isIsland == false` and their explicit `Island`,
