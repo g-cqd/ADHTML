@@ -56,3 +56,61 @@ struct EscaperPropertyTests {
         #expect(counterexample == nil)
     }
 }
+
+// Fuzz the wire serializer (RFC-0019 §6.3-D5). There is no Swift wire DECODER — the serializer is the
+// fuzzable Swift surface — so we drive it with seeded random `WireValue` trees and assert the failure-safe
+// invariant: it ALWAYS either returns bytes or throws `WireError`, and never crashes / overflows (the walk
+// is iterative). This runs in the fast macOS lane (deterministic + shrinking), complementing the
+// Linux-only libFuzzer escaper harness — the value the plan's "extend libFuzzer to the wire" item targets,
+// delivered verifiably here.
+@Suite(.tags(.fuzz, .property))
+struct WireSerializerFuzzTests {
+    private static func serialize(_ value: WireValue) throws {
+        let cell = CellArena.Cell(id: CellID(0), kind: .signal, value: value)
+        _ = try WireSerializer.payload(
+            cells: [cell], islands: [WireIsland(id: "i", on: .load, scope: [CellID(0)])])
+    }
+
+    @Test
+    func `nested-array depth fuzz: serializes iff within the cap, else throws WireError (never crashes)`() {
+        let cap = WireSerializer.maxValueDepth
+        let counterexample = forAll(Gen.int(in: 0 ... (cap + 8))) { depth in
+            var value: WireValue = .int(0)
+            for _ in 0 ..< depth { value = .array([value]) }
+            do {
+                try Self.serialize(value)
+                return depth <= cap  // produced bytes -> must be within the cap
+            } catch is WireError {
+                return depth > cap  // threw the typed error -> must be over the cap
+            } catch {
+                return false  // any OTHER error type is an invariant violation
+            }
+        }
+        #expect(counterexample == nil)
+    }
+
+    @Test
+    func `flat arrays of arbitrary mixed scalars always serialize without crashing`() {
+        // Exercises every WireValue scalar case through the iterative serializer; a flat array is well
+        // under the depth cap, so it must always produce bytes.
+        let scalarGen = Gen.int(in: 0 ... 4)
+            .map { tag -> WireValue in
+                switch tag {
+                    case 0: .null
+                    case 1: .bool(true)
+                    case 2: .int(Int64(tag))
+                    case 3: .double(1.5)
+                    default: .string("x<>&\"'")
+                }
+            }
+        let counterexample = forAll(Gen.array(of: scalarGen, maxCount: 32)) { scalars in
+            do {
+                try Self.serialize(.array(scalars))
+                return true
+            } catch {
+                return false
+            }
+        }
+        #expect(counterexample == nil)
+    }
+}
