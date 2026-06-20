@@ -115,4 +115,35 @@ nonisolated(unsafe) let benchmarks = {
             blackHole(div { _HTMLArray(rows.map { row in p { row } }) }.renderBytes())
         }
     }
+
+    // Sparse-escapable prose: exercises the SWAR fast-forward over long safe runs — the complement of
+    // escape/text-heavy (dense). Splitting the two surfaces a regression on either path independently.
+    Benchmark("escape/prose") { bm in
+        let prose = String(repeating: "The quick brown fox & the lazy dog jumped over 5 logs. ", count: 64)
+        for _ in bm.scaledIterations {
+            blackHole(span { prose }.render())
+        }
+    }
+
+    // The RFC-0019 Action DSL lowering: a fully-modified action → its `data-adh-*` attribute set.
+    Benchmark("render/action-lowering") { bm in
+        for _ in bm.scaledIterations {
+            blackHole(
+                input().attribute("name", "q")
+                    .action(
+                        .get("/rows").trigger(.input).debounce(.milliseconds(200)).include("q")
+                            .target("rows").swap(.morph)
+                    )
+                    .render())
+        }
+    }
+
+    // Wire-serialization scaling: 100 reactive islands → 100 cells filtered + scriptJSON-escaped. Isolates
+    // the per-island wire cost (vs render/reactive-island's single island) as the island count grows.
+    Benchmark("render/reactive-islands-100") { bm in
+        for _ in bm.scaledIterations {
+            let arena = CellArena()
+            blackHole(try? div { _HTMLArray((0 ..< 100).map { _ in BenchCounter() }) }.renderHydratable(arena: arena))
+        }
+    }
 }

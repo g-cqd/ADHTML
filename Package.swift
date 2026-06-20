@@ -24,7 +24,12 @@ let timingWarningFlags: [SwiftSetting] = [
         "-Xfrontend", "-warn-long-expression-type-checking=100"
     ])
 ]
-let benchSettings: [SwiftSetting] = strictSettings + timingWarningFlags
+// The benchmark target gets a LOOSER type-check budget than the library/tests: the ordo-one plugin
+// GENERATES a `registerBenchmarks()` boilerplate that aggregates every benchmark and grows with the
+// suite, tripping the 100 ms gate as cases are added — a false positive on generated code, not a
+// hand-written-quality signal. Tests keep the strict 100 ms budget.
+let benchSettings: [SwiftSetting] =
+    strictSettings + [.unsafeFlags(["-Xfrontend", "-warn-long-expression-type-checking=500"])]
 let testSettings: [SwiftSetting] =
     strictSettings + timingWarningFlags + [.unsafeFlags(["-enable-actor-data-race-checks"])]
 

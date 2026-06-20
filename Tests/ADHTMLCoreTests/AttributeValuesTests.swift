@@ -47,6 +47,35 @@ struct AttributeValuesTests {
         #expect(option { "A" }.value("a").selected().render() == #"<option value="a" selected="">A</option>"#)
     }
 
+    // B5 — presence attributes both-polarity + independent. Each emits ITS OWN name, only when true: a
+    // mutation mapping one to another's name, or making a present-when-true attribute unconditional, fails
+    // here. Split across small bodies so each type-checks under the timing gate.
+    @Test
+    func `input presence attributes are present-when-true, absent-when-false`() {
+        #expect(input().readOnly().render() == #"<input readonly="">"#)
+        #expect(input().readOnly(false).render() == "<input>")
+        #expect(input().autoFocus().render() == #"<input autofocus="">"#)
+        #expect(input().autoFocus(false).render() == "<input>")
+        #expect(input().disabled(false).render() == "<input>")
+    }
+
+    @Test
+    func `container presence attributes are present-when-true, absent-when-false`() {
+        #expect(select { "x" }.multiple().render() == #"<select multiple="">x</select>"#)
+        #expect(select { "x" }.multiple(false).render() == #"<select>x</select>"#)
+        #expect(option { "A" }.selected(false).render() == #"<option>A</option>"#)
+        #expect(form {}.noValidate().render() == #"<form novalidate=""></form>"#)
+        #expect(form {}.noValidate(false).render() == "<form></form>")
+    }
+
+    @Test
+    func `global presence attributes are present-when-true, absent-when-false`() {
+        #expect(details { "x" }.open(false).render() == #"<details>x</details>"#)
+        #expect(span { "x" }.hidden(false).render() == "<span>x</span>")
+        #expect(div { "x" }.inert().render() == #"<div inert="">x</div>"#)
+        #expect(div { "x" }.inert(false).render() == #"<div>x</div>"#)
+    }
+
     @Test
     func `typed ARIA renders roles and states`() {
         #expect(

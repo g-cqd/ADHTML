@@ -65,15 +65,35 @@ public struct Action: Sendable, Equatable {
     public static func delete(_ path: String) -> Action { Action(method: "delete", path: path) }
 
     /// The DOM event that fires the action (default: submit for forms, click otherwise).
-    public func trigger(_ event: DOMEvent) -> Action { var copy = self; copy.trigger = event; return copy }
+    public func trigger(_ event: DOMEvent) -> Action {
+        var copy = self
+        copy.trigger = event
+        return copy
+    }
     /// Coalesce rapid triggers to one request after `duration` of quiet (e.g. `.milliseconds(200)`).
-    public func debounce(_ duration: Duration) -> Action { var copy = self; copy.debounce = duration; return copy }
+    public func debounce(_ duration: Duration) -> Action {
+        var copy = self
+        copy.debounce = duration
+        return copy
+    }
     /// Also serialize these named fields (resolved from the document) with the request.
-    public func include(_ fields: String...) -> Action { var copy = self; copy.includes += fields; return copy }
+    public func include(_ fields: String...) -> Action {
+        var copy = self
+        copy.includes += fields
+        return copy
+    }
     /// The region to update (default: the enclosing island).
-    public func target(_ id: IslandID) -> Action { var copy = self; copy.targetID = id; return copy }
+    public func target(_ id: IslandID) -> Action {
+        var copy = self
+        copy.targetID = id
+        return copy
+    }
     /// How to apply the response (default: ``Swap/morph``).
-    public func swap(_ mode: Swap) -> Action { var copy = self; copy.swap = mode; return copy }
+    public func swap(_ mode: Swap) -> Action {
+        var copy = self
+        copy.swap = mode
+        return copy
+    }
     /// Apply a client behavior instantly, before the request resolves (the server fragment then reconciles).
     public func optimistic(_ behavior: BehaviorInvocation) -> Action {
         var copy = self
