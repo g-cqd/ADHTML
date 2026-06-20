@@ -16,22 +16,22 @@ public enum ActionRenderContext {
     /// the form still posts, and the server rejects the unsigned request: fail-closed).
     @TaskLocal public static var current: Signing?
 
-    /// The signer + the request's CSRF binding + the mint clock for one render.
+    /// The signer + the request's session cookie (the CSRF binding source) + the mint clock for one render.
     public struct Signing: Sendable {
         let signer: ActionSigner
-        let sessionBinding: String?
+        let sessionCookie: String?
         let now: Int
-        /// The default token lifetime (seconds) minted at the call site.
-        static let ttl = 3600
+        /// The default token lifetime (seconds) minted at the call site — short, to bound the replay window.
+        static let ttl = 300
 
-        init(signer: ActionSigner, sessionBinding: String?, now: Int) {
+        init(signer: ActionSigner, sessionCookie: String?, now: Int) {
             self.signer = signer
-            self.sessionBinding = sessionBinding
+            self.sessionCookie = sessionCookie
             self.now = now
         }
 
         func token(for id: ActionID) -> String {
-            signer.mint(id: id.raw, ttl: Self.ttl, sessionID: sessionBinding, now: now)
+            signer.mint(id: id.raw, ttl: Self.ttl, sessionCookie: sessionCookie, now: now)
         }
     }
 }
@@ -45,7 +45,7 @@ extension HandlerContext {
         @HTMLBuilder page: () -> Page, @HTMLBuilder fragment: () -> Fragment
     ) throws -> ResponseContent {
         try ActionRenderContext.$current.withValue(
-            ActionRenderContext.Signing(signer: signer, sessionBinding: cookies["session"], now: now)
+            ActionRenderContext.Signing(signer: signer, sessionCookie: cookies["session"], now: now)
         ) {
             try view(page: page, fragment: fragment)
         }

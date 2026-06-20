@@ -5,15 +5,17 @@ import ADServeCore  // ResponseContent for the dummy handler
 
 @testable import ADHTMLActions
 
-// RFC-0020 Track 3 P2 — the registry + dispatch mechanism. The security-critical part (the fail-closed
+// RFC-0020 Track 3 P2/P3 — the registry + dispatch mechanism. The security-critical part (the fail-closed
 // verification ladder) is factored into `resolve`, unit-tested here WITHOUT a running server; the dispatch
-// route is a thin wrapper over it. The call-site test pins the dual-world lowering (RFC-0019 `Action` +
-// native form + the signed hidden field).
+// route is a thin wrapper over it. The call-site tests pin the dual-world lowering (RFC-0019 `Action` +
+// native form + the signed hidden field) and the ambient-signer mint.
 @Suite struct ServerActionTests {
-    private func fixture() throws -> (ActionSigner, ServerActionTable, ActionID) {
+    private func fixture(requiresSession: Bool = false) throws -> (ActionSigner, ServerActionTable, ActionID) {
         let signer = try ActionSigner(secret: [UInt8](repeating: 0x33, count: 32))
         let table = ServerActionTable([
-            ServerAction(slug: "part.delete", returnPath: "/parts") { _ in .notFound }  // never called by resolve
+            ServerAction(slug: "part.delete", returnPath: "/parts", requiresSession: requiresSession) {
+                _ in .notFound  // never reached by `resolve`
+            }
         ])
         return (signer, table, ActionID(slug: "part.delete"))
     }
@@ -22,45 +24,57 @@ import ADServeCore  // ResponseContent for the dummy handler
 
     @Test func `a valid, unexpired, session-bound token resolves to run`() throws {
         let (signer, table, id) = try fixture()
-        let wire = signer.mint(id: id.raw, ttl: 900, sessionID: "sess1234", now: 1000)
+        let wire = signer.mint(id: id.raw, ttl: 900, sessionCookie: "sess1234", now: 1000)
         let outcome = table.resolve(
-            pathID: id.raw, token: wire, sessionBinding: "sess1234", now: 1500, signer: signer)
+            pathID: id.raw, token: wire, sessionCookie: "sess1234", now: 1500, signer: signer)
         #expect(outcome == .run(id))
     }
 
     @Test func `a session-less token resolves when the request is also session-less`() throws {
         let (signer, table, id) = try fixture()
-        let wire = signer.mint(id: id.raw, ttl: 900, sessionID: nil, now: 0)
-        #expect(table.resolve(pathID: id.raw, token: wire, sessionBinding: nil, now: 1, signer: signer) == .run(id))
+        let wire = signer.mint(id: id.raw, ttl: 900, sessionCookie: nil, now: 0)
+        #expect(table.resolve(pathID: id.raw, token: wire, sessionCookie: nil, now: 1, signer: signer) == .run(id))
     }
 
     @Test func `every failure mode is fail-closed`() throws {
         let (signer, table, id) = try fixture()
-        let wire = signer.mint(id: id.raw, ttl: 900, sessionID: "sess1234", now: 1000)
-        // missing path id
-        #expect(table.resolve(pathID: nil, token: wire, sessionBinding: "sess1234", now: 1500, signer: signer)
-            == .forbidden("bad action"))
-        // tampered / absent token
-        #expect(table.resolve(pathID: id.raw, token: "garbage", sessionBinding: "sess1234", now: 1500, signer: signer)
-            == .forbidden("bad token"))
-        #expect(table.resolve(pathID: id.raw, token: nil, sessionBinding: "sess1234", now: 1500, signer: signer)
-            == .forbidden("bad token"))
-        // token id != path id (confused deputy)
-        #expect(table.resolve(pathID: "elsewhere", token: wire, sessionBinding: "sess1234", now: 1500, signer: signer)
-            == .forbidden("action mismatch"))
-        // expired (now > exp = 1000 + 900)
-        #expect(table.resolve(pathID: id.raw, token: wire, sessionBinding: "sess1234", now: 2000, signer: signer)
-            == .forbidden("expired"))
-        // CSRF: the request's session binding differs from the token's
-        #expect(table.resolve(pathID: id.raw, token: wire, sessionBinding: "attacker", now: 1500, signer: signer)
-            == .forbidden("csrf"))
+        let wire = signer.mint(id: id.raw, ttl: 900, sessionCookie: "sess1234", now: 1000)
+        #expect(table.resolve(pathID: nil, token: wire, sessionCookie: "sess1234", now: 1500, signer: signer)
+            == .forbidden("bad action"))  // missing path id
+        #expect(table.resolve(pathID: id.raw, token: "garbage", sessionCookie: "sess1234", now: 1500, signer: signer)
+            == .forbidden("bad token"))  // tampered token
+        #expect(table.resolve(pathID: id.raw, token: nil, sessionCookie: "sess1234", now: 1500, signer: signer)
+            == .forbidden("bad token"))  // absent token
+        #expect(table.resolve(pathID: "elsewhere", token: wire, sessionCookie: "sess1234", now: 1500, signer: signer)
+            == .forbidden("action mismatch"))  // confused deputy
+        #expect(table.resolve(pathID: id.raw, token: wire, sessionCookie: "sess1234", now: 2000, signer: signer)
+            == .forbidden("expired"))  // now > exp = 1000 + 900
+        #expect(table.resolve(pathID: id.raw, token: wire, sessionCookie: "attacker", now: 1500, signer: signer)
+            == .forbidden("csrf"))  // the request's session binding differs from the token's
+    }
+
+    @Test func `a session-required action rejects a session-less request`() throws {
+        let (signer, table, id) = try fixture(requiresSession: true)
+        let wire = signer.mint(id: id.raw, ttl: 900, sessionCookie: nil, now: 0)  // minted session-less
+        #expect(table.resolve(pathID: id.raw, token: wire, sessionCookie: nil, now: 1, signer: signer)
+            == .forbidden("session required"))
+        // with a session it runs
+        let bound = signer.mint(id: id.raw, ttl: 900, sessionCookie: "abc.tag", now: 0)
+        #expect(table.resolve(pathID: id.raw, token: bound, sessionCookie: "abc.tag", now: 1, signer: signer) == .run(id))
     }
 
     @Test func `a valid token for an UNREGISTERED action is 404, not 403`() throws {
         let (signer, table, _) = try fixture()
         let ghost = ActionID(slug: "part.purge")  // never registered
-        let wire = signer.mint(id: ghost.raw, ttl: 900, sessionID: "s", now: 0)
-        #expect(table.resolve(pathID: ghost.raw, token: wire, sessionBinding: "s", now: 1, signer: signer) == .notFound)
+        let wire = signer.mint(id: ghost.raw, ttl: 900, sessionCookie: "s", now: 0)
+        #expect(table.resolve(pathID: ghost.raw, token: wire, sessionCookie: "s", now: 1, signer: signer) == .notFound)
+    }
+
+    @Test func `the CSRF binding compare is constant-time-equal`() {
+        #expect(ctEqual("abc123", "abc123"))
+        #expect(!ctEqual("abc123", "abc124"))  // last-byte diff
+        #expect(!ctEqual("abc", "abcd"))  // length diff
+        #expect(ctEqual("-", "-"))  // both session-less
     }
 
     // MARK: ActionID
@@ -88,18 +102,18 @@ import ADServeCore  // ResponseContent for the dummy handler
 
     @Test func `the ambient signer mints a token that the dispatcher verifies`() throws {
         let signer = try ActionSigner(secret: [UInt8](repeating: 0x44, count: 32))
-        let signing = ActionRenderContext.Signing(signer: signer, sessionBinding: "sess1234", now: 1000)
+        let signing = ActionRenderContext.Signing(signer: signer, sessionCookie: "sess1234", now: 1000)
         let verified = try #require(signer.verified(signing.token(for: ActionID("xyz"))))
         #expect(verified.id == "xyz")
-        #expect(verified.sid8 == "sess1234")  // CSRF binding flows from the render's session
-        #expect(verified.exp == 1000 + 3600)  // now + the default ttl
+        #expect(verified.sid == "sess1234")  // the full CSRF binding flows from the render's session
+        #expect(verified.exp == 1000 + 300)  // now + the short default ttl
     }
 
     @Test func `submits lowers to the dual-world form with the signed token + value fields`() throws {
         let signer = try ActionSigner(secret: [UInt8](repeating: 0x44, count: 32))
         let handle = ActionHandle(id: ActionID("xyz"), region: "parts")
         let html = ActionRenderContext.$current.withValue(
-            ActionRenderContext.Signing(signer: signer, sessionBinding: nil, now: 0)
+            ActionRenderContext.Signing(signer: signer, sessionCookie: nil, now: 0)
         ) {
             form { button { "Go" }.attribute("type", "submit") }
                 .submits(to: handle, values: ["id": "7"])

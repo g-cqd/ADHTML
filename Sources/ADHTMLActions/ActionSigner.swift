@@ -18,10 +18,12 @@ public struct ActionSigner: Sendable {
         self.hmac = try HMACSigner(secret: secret, info: Self.info)
     }
 
-    /// Mint a wire token (`<id>.<exp>.<sid8>.<tag>`) for `id`, valid for `ttl` seconds from `now`, bound to
-    /// `sessionID` for CSRF. `now` is injected (no ambient clock) so renders + tests are deterministic.
-    public func mint(id: String, ttl: Int, sessionID: String?, now: Int) -> String {
-        let token = ActionToken(id: id, exp: now + ttl, sid8: Self.sid8(of: sessionID))
+    /// Mint a wire token (`<id>.<exp>.<sid>.<tag>`) for `id`, valid for `ttl` seconds from `now`, bound to the
+    /// request's `sessionCookie` for CSRF. `now` is injected (no ambient clock) so renders + tests are
+    /// deterministic. The expiry add is overflow-clamped so a hostile/typo'd `ttl` can't trap the process.
+    public func mint(id: String, ttl: Int, sessionCookie: String?, now: Int) -> String {
+        let exp = now.addingReportingOverflow(ttl).overflow ? Int.max : now + ttl
+        let token = ActionToken(id: id, exp: exp, sid: Self.sessionBinding(of: sessionCookie))
         return hmac.sign(token.payload)
     }
 
@@ -32,10 +34,12 @@ public struct ActionSigner: Sendable {
         return ActionToken(payload: payload)
     }
 
-    /// The CSRF binding value for `sessionID`: its first 8 characters, or `-` when there is no session — a
-    /// short, non-secret check value (the full id never travels in the token).
-    static func sid8(of sessionID: String?) -> String {
-        guard let id = sessionID, !id.isEmpty else { return "-" }
-        return String(id.prefix(8))
+    /// The CSRF binding for a request's `session` cookie value (`<id>.<hmac>`): the session id — the part
+    /// before the cookie's `.` (pure hex, so it is `.`-free and safe in the dot-joined token payload, and
+    /// full-entropy so two users can't share it) — or `-` when there is no session.
+    static func sessionBinding(of sessionCookie: String?) -> String {
+        guard let cookie = sessionCookie, !cookie.isEmpty else { return "-" }
+        if let dot = cookie.firstIndex(of: ".") { return String(cookie[..<dot]) }
+        return cookie
     }
 }
