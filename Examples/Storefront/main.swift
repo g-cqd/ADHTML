@@ -8,6 +8,6 @@ import ADHTML
 // response — `.adhtml(CatalogPage(products:))` (buffered) or `.adhtmlStream(CatalogPage(products:))`
 // (streamed) — and `Static("/assets", root:)` serves the SRI-pinned runtime. No view code changes.
 
-let page = HTMLDocument { CatalogPage(products: ProductRepository.all()) }
-let bytes = try page.renderHydratable(arena: CellArena())
+// `Page` (inside the layout) already emits `<!doctype html>`, so render the page directly.
+let bytes = try CatalogPage(products: ProductRepository.all()).renderHydratable(arena: CellArena())
 print(String(decoding: bytes, as: UTF8.self))

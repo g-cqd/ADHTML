@@ -7,7 +7,7 @@ struct CatalogPage {
     let products: [Product]
 
     var body: some HTML {
-        pageLayout(pageTitle: "Shop — Acme Tools") {
+        PageLayout(pageTitle: "Shop — Acme Tools") {
             h1 { "Shop" }
             div {
                 for product in products {
