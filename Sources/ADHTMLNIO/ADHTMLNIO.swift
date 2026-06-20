@@ -54,3 +54,21 @@ extension ResponseContent {
         }
     }
 }
+
+extension SSEWriter {
+    /// Push a live out-of-band HTML swap to the client: render `view` (the island's new content) and emit
+    /// a `morph` event the runtime reconciles into `[data-adh-id="<id>"]` (RFC-0003 §5). Drive it from a
+    /// route's `.sse { writer in … }` body as the app's change feed produces updates.
+    public func morph(id: IslandID, _ view: consuming some HTML) async throws {
+        let frame = try WireSerializer.morphFrame(id: id, html: view.renderBytes())
+        try await send(event: "morph", data: String(decoding: frame, as: UTF8.self), id: nil, retry: nil)
+    }
+
+    /// Push a fine-grained `patch` event: set wire cells (by their inline-state index) to new values — the
+    /// runtime updates exactly the bound nodes, no re-render. (Index stability across renders is the
+    /// stable-`CellID` follow-up; for now the caller supplies this render's wire indices.)
+    public func patch(_ cells: [Int: WireValue]) async throws {
+        let frame = try WireSerializer.patchFrame(cells)
+        try await send(event: "patch", data: String(decoding: frame, as: UTF8.self), id: nil, retry: nil)
+    }
+}

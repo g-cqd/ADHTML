@@ -30,6 +30,43 @@ public enum WireSerializer {
         }
     }
 
+    // MARK: - Live update frames (SSE)
+
+    /// The JSON body of an SSE `morph` event — `{"id":"<island>","html":"<fragment>"}`. The client
+    /// (`connect()`) reconciles the island `[data-adh-id="<id>"]`'s subtree to `html` (RFC-0003 §5). The
+    /// HTML is ALREADY escape-by-default at render time; here it is a JSON string value, so JSON escaping
+    /// is enough (this is SSE data, not an inline `<script>`).
+    public static func morphFrame(id: IslandID, html: [UInt8]) throws(WireError) -> [UInt8] {
+        var object = OrderedDictionary<String, JSONValue>()
+        object["id"] = .string(id.raw)
+        object["html"] = .string(String(decoding: html, as: UTF8.self))
+        do {
+            return try JSONValue.object(object).encodedBytes(options: JSONEncodingOptions())
+        } catch {
+            throw WireError.encoding("\(error)")
+        }
+    }
+
+    /// The JSON body of an SSE `patch` event — `{"cells":{"<index>":{"v":<value>}}}`. The client sets each
+    /// listed cell (fine-grained, RFC-0003 §5 / RFC 7396 shape). `index` is the cell's position in THIS
+    /// render's wire state (the same index the inline state used). Keys are emitted in ascending index
+    /// order for a deterministic frame.
+    public static func patchFrame(_ cells: [Int: WireValue]) throws(WireError) -> [UInt8] {
+        var cellsJSON = OrderedDictionary<String, JSONValue>()
+        for index in cells.keys.sorted() {
+            var cell = OrderedDictionary<String, JSONValue>()
+            cell["v"] = try json(cells[index] ?? .null)
+            cellsJSON[String(index)] = .object(cell)
+        }
+        var root = OrderedDictionary<String, JSONValue>()
+        root["cells"] = .object(cellsJSON)
+        do {
+            return try JSONValue.object(root).encodedBytes(options: JSONEncodingOptions())
+        } catch {
+            throw WireError.encoding("\(error)")
+        }
+    }
+
     /// Build the wire payload as a `JSONValue` (internal; `scriptBytes` is the public entry). Throws if a
     /// cell value's array nesting exceeds the serializer's depth cap (failure-safe, never a stack crash).
     static func payload(cells: [CellArena.Cell], islands: [WireIsland]) throws(WireError) -> JSONValue {
