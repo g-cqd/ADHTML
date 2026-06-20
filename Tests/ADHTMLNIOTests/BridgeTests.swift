@@ -47,6 +47,19 @@ struct BridgeTests {
     }
 
     @Test
+    func `view is the buffered full-page alias (RFC-0020 §1)`() throws {
+        let response = try ResponseContent.view(div { span { "x" } })
+        guard case .raw(let body, let contentType, _) = response else {
+            Issue.record("expected .raw, got \(response)")
+            return
+        }
+        #expect(contentType == "text/html; charset=utf-8")
+        let html = String(decoding: body, as: UTF8.self)
+        #expect(html.hasPrefix("<div><span>x</span></div>"))
+        #expect(html.contains("adh-state"))  // full page carries the inline hydration state
+    }
+
+    @Test
     func `adhtmlFragment yields a partial text/html response (no doctype, no state script)`() {
         let response = ResponseContent.adhtmlFragment(ul { li { "row" } })
         guard case .raw(let body, let contentType, _) = response else {

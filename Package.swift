@@ -194,7 +194,13 @@ if isNIO {
     package.targets.append(
         .target(
             name: "ADHTMLNIO",
-            dependencies: ["ADHTMLCore", .product(name: "ADServeCore", package: "ADServe")],
+            dependencies: [
+                "ADHTMLCore",
+                .product(name: "ADServeCore", package: "ADServe"),
+                // ADServeDSL for the `HandlerContext` seam — the dual-mode `ctx.view(page:fragment:)`
+                // reads `ctx.isFragment` (RFC-0019 C1) to pick page vs fragment (RFC-0020 §1).
+                .product(name: "ADServeDSL", package: "ADServe")
+            ],
             swiftSettings: strictSettings))
     package.targets.append(
         .testTarget(
