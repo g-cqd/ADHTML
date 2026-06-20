@@ -242,7 +242,7 @@ if isActions {
         .target(
             name: "ADHTMLActions",
             dependencies: [
-                "ADHTMLCore", "ADHTMLNIO",
+                "ADHTMLCore", "ADHTMLNIO", adfCore,
                 .product(name: "ADServeCore", package: "ADServe"),
                 .product(name: "ADServeDSL", package: "ADServe")
             ],
