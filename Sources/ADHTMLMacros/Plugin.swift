@@ -7,5 +7,7 @@ internal import SwiftSyntaxMacros
 
 @main
 struct ADHTMLMacrosPlugin: CompilerPlugin {
-    let providingMacros: [any Macro.Type] = [AttributeNameMacro.self]
+    let providingMacros: [any Macro.Type] = [
+        AttributeNameMacro.self, StateMacro.self, ComponentMacro.self
+    ]
 }

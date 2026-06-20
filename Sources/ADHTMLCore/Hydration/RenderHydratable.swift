@@ -7,8 +7,15 @@ extension HTML {
     /// Render to HTML bytes followed by `<script type="application/adh-state+json" id="adh-state">…`
     /// carrying this render's island-scoped reactive state, ready for the client runtime to resume.
     public consuming func renderHydratable(arena: CellArena) throws(WireError) -> [UInt8] {
+        // Install `arena` as the ambient context for the whole lowering pass, so a top-level
+        // `@State`-bearing component registers its cells in THIS arena (and thus into the wire state),
+        // and each nested component claims a fresh scope. `node` is a copy of the consumed `self`.
         var program = HTMLProgram()
-        Self._render(self, into: &program)
+        let node = self
+        let root = ADHTMLRenderContext.Context(arena: arena, scope: arena.freshScope())
+        ADHTMLRenderContext.$current.withValue(root) {
+            Self._render(node, into: &program)
+        }
 
         var islands: [WireIsland] = []
         for op in program.ops {

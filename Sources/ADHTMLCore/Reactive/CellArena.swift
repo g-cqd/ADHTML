@@ -27,6 +27,11 @@ public final class CellArena: Sendable {
         var nextIndex: UInt64 = 0
         /// Non-nil while a computed's body evaluates; reads append their `CellID` here.
         var collecting: [CellID]?
+        /// Monotonic per-render component scope counter (see ``freshScope()``).
+        var nextScope: UInt64 = 0
+        /// `"scope.key"` → the cell backing a `@State` property, so repeated reads dedup (see
+        /// ``stateCell(scope:key:default:)``).
+        var stateKeys: [String: CellID] = [:]
     }
 
     private let state = Mutex(State())
@@ -57,6 +62,35 @@ public final class CellArena: Sendable {
     /// Record that the currently-evaluating computed (if any) read cell `id`.
     func recordRead(_ id: CellID) {
         state.withLock { if $0.collecting != nil { $0.collecting?.append(id) } }
+    }
+
+    /// A fresh per-render component scope id (monotonic within this render). ``Component`` rendering
+    /// claims one per instance so two instances of one component type get distinct `@State` cells.
+    func freshScope() -> UInt64 {
+        state.withLock { lock in
+            let scope = lock.nextScope
+            lock.nextScope += 1
+            return scope
+        }
+    }
+
+    /// Get-or-create the signal cell backing a `@State` property, keyed by `(scope, key)`. The first
+    /// read within a render registers the cell; later reads of the same property return the same handle
+    /// (a stable ``CellID``) rather than registering a duplicate — so `@State var count` referenced by
+    /// both an event behavior and a binding resolves to ONE cell.
+    public func stateCell<Value: WireEncodable>(scope: UInt64, key: String, default defaultValue: Value)
+        -> Signal<Value>
+    {
+        let composite = "\(scope).\(key)"
+        let id = state.withLock { lock -> CellID in
+            if let existing = lock.stateKeys[composite] { return existing }
+            let id = CellID(lock.nextIndex)
+            lock.nextIndex += 1
+            lock.cells.append(Cell(id: id, kind: .signal, value: defaultValue.wireValue))
+            lock.stateKeys[composite] = id
+            return id
+        }
+        return Signal(arena: self, id: id, stored: defaultValue)
     }
 
     /// All recorded cells, in creation order — the wire serializer's input.

@@ -20,8 +20,16 @@ public protocol Component: HTML {
 }
 
 extension Component {
-    @inlinable
     public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        Body._render(html.body, into: &program)
+        // Pure static render (no hydration): render the body directly — zero reactive bookkeeping.
+        guard let context = ADHTMLRenderContext.child() else {
+            Body._render(html.body, into: &program)
+            return
+        }
+        // Reactive render: push a fresh per-instance scope so this instance's `@State` cells are
+        // distinct from any sibling's. `body` is evaluated INSIDE the scope (where `@State` reads
+        // happen); lowering the built value afterwards needs no context.
+        let built = ADHTMLRenderContext.$current.withValue(context) { html.body }
+        Body._render(built, into: &program)
     }
 }

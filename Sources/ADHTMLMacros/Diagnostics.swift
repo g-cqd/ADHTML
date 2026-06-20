@@ -5,6 +5,8 @@ internal import SwiftDiagnostics
 enum ADHTMLDiagnostic: DiagnosticMessage {
     case attrRequiresStringLiteral
     case invalidAttributeName(String)
+    case stateRequiresStoredVar
+    case stateNeedsType(String)
 
     var message: String {
         switch self {
@@ -12,6 +14,11 @@ enum ADHTMLDiagnostic: DiagnosticMessage {
                 "#attr requires a static string literal"
             case .invalidAttributeName(let name):
                 #"'\#(name)' is not a valid HTML attribute name (no spaces, " ' > / = or control characters)"#
+            case .stateRequiresStoredVar:
+                "@State must be applied to a single stored 'var' (not 'let' or a computed property)"
+            case .stateNeedsType(let name):
+                "@State var \(name) needs an explicit type or a literal initializer "
+                    + "(e.g. `@State var \(name): Int = 0`) so its Signal type is known"
         }
     }
 
@@ -19,6 +26,8 @@ enum ADHTMLDiagnostic: DiagnosticMessage {
         switch self {
             case .attrRequiresStringLiteral: MessageID(domain: "ADHTMLMacros", id: "attr.requiresStringLiteral")
             case .invalidAttributeName: MessageID(domain: "ADHTMLMacros", id: "attr.invalidName")
+            case .stateRequiresStoredVar: MessageID(domain: "ADHTMLMacros", id: "state.requiresStoredVar")
+            case .stateNeedsType: MessageID(domain: "ADHTMLMacros", id: "state.needsType")
         }
     }
 
