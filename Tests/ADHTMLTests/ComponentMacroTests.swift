@@ -33,10 +33,9 @@ struct MacroToggle {
     }
 }
 
-@Suite("Component macros")
 struct ComponentMacroTests {
-    @Test("@Component + @State render and wire a counter end to end")
-    func counter() throws {
+    @Test
+    func `@Component + @State render and wire a counter end to end`() throws {
         let arena = CellArena()
         let html = String(decoding: try MacroCounter().renderHydratable(arena: arena), as: UTF8.self)
 
@@ -50,16 +49,16 @@ struct ComponentMacroTests {
         #expect(arena.cells[0].value == .int(0))
     }
 
-    @Test("@State carries a non-default initial value")
-    func nonDefault() throws {
+    @Test
+    func `@State carries a non-default initial value`() throws {
         let arena = CellArena()
         let html = String(decoding: try MacroCounter(count: 42).renderHydratable(arena: arena), as: UTF8.self)
         #expect(html.contains(#"<span data-adh-bind:text="0">42</span>"#))
         #expect(arena.cells[0].value == .int(42))
     }
 
-    @Test("@State infers String and respects an explicit Bool type")
-    func mixedTypes() throws {
+    @Test
+    func `@State infers String and respects an explicit Bool type`() throws {
         let arena = CellArena()
         let html = String(decoding: try MacroToggle().renderHydratable(arena: arena), as: UTF8.self)
         #expect(html.contains(#"data-adh-on:click="toggle#0""#))
@@ -70,8 +69,8 @@ struct ComponentMacroTests {
         #expect(arena.cells[1].value == .string("off"))  // label
     }
 
-    @Test("sibling macro components get distinct cells")
-    func siblings() throws {
+    @Test
+    func `sibling macro components get distinct cells`() throws {
         let arena = CellArena()
         _ = try div {
             MacroCounter(count: 1)
