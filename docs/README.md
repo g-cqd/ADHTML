@@ -39,6 +39,7 @@ ADRs are immutable once accepted: supersede with a new ADR rather than editing a
 | [0018](adr/0018-event-and-behavior-vocabulary.md) | Extended event & behavior vocabulary (P1 / P4) | Accepted |
 | [0019](adr/0019-wire-token-vocabulary.md) | Single-source wire-token vocabulary (Swift-generated) | Accepted |
 | [0020](adr/0020-markdown-in-builder-with-embedded-components.md) | Markdown in a component body, with embedded live components | Accepted |
+| [0021](adr/0021-component-scoped-assets.md) | Component-scoped CSS & JS (the declarative-first escape hatch) | Accepted (phased) |
 
 ## Integration
 
