@@ -61,4 +61,40 @@ struct HTMLTapeRobustnessTests {
             _ = HTMLTape.build(html).materialize()
         }
     }
+
+    /// Differential fuzz: random WELL-FORMED documents (balanced tags, safe text + valid entities,
+    /// simple quoted attributes) must materialize to EXACTLY what the reference `HTMLTokenizer`
+    /// produces. The grammar is restricted to constructs where the two provably agree, so any
+    /// divergence here is a real tape bug — not an accepted edge-case difference.
+    @Test func randomWellFormedDocumentsMatchReference() {
+        var rng = SeededRNG(seed: 0xD1FF_0FF5_1234)
+        let tags = ["p", "div", "span", "b", "i", "a", "ul", "li", "h2", "em", "strong", "section"]
+        let words = ["hello", "world", "foo", "bar", "swift", "test", "x1", "node"]
+        let entities = ["&amp;", "&lt;", "&gt;", "&quot;"]
+
+        for _ in 0 ..< 400 {
+            var html = ""
+            var open: [String] = []
+            for _ in 0 ..< rng.int(in: 4 ... 40) {
+                switch rng.int(in: 0 ... 3) {
+                    case 0:
+                        let tag = rng.pick(tags)
+                        open.append(tag)
+                        html += rng.bool() ? "<\(tag) class=\"\(rng.pick(words))\">" : "<\(tag)>"
+                    case 1:
+                        html += rng.pick(words)
+                        if rng.bool() { html += " " + rng.pick(entities) + " " }
+                    case 2:
+                        if let tag = open.popLast() { html += "</\(tag)>" }
+                    default:
+                        html += rng.bool() ? "<br>" : "<img src=\"\(rng.pick(words))\">"
+                }
+            }
+            while let tag = open.popLast() { html += "</\(tag)>" }
+
+            #expect(
+                HTMLTape.build(html).materialize() == HTMLTokenizer.tokenize(html),
+                "tape diverged from reference on: \(html)")
+        }
+    }
 }
