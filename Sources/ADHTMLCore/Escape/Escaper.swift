@@ -45,9 +45,7 @@ public enum Escaper {
             while index < count {
                 // SWAR: skip whole 8-byte words with no escapable byte; jump straight to the first one.
                 while index + 8 <= count {
-                    let word = raw.loadLE64(index)  // ADFCore: a single unaligned little-endian load
-                    var mask = SWAR.equals(word, 0x26) | SWAR.equals(word, 0x3C) | SWAR.equals(word, 0x3E)
-                    if escapeQuotes { mask |= SWAR.equals(word, 0x22) | SWAR.equals(word, 0x27) }
+                    let mask = Self.escapeStopMask(raw.loadLE64(index), escapeQuotes: escapeQuotes)
                     if mask == 0 {
                         index += 8
                         continue
@@ -75,6 +73,16 @@ public enum Escaper {
             }
             if count > runStart { sink.write(UnsafeBufferPointer(rebasing: buffer[runStart ..< count])) }
         }
+    }
+
+    /// The SWAR stop-mask: a non-zero lane (`0x80`) at each byte that needs an HTML entity — `& < >`, plus
+    /// `" '` in attribute context. Unifies the per-word escapable-byte test in one place (mirrors ADJSON's
+    /// `JSONOutput` factoring); `@inline(__always)` so the word loop pays no call. The `escapeQuotes`
+    /// branch is loop-invariant, so this is a structural clarification, not a behavior or cost change.
+    @inline(__always)
+    private static func escapeStopMask(_ word: UInt64, escapeQuotes: Bool) -> UInt64 {
+        let core = SWAR.equals(word, 0x26) | SWAR.equals(word, 0x3C) | SWAR.equals(word, 0x3E)
+        return escapeQuotes ? core | SWAR.equals(word, 0x22) | SWAR.equals(word, 0x27) : core
     }
 
     /// Emit a URL attribute value: reject a dangerous scheme (neutralize to `#`), else escape it.
