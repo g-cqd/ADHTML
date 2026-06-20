@@ -10,7 +10,12 @@ import { effect } from "./signals";
 import { readState } from "./wire";
 
 const BIND_TARGETS = ["text", "value", "class"];
-const DELEGATED_EVENTS = ["click", "input", "change"];
+// One document-level listener per type (qwikloader-style). Mirrors Swift `DOMEvent.delegated` — keep in
+// sync. Idle listeners for unused types cost ~nothing; only bubbling, no-default-action events are listed.
+const DELEGATED_EVENTS = [
+  "click", "dblclick", "input", "change", "keydown", "keyup", "keypress", "focusin", "focusout",
+  "pointerdown", "pointerup", "mousedown", "mouseup", "mouseover", "mouseout", "contextmenu",
+];
 const BIND_SELECTOR = "[data-adh-bind\\:text],[data-adh-bind\\:value],[data-adh-bind\\:class]";
 
 // Islands that have wired. The document-level delegated listener checks this so a lazy island
