@@ -11,10 +11,10 @@ import { B } from "./tokens";
  * @property {string[]} params
  */
 
-/** The closed behavior-name set, mirrored by Swift `Behavior.names` (parity test). Not referenced by the
- * interpreter (the switch lists them inline), so the bundler tree-shakes it out of the runtime — it exists
- * for the parity test only. @type {readonly string[]} */
-export const BEHAVIOR_NAMES = Object.values(B);
+// NB: the behavior names are NOT mapped at runtime — each `B.<name>` in the switch below is inlined to its
+// 1-char mangled token at build time (build.js), so the shipped runtime switches on the raw tokens and
+// carries no name→token table. (The parity test re-derives the closed set from the generated `tokens.js`
+// directly, so nothing test-only is dragged into the bundle — see test/core.test.js.)
 
 /** Parse a `data-adh-on:<event>` value into an invocation, or `null` if malformed.
  * @param {string} value

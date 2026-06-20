@@ -27,6 +27,7 @@ export const T = {
   optimistic: "data-w",
   oob: "data-x",
   keymap: "data-y",
+  link: "data-z",
 };
 
 export const B = {

@@ -6,6 +6,7 @@
 
 import { actionTrigger, runAction } from "./action";
 import { applyBehavior, parseInvocation } from "./behaviors";
+import { boostClick, boostPopstate } from "./boost";
 import { morph } from "./morph";
 import { effect } from "./signals";
 import { T } from "./tokens";
@@ -148,6 +149,7 @@ function delivers(node) {
 function delegated(type, state, event, doc) {
   const start = event.target;
   if (!(start instanceof Element)) return;
+  if (type === "click") boostClick(event, doc);  // P7: intercept a boosted `<a data-link>` (SPA-feel nav)
   const onNode = start.closest(`[${T.on}\\:${type}]`);
   if (onNode && delivers(onNode) && keyMatches(onNode, event)) {  // lazy island / key filter -> inert
     const invocation = parseInvocation(onNode.getAttribute(`${T.on}:${type}`) ?? "");
@@ -238,6 +240,7 @@ export function hydrate(doc = document) {
     doc.addEventListener(type, (event) => delegated(type, state, event, doc));
   }
   doc.addEventListener("submit", (event) => onSubmit(state, event, doc));
+  boostPopstate(doc);  // P7: Back/Forward re-morph the recorded region (boosted-nav history)
   // One DOM query for all island roots, mapped by id (vs a full-document search per island).
   /** @type {Map<string, Element>} */
   const roots = new Map();

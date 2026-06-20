@@ -5,7 +5,9 @@ import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 // delegated events, reactive bindings, and the SSE morph. happy-dom provides a real DOM, so a click
 // actually bubbles to the document and an effect actually writes to a node.
 
-beforeAll(() => GlobalRegistrator.register());
+// A real origin (not `about:blank`) so same-origin checks resolve — the boost link's `.origin` must match
+// `location.origin` (P7). `about:blank` yields a null origin and unresolved relative hrefs.
+beforeAll(() => GlobalRegistrator.register({ url: "http://localhost/" }));
 afterAll(() => GlobalRegistrator.unregister());
 
 let hydrate;
@@ -20,7 +22,12 @@ beforeAll(async () => {
 });
 
 beforeEach(() => {
-  document.body.innerHTML = "";
+  // Fresh window per test. `hydrate()` adds document-level delegated listeners that are never removed, so on
+  // the SHARED happy-dom document they would accumulate across tests — a prior test's listener (closed over
+  // that test's `state`) could then fire against this test's DOM and mutate a stale cell. A new window per
+  // test gives true isolation (in production `hydrate` runs once, so this leak can't occur there).
+  GlobalRegistrator.unregister();
+  GlobalRegistrator.register({ url: "http://localhost/" });
 });
 
 /** A counter island + its inline state, exactly as the Swift renderer emits them. */
@@ -451,4 +458,82 @@ test("a reordered keyed input keeps its live value (state survives the move)", (
 
   expect(document.getElementById("i1").value).toBe("typed");
   expect([...form.children].map((el) => el.id)).toEqual(["i2", "i1"]);
+});
+
+// --- P7 Link boost (SPA-feel navigation) + P8 AppStore persistence ---
+
+test("a boosted link morphs the target Region in place and pushes history (P7), no full reload", async () => {
+  document.body.innerHTML = `
+    <a id="nav" data-z="content" href="/parts">Parts</a>
+    <div data-a id="content" data-b="content" data-c="load"><p>home</p></div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[],"islands":[{"id":"content","on":"load","scope":[]}]}
+    </script>`;
+  const original = globalThis.fetch;
+  let seen;
+  globalThis.fetch = /** @type {any} */ (async (url, opts) => {
+    seen = { url, opts };
+    return { ok: true, text: async () => "<p>parts page</p>" };
+  });
+  try {
+    hydrate(document);
+    document.getElementById("nav").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.getElementById("content").textContent).toBe("parts page");  // region morphed in place
+    expect(seen.opts.headers["ADH-Request"]).toBe("1");  // requested as an ADH fragment (C1)
+    expect(history.state?.adh).toBe("content");  // history entry records the boosted region
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("a modified click (cmd/ctrl/new-tab) is left to the browser — not boosted", () => {
+  document.body.innerHTML = `
+    <a id="nav" data-z="content" href="/parts">Parts</a>
+    <div data-a id="content" data-b="content" data-c="load"><p>home</p></div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[],"islands":[{"id":"content","on":"load","scope":[]}]}
+    </script>`;
+  hydrate(document);
+  const event = new MouseEvent("click", { bubbles: true, cancelable: true, metaKey: true });
+  document.getElementById("nav").dispatchEvent(event);
+  expect(event.defaultPrevented).toBe(false);  // cmd-click keeps the native open-in-new-tab
+});
+
+test("popstate re-morphs the region recorded in the history entry (Back/Forward)", async () => {
+  document.body.innerHTML = `
+    <div data-a id="content" data-b="content" data-c="load"><p>home</p></div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[],"islands":[{"id":"content","on":"load","scope":[]}]}
+    </script>`;
+  const original = globalThis.fetch;
+  globalThis.fetch = /** @type {any} */ (async () => ({ ok: true, text: async () => "<p>back</p>" }));
+  try {
+    hydrate(document);
+    window.dispatchEvent(new PopStateEvent("popstate", { state: { adh: "content" } }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.getElementById("content").textContent).toBe("back");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test("AppStore signals survive a boosted region morph: the region resets, the store cell does not (P8)", () => {
+  // The `adh-store` island holds a persistent cell (0) bound in the chrome; a nested region is the boost
+  // target. A boost morphs ONLY the region, so the store cell + its binding (outside it) are untouched.
+  document.body.innerHTML = `
+    <div data-a data-b="adh-store" data-c="load">
+      <button data-c:click="b#0">toggle</button>
+      <span data-e:text="0">false</span>
+      <div data-a id="content" data-b="content" data-c="load"><p>home</p></div>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"adh-store","on":"load","scope":[0]},{"id":"content","on":"load","scope":[]}]}
+    </script>`;
+  hydrate(document);
+  document.querySelector("button").click();  // flip the persistent store cell
+  expect(document.querySelector("[data-e\\:text]").textContent).toBe("true");
+  morph(document.getElementById("content"), "<p>parts</p>");  // a boost morphs only the region
+  expect(document.getElementById("content").textContent).toBe("parts");
+  expect(document.querySelector("[data-e\\:text]").textContent).toBe("true");  // store survived the morph
 });

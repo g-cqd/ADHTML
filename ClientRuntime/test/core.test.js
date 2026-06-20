@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { BEHAVIOR_NAMES, applyBehavior, parseInvocation } from "../src/behaviors";
+import { applyBehavior, parseInvocation } from "../src/behaviors";
 import { BINARY_OPS, UNARY_OPS, evalExpr, highlight } from "../src/expr";
 import { Signal, effect } from "../src/signals";
 import { B, S, T } from "../src/tokens";
@@ -94,8 +94,9 @@ test("P5 highlight wraps the match in <mark> and escapes everything else (XSS-sa
 });
 
 test("the behavior-token set is closed and matches Swift Behavior.names (parity)", () => {
-  // 1-char tokens, generated from wire-tokens.json (increment=a … commitValue=h).
-  expect([...BEHAVIOR_NAMES]).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
+  // 1-char tokens, generated from wire-tokens.json (increment=a … commitValue=h). Re-derived straight from
+  // the generated `B` map (not a runtime export) — so the runtime carries no behavior-name table at all.
+  expect(Object.values(B)).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
 });
 
 test("commitValue appends the triggering element's text and clears the query (click-to-commit)", () => {

@@ -28,6 +28,7 @@ public enum WireToken {
     public static let optimistic = "data-w"
     public static let oob = "data-x"
     public static let keymap = "data-y"
+    public static let link = "data-z"
 
     /// Every (name, token) pair — the input to the Swift↔JS parity test.
     public static let all: [(name: String, token: String)] = [
@@ -55,7 +56,8 @@ public enum WireToken {
         ("swap", "data-v"),
         ("optimistic", "data-w"),
         ("oob", "data-x"),
-        ("keymap", "data-y")
+        ("keymap", "data-y"),
+        ("link", "data-z")
     ]
 }
 
