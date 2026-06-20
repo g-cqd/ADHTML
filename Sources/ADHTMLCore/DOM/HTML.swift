@@ -18,7 +18,7 @@ public protocol HTML: Sendable {
 public protocol Component: HTML {
     associatedtype Body: HTML
     @HTMLBuilder var body: Body { get }
-    /// Set `true` by `@Component` when the type has `@State`/`@Derived`: the component then AUTO-WRAPS as a
+    /// Set `true` by `@Component` when the type has `@State`/`@Bound`: the component then AUTO-WRAPS as a
     /// hydration island with an INFERRED scope, so the author writes no `Island`/`scope`/`.id`
     /// (RFC-0005 §3.0). Default `false` — a static component (and a manual `: Component` conformance)
     /// renders inline; an explicit `Island` in the body still works.

@@ -11,8 +11,8 @@
     defaults `scope` to that set (explicit `scope:` becomes an override).
   - *Phase C (the headline):* **implicit islands** — an interactive `@Component` auto-wraps as an island
     with an inferred scope and a stable id; the author never writes `Island(...)`.
-  - *Phase D:* **`@Derived`** component computeds + a wider client expression set; explicit
-    `serverComputed` for the opaque path.
+  - *Phase D:* **`@Bound`** (renamed from `@Derived`) component computeds + a wider client expression set;
+    explicit `serverComputed` for the opaque path.
 
 ## Context
 
@@ -38,7 +38,7 @@ Make **"interactive component"** the authoring unit and **"island"** an inferred
   remains for the rare manual case.
 
 - **Phase C — implicit islands.** `@Component` inspects its members at expansion: a type with `@State`/
-  `@Derived` conforms to a marker `Interactive`. `Component._render` wraps an `Interactive` component's
+  `@Bound` conforms to a marker `Interactive`. `Component._render` wraps an `Interactive` component's
   body in island markup automatically — **id** = hash of the render-scope path (the stable `CellID`
   scheme, RFC-0003 §2; also unblocks SSE morph targeting), **scope** = inferred (Phase B), **loading** =
   `.load` by default, overridable via `@Component(hydrate: .visible)` or a `.hydration(_)` use-site
@@ -47,30 +47,49 @@ Make **"interactive component"** the authoring unit and **"island"** an inferred
   components compose into nested islands because each instance already gets a fresh scope
   (`HTML.swift:23-36`).
 
-- **Phase D — computed/derived in components.** `@Derived var total = $apples + $oranges` builds a
-  client-recomputable `Reactive` and exposes a `Computed` handle usable in `.bind`. Widen
-  `WireExpr`/`BinaryOp` (and the JS evaluator, with the parity test) to add `/`, comparisons, boolean
-  ops, and a ternary, so more derived values stay client-reactive. Rename the opaque closure path to
-  `serverComputed { }` so crossing into server-only is explicit, not silent. Aspirationally, a macro form
-  `@Derived var total: Int { apples + oranges }` parses the body into a `WireExpr` (closed op set;
-  out-of-set bodies diagnose or opt into `serverComputed`).
+- **Phase D — computed/derived in components.** `@Bound var inCart: Reactive<Bool> { qtySignal.reactive
+  > 0 }` builds a client-recomputable `Reactive` and exposes a `Computed` handle (`<name>Computed`) usable
+  in `.bind`/`.show`/`When`. Widen `WireExpr`/`BinaryOp` (and the JS evaluator, with the parity test) to
+  add `/`, comparisons, boolean ops, and a ternary, so more derived values stay client-reactive. Rename
+  the opaque closure path to `serverComputed { }` so crossing into server-only is explicit, not silent.
+  Aspirationally, a macro form `@Bound var total: Int { apples + oranges }` parses the body into a
+  `WireExpr` (closed op set; out-of-set bodies diagnose or opt into `serverComputed`).
 
 ## Implementation status (2026-06-20)
 
 - **Phases A + B + C landed.** Phase A (typed `DOMEvent` + `Signal`/`Computed` `.bind` overloads).
   Phase B/C unified: `CellArena` tracks cells per render scope (`cells(inScope:)`); `Component` gains a
   defaulted `static var isIsland` (the `@Component` macro flips it to `true` for a type with `@State`/
-  `@Derived`) + `static var hydration` (default `.load`, overridable). The single `Component._render`
+  `@Bound`) + `static var hydration` (default `.load`, overridable). The single `Component._render`
   branches: an `isIsland` component wraps its body in `islandOpen(id:"c<scope>", on: hydration,
   scope: cells(inScope:))` / `islandClose` — scope **inferred**, not hand-listed. Static components render
   inline. This replaced the original "marker protocol `Interactive` with its own `_render`" design, which
   hit a Swift limitation (`@HTMLBuilder` inference + `_render` ambiguity don't propagate through a protocol
   refinement). The id is `c<scope-number>` (deterministic per render) for now; the stable XXH64-of-path id
   (cross-render SSE morph targeting) is the M1-cont. / #44 work.
-- **Computed properties via `.bind(_:to: Reactive)`** (no `@Derived` macro): an author writes a plain
-  `var total: Reactive<Int> { aSignal.reactive + bSignal.reactive }` and binds it; the bind registers a
-  client-recomputable computed cell in the ambient arena. The `@Derived`-macro form + the wider expression
-  set (`/`, comparisons, boolean, ternary) remain Phase D follow-ups.
+- **Computed properties via `.bind(_:to: Reactive)`** (the pre-`@Bound` workaround): an author writes a
+  plain `var total: Reactive<Int> { aSignal.reactive + bSignal.reactive }` and binds it; the bind registers
+  a client-recomputable computed cell in the ambient arena. The wider expression set (`/`, ternary) remains
+  a Phase D follow-up.
+
+### Update (2026-06-21) — Phase D: `@Bound` lands (renamed from `@Derived`)
+
+- **The rename.** `@Derived` → **`@Bound`** (grammar-fixed from the rejected "binded"). It is clash-free:
+  there is no `Bound` type, unlike `@Computed`/`@Reactive` which would collide with the existing
+  `Computed<T>`/`Reactive<T>` value types. The peer handle is `<name>Computed`.
+- **The macro** (`BoundMacro`, a `PeerMacro` mirroring `StateMacro`). `@Bound var inCart: Reactive<Bool> {
+  qtySignal.reactive > 0 }` adds a peer `inCartComputed: Computed<Bool> { ADHTMLRenderContext.bound(<RHS>)
+  }`, where `<RHS>` is the author's already-reactive expression read verbatim from the getter. `bound(_:)`
+  (new on `ADHTMLRenderContext`, mirroring `state(...)`) registers it via `CellArena.computed(_:Reactive)`
+  — the proven `Reactive`→`WireExpr`→`Computed` path — so the browser re-derives it with no round-trip; a
+  static render resolves against a throwaway arena (value renders, no wiring).
+- **Getter form, not `= …`.** The macro reads the expression from the property GETTER (`{ … }`), not an
+  `= …` initializer: Swift forbids instance-member references in a stored-property initializer, and a
+  `@Bound` expression inherently references the component's `@State` signal peers. The getter runs when
+  accessed (`self` available), so the reference is legal. (The `= …` form still parses for the rare
+  instance-free constant reactive.) The body-parse form — `@Bound var total: Int { a + b }`, rewriting bare
+  identifiers → signal refs → `WireExpr` — stays the deferred follow-up bounded by the closed op set.
+- A `@Bound` member alone flips `isIsland` (the `@Component` detection now matches `State`/`Bound`).
 - **Known limitation — multi-statement `body` under `@Component`.** Confirmed by diagnostic: a **direct**
   `struct X: Component { var body: some HTML { a; b } }` infers `@HTMLBuilder` and compiles, but the same
   multi-statement `body` does **not** when the `Component` conformance is added by the `@Component`
@@ -89,7 +108,7 @@ Make **"interactive component"** the authoring unit and **"island"** an inferred
 
 ## Consequences
 
-- **Positive:** developer-facing interactive code becomes `@State` + `@Derived` + events + bindings with
+- **Positive:** developer-facing interactive code becomes `@State` + `@Bound` + events + bindings with
   **no `Island`, no `scope`, no `.id`** — SwiftUI-grade. The data-leak boundary is computed by the engine
   (inference is *at least* as safe as a hand-written allowlist, and removes the omission hazard). Stable
   ids unblock SSE morph. Phases A/B ship value immediately and de-risk C/D.

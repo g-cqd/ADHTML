@@ -48,7 +48,7 @@ all of it and sequences it into milestones with a definition of done.
 | Stable `CellID` (hash of render-scope path) | ❌ Phase-1 = creation index |
 | `ADHTMLNIO` ADServe bridge | ❌ empty placeholder (the critical path) |
 | `ADHTMLMarkdown`, `ADHTMLObservability` | ❌ empty placeholders |
-| DSL ergonomics (RFC-0005): implicit islands, `@Derived`, scope inference, … | ◻️ planned (enums + typed events done) |
+| DSL ergonomics (RFC-0005): implicit islands, `@Bound`, scope inference, … | ◻️ planned (enums + typed events done) |
 
 ### ADServe (sibling, `feat/production-complete`, 105 tests green)
 | Area | Status |
@@ -98,7 +98,7 @@ Depends on **stable `CellID`** (§4) for reliable SSE morph targeting across ren
 | **Stable `CellID`** (XXH64 of render-scope path, RFC-0003 §2) | SSE morph/patch must target cells across renders | M |
 | **`.css` + `.scriptJSON` dedicated encoders** | finish escape-by-default (today: fail-safe stubs) | S–M |
 | **Object/array-valued reactive cells** | real app state (lists, records) | M |
-| **DSL ergonomics (RFC-0005):** implicit islands, `@Derived` + wider expr set, scope inference, reactive interpolation, `$state`, doc/head conveniences, component slots | SwiftUI-grade authoring | L |
+| **DSL ergonomics (RFC-0005):** implicit islands, `@Bound` + wider expr set, scope inference, reactive interpolation, `$state`, doc/head conveniences, component slots | SwiftUI-grade authoring | L |
 | **Client dynamic/async/JS (RFC-0006):** show/hide + attr bindings, custom-behavior registry + mount hooks, hypermedia actions (`fetch`→`morph`, ADServe-ready), async UX states | dynamic + networked + extensible | L |
 | **`ADHTMLObservability`** render metrics/tracing hooks | prod visibility | M |
 | **`ADHTMLMarkdown`** (optional for 1.0) | content sites | M |
@@ -142,7 +142,7 @@ Depends on **stable `CellID`** (§4) for reliable SSE morph targeting across ren
 | Milestone | Contents | Outcome |
 |---|---|---|
 | **M1 — Wire it together (live end-to-end)** | `ADHTMLNIO` bridge (§3) + stable `CellID` + CSP wiring + cross-repo integration tests | A real ADHTML app served by ADServe with **live SSE updates** — the headline unblock |
-| **M2 — SwiftUI-grade authoring** | RFC-0005: implicit islands, `@Derived` + wider expr, scope inference, reactive interpolation, doc/head, slots; ship `Examples/Storefront` | Apps written with no `Island`/`scope`/`.id` ceremony |
+| **M2 — SwiftUI-grade authoring** | RFC-0005: implicit islands, `@Bound` + wider expr, scope inference, reactive interpolation, doc/head, slots; ship `Examples/Storefront` | Apps written with no `Island`/`scope`/`.id` ceremony |
 | **M3 — Dynamic + networked + extensible** | RFC-0006 phases 1–2 (show/hide, custom behaviors, mount hooks) + hypermedia actions (ADServe-ready) + async UX | Real dynamic/async UIs + sanctioned author JS |
 | **M4 — Completeness & hardening** | `.css`/`.scriptJSON` encoders, object/array cells, observability both sides, perf (Span escaper + baselines), fuzz/e2e in CI, a11y guidance, ADServe health route + mTLS | Feature-complete, observable, benchmarked |
 | **M5 — Ops & 1.0** | ADServe deployment artifacts + load tests + TLS-over-network; Package.resolved pinning; DocC tutorials + adoption guide; API freeze + CHANGELOG; coordinated **1.0** tags | Deployable, documented, versioned 1.0 |
@@ -153,7 +153,7 @@ Depends on **stable `CellID`** (§4) for reliable SSE morph targeting across ren
   through ADServe, under a **strict CSP** (nonce) with an **SRI-pinned** runtime.
 - Escape-by-default complete (dedicated `.css`/`.scriptJSON`); object/array cells supported; stable
   `CellID`.
-- Authoring is SwiftUI-grade (implicit islands + `@Derived`); the example app uses no `Island`/`scope`.
+- Authoring is SwiftUI-grade (implicit islands + `@Bound`); the example app uses no `Island`/`scope`.
 - Both repos: green CI on macOS + Linux, the cross-repo integration job, committed perf baselines, fuzz
   on schedule; ADServe deployable (container + health + load-tested) with mTLS.
 - Docs: DocC + tutorials + adoption guide; no stale status; ADServe decision docs exist.

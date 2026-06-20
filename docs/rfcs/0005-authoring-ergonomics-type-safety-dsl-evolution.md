@@ -50,7 +50,7 @@ interactive component*, not an authoring concept.
 
 Mechanism:
 - **`@Component` classifies itself.** At expansion the macro sees whether the type has any `@State` /
-  `@Derived` members (or interactive modifiers) and conforms it to a marker `Interactive`. A component
+  `@Bound` members (or interactive modifiers) and conforms it to a marker `Interactive`. A component
   with reactive state *is* an island; a purely static one renders inline (zero island, zero JS) — exactly
   the two-tier model (ADR-0005), now inferred instead of hand-marked.
 - **`Component._render` wraps interactive components automatically** in the island markup
@@ -74,10 +74,10 @@ derived values, events, and bindings. (See §7 for a whole app written this way.
 ### 3.0b Rely on computed/derived properties
 
 Pairing with implicit islands, derived state should be ordinary-looking Swift:
-- **`@Derived var total = $apples + $oranges`** (assignment form) builds a client-recomputable `Reactive`
+- **`@Bound var total = $apples + $oranges`** (assignment form) builds a client-recomputable `Reactive`
   and exposes a `Computed` handle — the pragmatic form, available as soon as the wider expression set
   (§3.5) lands.
-- **Aspiration — macro-parsed computed bodies:** `@Derived var total: Int { apples + oranges }` where the
+- **Aspiration — macro-parsed computed bodies:** `@Bound var total: Int { apples + oranges }` where the
   macro translates the body into a `WireExpr` over the closed op set; an expression outside the set is a
   compile diagnostic (or an opt-in `@ServerComputed` that is server-fixed). This is the "just write a
   computed property" ideal, bounded by what the client can re-evaluate.
@@ -112,10 +112,18 @@ is the `Signal` (SwiftUI parity), collapsing F4 to a single name. Tradeoff: the 
 `State<Int>`; the parent-supplied server seed still works via `init(wrappedValue:)`. Prototype behind the
 existing peer macro before committing.
 
-### 3.5 `@Derived` + wider expression set + explicit server-only (next)
-- `@Derived var total = $apples + $oranges` — a component-level client-recomputable computed (F8).
+### 3.5 `@Bound` + wider expression set + explicit server-only (partly landed)
+- `@Bound var inCart: Reactive<Bool> { $quantity > 0 }` — a component-level client-recomputable computed
+  (F8). **Landed (2026-06-21, renamed from `@Derived`):** the macro reads the author's already-reactive
+  expression from the property GETTER (`{ … }`, not a `= …` initializer — Swift forbids instance-member
+  references in a stored-property initializer, and a derived value inherently references the component's
+  `@State` signals) and emits a peer `<name>Computed: Computed<T>` resolved via `ADHTMLRenderContext.bound`.
+  The `$`/`= …` sugar above is the §3.4 `$state` aspiration; the implemented spelling is
+  `qtySignal.reactive > 0` in the getter. The body-parse form (`@Bound var total: Int { a + b }`, rewriting
+  bare identifiers) stays the deferred follow-up.
 - Widen `WireExpr`/`BinaryOp` (and the JS evaluator, with the parity test) with `/`, comparisons
-  (`== != < <= > >=`), boolean (`&& || !`), and a ternary (F7).
+  (`== != < <= > >=`), boolean (`&& || !`), and a ternary (F7). *(Comparisons + boolean + `contains`/
+  `filter`/`count` landed with P5; `/` and a ternary remain.)*
 - Rename the opaque path to `serverComputed { }` so losing client reactivity is explicit, not silent.
 
 ### 3.6 Document/head conveniences (next)
@@ -137,7 +145,7 @@ and example app (F11).
 | 1 | Typed attribute enums + boolean modifiers + typed ARIA (3.1) | ADR-0014 | low (purely additive, one new file) |
 | 2 | Typed events + Signal-based bindings + island scope inference (3.2) | ADR-0015 | low–medium (render-context change for scope) |
 | 3 | Reactive interpolation/auto-fill (3.3) + `$state` (3.4) | (future ADR) | medium (renderer + macro) |
-| 4 | `@Derived` + wider expression set (3.5) | (future ADR) | medium (Swift+JS parity) |
+| 4 | `@Bound` + wider expression set (3.5) | (future ADR) | medium (Swift+JS parity) |
 | 5 | Document/head conveniences (3.6) + component slots (3.7) | (future ADR) | low–medium |
 | — | Transport: SSE + streaming response + `text/html` (RFC-0003 live updates) | ADR-0012 | blocked on ADServe |
 
@@ -175,7 +183,7 @@ Island("counter", scope: [countSignal.id]) {           →  Island("counter") { 
 
 A small storefront as one SPM target (`Examples/Storefront`). Files in a target see each other with no
 imports; each file just `import ADHTML`. This is the **target** DSL — implicit islands (no `Island`/
-`scope`), `$state`, `@Derived`, typed attributes, and a slotted layout. It is what the compilable example
+`scope`), `$state`, `@Bound`, typed attributes, and a slotted layout. It is what the compilable example
 app converges to as §3.0/§3.5 land; the first committed example uses today's explicit-`Island` API.
 
 ```
@@ -242,7 +250,7 @@ struct ProductCard: Component {
 struct AddToCart: Component {
     let productID: String
     @State var quantity = 0
-    @Derived var inCart = $quantity > 0                   // computed/derived (§3.0b/§3.5)
+    @Bound var inCart = $quantity > 0                   // computed/derived (§3.0b/§3.5)
 
     var body: some HTML {
         div {

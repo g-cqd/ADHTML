@@ -35,6 +35,15 @@ public enum ADHTMLRenderContext {
         return CellArena().stateCell(scope: 0, key: key, default: defaultValue)
     }
 
+    /// Resolve a `@Bound var x: Reactive<V> { … }` declaration to its registered computed handle. Within an
+    /// active context it registers the `Reactive` expression as a client-recomputable computed cell (the
+    /// `Reactive`→`WireExpr`→`Computed` path, so the browser re-evaluates it with no round-trip); outside one
+    /// — a static render — a throwaway arena evaluates the value inline with no wiring. The generated
+    /// `@Bound` handle (`<name>Computed`) is the only caller.
+    public static func bound<Value: WireEncodable>(_ reactive: Reactive<Value>) -> Computed<Value> {
+        (current?.arena ?? CellArena()).computed(reactive)
+    }
+
     /// The child context for a nested ``Component`` render: the same arena, a fresh per-instance scope.
     /// `nil` when there is no active context, so a pure static render stays allocation-free.
     static func child() -> Context? {
