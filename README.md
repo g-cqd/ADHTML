@@ -8,10 +8,16 @@ becomes interactive without a JavaScript framework. There are **no template file
 components, and client behaviors are all `.swift`, so the *entire server scope type-checks and
 compiles as one unit*. `swift build` is the template compiler.
 
-> **Status: pre-1.0.** This repository currently contains the design corpus (4 RFCs + 12 ADRs under
-> [`docs/`](docs/)) and a minimal **compiling render-core skeleton** (the iterative renderer +
-> context-aware escaping). The reactivity/hydration subsystem, macros, and the NIO/Markdown/SRI
-> adapters are specified in the docs and land in subsequent passes. See [`docs/README.md`](docs/README.md).
+> **Status: pre-1.0, engine implemented & tested.** The engine ships today — the iterative render core,
+> context-aware escaping, fine-grained **reactivity**, resumable **islands + hydration**, the **wire
+> format**, the `@Component`/`@State`/`#attr` **macros**, streaming, **SRI**, and the 2.2 KiB **client
+> runtime** are all implemented and covered by **61 Swift tests** + the JS runtime suite (`ADR-0013` is
+> the authoritative status; the design corpus is 6 RFCs + 15 ADRs under [`docs/`](docs/)). The one piece
+> still **planned** is the **ADServe transport bridge** (`ADHTMLNIO`: streaming response + SSE), which
+> needs ADServe's view-support work (spare-parts-app ADR-0046). **Adopt it today via buffered SSR:**
+> render with `renderBytes()` (static) or `renderHydratable(arena:)` (islands + inline state + runtime)
+> and return the bytes as an ADServe `.html` / `.raw` (`text/html`) response — only live SSE
+> `patch`/`morph` updates wait on the bridge.
 
 ## Why
 
@@ -62,14 +68,19 @@ Text is **escaped by default** in the correct context; raw insertion is the sing
 
 | Product | Role | Gate | Status |
 |---|---|---|---|
-| `ADHTMLCore` | Foundation-free render engine (DOM, iterative renderer, escaping) | — | skeleton |
-| `ADHTML` | Umbrella: core + macros + conveniences | — | skeleton |
-| `ADHTMLMacros` | `.macro` target (component/HTML-literal macros) | — | placeholder |
-| `ADHTMLNIO` | NIO `ByteBuffer` byte-sink + ADServe bridge | `ADHTML_NIO` | planned |
-| `ADHTMLMarkdown` | Markdown → ADHTML nodes (swift-markdown) | `ADHTML_MARKDOWN` | planned |
-| `ADHTMLSRI` | Subresource-Integrity hashing of the client runtime (swift-crypto) | `ADHTML_SRI` | planned |
-| `ADHTMLObservability` | Render-path logging/metrics/tracing | `ADHTML_OBS` | planned |
-| `ADHTMLFuzz` | libFuzzer harness for the escaper/parser (Linux) | `ADHTML_FUZZ` | planned |
+| `ADHTMLCore` | Foundation-free render engine (DOM, iterative renderer, escaping, reactivity, hydration, wire, streaming) | — | **implemented** |
+| `ADHTML` | Umbrella: core + macros + `HTMLDocument` | — | **implemented** |
+| `ADHTMLMacros` | `.macro` target (`@Component`/`@State`/`#attr`) | — | **implemented** |
+| `ADHTMLSRI` | Subresource-Integrity hashing of the client runtime (swift-crypto) | `ADHTML_SRI` | **implemented** (gated) |
+| `ADHTMLFuzz` | libFuzzer harness for the escaper (Linux) | `ADHTML_FUZZ` | **implemented** (gated) |
+| `ADHTMLNIO` | NIO `ByteBuffer` byte-sink + ADServe response/SSE bridge | `ADHTML_NIO` | planned (ADServe, ADR-0012) |
+| `ADHTMLMarkdown` | Markdown → ADHTML nodes (swift-markdown) | `ADHTML_MARKDOWN` | planned (placeholder) |
+| `ADHTMLObservability` | Render-path logging/metrics/tracing | `ADHTML_OBS` | planned (placeholder) |
+
+Client interactivity (islands, signals, behaviors, bindings, computeds) and live SSE `patch`/`morph` are
+implemented on **both** sides (Swift wire serializer + the 2.2 KiB JS runtime); SSE can't be *driven*
+until the `ADHTMLNIO` bridge gives ADServe `text/event-stream`, so live updates are the one deferred
+capability. Buffered static + island SSR works now.
 
 ## Building locally
 
