@@ -53,7 +53,40 @@ struct ProbeCounter: Component {
     }
 }
 
+// Lower a view to its opcode program (for the lower-vs-emit phase breakdown).
+func lower<V: HTML>(_ view: V) -> HTMLProgram {
+    var program = HTMLProgram()
+    V._render(view, into: &program)
+    return program
+}
+
+// A realistic small document (head + nav + main + form) for the document-render fixture.
+func documentFixture() -> some HTML {
+    html {
+        head {
+            title { "ADHTML" }
+            meta().attribute("charset", "utf-8")
+            meta().name("viewport").content("width=device-width")
+        }
+        body {
+            nav { ul { _HTMLArray((0 ..< 5).map { i in li { "item \(i)" } }) } }
+            main {
+                h1 { "Welcome" }
+                section {
+                    p { "Lorem ipsum dolor sit amet." }
+                    p { "Consectetur adipiscing elit." }
+                }
+                form {
+                    input().type("text").name("q").placeholder("Search")
+                    button { "Go" }.type("submit")
+                }
+            }
+        }
+    }
+}
+
 let rows = (0 ..< 1000).map { "row \($0)" }
+let rows10k = (0 ..< 10_000).map { "row \($0)" }
 let escapePayload = String(repeating: #"a<b>&"c'd "#, count: 256)  // pathologically escape-dense (~50%)
 let prosePayload = String(  // realistic prose: a couple of escapables per ~60 safe chars (~5%)
     repeating: "The quick brown fox & the lazy dog jumped over <the> fence. ", count: 64)
@@ -88,6 +121,58 @@ measure("render/wide-list-1k", iterations: 2_000) {
 
 measure("render/reactive-island", iterations: 50_000) {
     (try? ProbeCounter().renderHydratable(arena: CellArena()))?.count ?? 0
+}
+
+// --- Larger / varied fixtures (scale + shape) ---
+
+measure("render/wide-list-10k", iterations: 300) {
+    div { _HTMLArray(rows10k.map { row in p { row } }) }.render().utf8.count
+}
+
+measure("render/attr-heavy-2k", iterations: 1_000) {
+    div {
+        _HTMLArray(
+            (0 ..< 2_000)
+                .map { i in
+                    span { "x" }
+                        .class("col").id("c\(i)").title("t").lang("en").dir("ltr").role("cell")
+                        .data("row", "1").data("kind", "num")
+                })
+    }
+    .render().utf8.count
+}
+
+measure("render/table-50x40", iterations: 1_000) {
+    table {
+        _HTMLArray(
+            (0 ..< 50)
+                .map { r in
+                    tr { _HTMLArray((0 ..< 40).map { c in td { "\(r):\(c)" } }) }
+                })
+    }
+    .render().utf8.count
+}
+
+measure("render/document", iterations: 20_000) {
+    documentFixture().render().utf8.count
+}
+
+measure("render/reactive-100-islands", iterations: 1_000) {
+    let arena = CellArena()
+    let view = div { _HTMLArray((0 ..< 100).map { _ in ProbeCounter() }) }
+    return (try? view.renderHydratable(arena: arena))?.count ?? 0
+}
+
+// --- Phase breakdown for the wide list: lowering (build program) vs emitting (program -> bytes) ---
+
+let wideView = div { _HTMLArray(rows10k.map { row in p { row } }) }
+let wide10kProgram = lower(wideView)
+
+measure("phase/lower-10k", iterations: 300) { lower(wideView).ops.count }
+measure("phase/emit-10k", iterations: 300) {
+    var sink = ArraySink(reservingCapacity: wide10kProgram.ops.count * 16)
+    Renderer.render(wide10kProgram, into: &sink)
+    return sink.bytes.count
 }
 
 print("checksum: \(checksum)")

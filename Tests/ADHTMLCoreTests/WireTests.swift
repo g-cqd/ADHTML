@@ -3,26 +3,36 @@ import Testing
 @testable import ADHTMLCore
 
 struct WireTests {
-    @Test
-    func `a counter renders island markup plus a scoped state script`() throws {
+    /// Render the canonical counter island once (extracted so each test's body stays small enough to
+    /// type-check fast — the DSL builder + many `#expect`s in one body otherwise trips the timing gate).
+    private func renderedCounter() throws -> String {
         let arena = CellArena()
         let count = arena.signal(0)
         let view = Island("counter", on: .visible, scope: [count.id]) {
             span { "0" }.bind(.text, to: count.id)
         }
-        let html = try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
+        return try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
+    }
 
+    @Test
+    func `a counter renders its island markup`() throws {
+        let html = try renderedCounter()
         #expect(
             html.hasPrefix(
                 #"<div data-adh-island data-adh-id="counter" data-adh-on="visible"><span data-adh-bind:text="0">0</span></div>"#
             ))
+        #expect(html.hasSuffix("</script>"))
+    }
+
+    @Test
+    func `a counter embeds a scoped state script`() throws {
+        let html = try renderedCounter()
         #expect(html.contains(#"<script type="application/adh-state+json" id="adh-state">"#))
         #expect(html.contains(#""v":1"#))
         #expect(html.contains(#""$":"sig""#))
         #expect(html.contains(#""id":"counter""#))
         #expect(html.contains(#""on":"visible""#))
         #expect(html.contains(#""scope":[0]"#))
-        #expect(html.hasSuffix("</script>"))
     }
 
     @Test
