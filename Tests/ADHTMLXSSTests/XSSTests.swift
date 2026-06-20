@@ -4,7 +4,6 @@ import Testing
 
 /// Adversarial output-encoding tests (ADR-0003). Output must be XSS-safe by construction: a value
 /// placed in any context can never introduce live markup or a dangerous URL scheme.
-@Suite("XSS safety")
 struct XSSTests {
     static let vectors = [
         "<script>alert(1)</script>",
@@ -14,8 +13,8 @@ struct XSSTests {
         "</span><script>alert(1)</script>"
     ]
 
-    @Test("text-context vectors render inert", arguments: vectors)
-    func textInert(_ vector: String) {
+    @Test(arguments: vectors)
+    func `text-context vectors render inert`(_ vector: String) {
         let out = span { vector }.render()
         #expect(!out.contains("<script"))
         #expect(!out.contains("<img"))
@@ -23,8 +22,8 @@ struct XSSTests {
         #expect(out.contains("&lt;"))
     }
 
-    @Test("attribute-context vectors cannot inject markup", arguments: vectors)
-    func attributeInert(_ vector: String) {
+    @Test(arguments: vectors)
+    func `attribute-context vectors cannot inject markup`(_ vector: String) {
         let out = div {}.attribute("title", vector).render()
         #expect(!out.contains("<script"))
         #expect(!out.contains("<img"))
@@ -32,8 +31,8 @@ struct XSSTests {
         #expect(out.contains("&quot;") || !vector.contains("\""))
     }
 
-    @Test("dangerous href schemes are neutralized to an inert placeholder")
-    func dangerousSchemes() {
+    @Test
+    func `dangerous href schemes are neutralized to an inert placeholder`() {
         let bad = [
             "javascript:alert(1)",
             "JaVaScRiPt:alert(1)",
@@ -47,8 +46,8 @@ struct XSSTests {
         }
     }
 
-    @Test("safe href schemes and relative URLs pass through")
-    func safeSchemes() {
+    @Test
+    func `safe href schemes and relative URLs pass through`() {
         #expect(a { "x" }.href("https://example.com/p?q=1").render() == #"<a href="https://example.com/p?q=1">x</a>"#)
         #expect(a { "x" }.href("/relative/path").render() == #"<a href="/relative/path">x</a>"#)
         #expect(a { "x" }.href("mailto:a@b.co").render() == #"<a href="mailto:a@b.co">x</a>"#)
