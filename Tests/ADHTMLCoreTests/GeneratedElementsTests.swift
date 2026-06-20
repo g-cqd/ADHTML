@@ -6,10 +6,9 @@ import Testing
 // hand-curated subset, the new trait-gated attributes (target/content/action/method), void elements, and
 // the one Swift-keyword element name (`var`). Compile-time legality is covered by the fact that these
 // modifiers only compile on their conforming tags — a `.href` on `<div>` would not build.
-@Suite("Generated elements")
 struct GeneratedElementsTests {
-    @Test("table content composes")
-    func tableContent() {
+    @Test
+    func `table content composes`() {
         let markup =
             table {
                 caption { "Scores" }
@@ -23,8 +22,8 @@ struct GeneratedElementsTests {
                 + "<tbody><tr><td>Ada</td></tr></tbody></table>")
     }
 
-    @Test("a form carries action/method/target/name")
-    func formElement() {
+    @Test
+    func `a form carries action/method/target/name`() {
         let markup =
             form {
                 input().type("search").name("q")
@@ -37,8 +36,8 @@ struct GeneratedElementsTests {
         #expect(markup.contains(#"<button type="submit">Go</button>"#))
     }
 
-    @Test("link/meta/base metadata carry their traits")
-    func metadata() {
+    @Test
+    func `link/meta/base metadata carry their traits`() {
         #expect(
             meta().name("viewport").content("width=device-width").render()
                 == #"<meta name="viewport" content="width=device-width">"#)
@@ -48,8 +47,8 @@ struct GeneratedElementsTests {
         #expect(base().href("/").target("_blank").render() == #"<base href="/" target="_blank">"#)
     }
 
-    @Test("an anchor carries target + rel; href stays scheme-allowlisted")
-    func anchor() {
+    @Test
+    func `an anchor carries target + rel; href stays scheme-allowlisted`() {
         let safe = a { "x" }.href("https://example.com").target("_blank").rel("noopener").render()
         #expect(safe == #"<a href="https://example.com" target="_blank" rel="noopener">x</a>"#)
         // A dangerous scheme is neutralized to an inert `#` by the URL escaping context (ADR-0003).
@@ -63,8 +62,8 @@ struct GeneratedElementsTests {
         #expect(`var` { "x" }.render() == "<var>x</var>")
     }
 
-    @Test("new void elements emit no closing tag")
-    func voids() {
+    @Test
+    func `new void elements emit no closing tag`() {
         #expect(col().render() == "<col>")
         #expect(wbr().render() == "<wbr>")
         #expect(source().src("/a.webm").type("video/webm").render() == #"<source src="/a.webm" type="video/webm">"#)
@@ -72,8 +71,8 @@ struct GeneratedElementsTests {
         #expect(area().href("/").alt("hot").render() == #"<area href="/" alt="hot">"#)
     }
 
-    @Test("interactive + edit + figure elements compose")
-    func misc() {
+    @Test
+    func `interactive + edit + figure elements compose`() {
         #expect(
             details { summary { "More" } }.name("acc").render()
                 == #"<details name="acc"><summary>More</summary></details>"#)
