@@ -32,6 +32,12 @@ ADRs are immutable once accepted: supersede with a new ADR rather than editing a
 | [0011](adr/0011-adfcore-adjson-adserve-reuse.md) | `ADFCore`/`ADJSON`/`ADServeCore` reuse policy (no duplication) | Proposed |
 | [0012](adr/0012-adserve-integration.md) | ADServe integration & the streaming dependency | Proposed |
 
+## Integration
+
+| Doc | Purpose |
+|---|---|
+| [integration/adserve-requirements.md](integration/adserve-requirements.md) | Exactly what the ADServe host must provide — `text/html`, streaming, SSE, static-asset serving, an async handler path, a per-request CSP nonce — for the full reactive/hydratable stack. The ADServe side of ADR-0012 (spare-parts-app ADR-0046). |
+
 ## Reading order
 
 1. **RFC-0001** for the vision, the state-of-the-art survey, and the architecture map.
