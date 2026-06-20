@@ -6,9 +6,10 @@
 - **Implementation note**: `ADHTMLSRI` is implemented (gated `ADHTML_SRI`) — SHA-256 via swift-crypto
   confined to that one target; island/cache IDs still use `ADFCore.XXH64`. ADFCore ships no base64, so
   SRI carries a small standard-alphabet encoder. The inline state script now reuses ADJSON's HTML-safe
-  JSON encoder (`escapeHTMLUnsafe`) instead of a duplicated escaper (ADR-0013). Promoting ADJSON's
-  internal `SWAR` kernel into `ADFCore` (shared by both) is a noted follow-up. ADServeCore reuse remains
-  pending the ADServe work.
+  JSON encoder (`escapeHTMLUnsafe`) instead of a duplicated escaper (ADR-0013). The `SWAR` byte-scan
+  kernel now lives in `ADFCore` (public) — ADHTML's escaper uses it; ADJSON adopting it (to drop its
+  internal copy) is a follow-up gated on import-visibility alignment in its `@inlinable` hot paths
+  (ADR-0013). ADServeCore reuse remains pending the ADServe work.
 
 ## Context
 

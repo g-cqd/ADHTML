@@ -66,12 +66,19 @@ deterministic by construction and the numbers are from quiescent runs.
   render walk — the actual stack-safety guarantee (ADR-0002, `maxDepth`) — is already iterative.
 - **Eliminating the `WireValue → JSONValue` bridge — rejected.** Would duplicate JSON encoding ADJSON
   owns (ADR-0011). De-recursion (4) meets the prism without duplication.
-- **Promoting `SWAR` to `ADFCore` for the entity escaper — deferred.** `SWAR` (currently internal to
-  ADJSONCore, which already depends on ADFCore) is a foundation primitive whose proper home is ADFCore;
-  promoting it would let the HTML entity escaper scan 8 bytes/step. Deferred because the escaper is **not**
-  the bottleneck (prose ≈ 5 µs vs wide-list ≈ 175 µs) and word-loads would widen the unsafe surface
-  against the memory-safety prism. Follow-up: promote `SWAR` to ADFCore and have ADJSON adopt it (removing
-  the cross-repo duplicate) before SWAR-accelerating the entity escaper.
+- **`SWAR` → `ADFCore` + SWAR-accelerated escaper — done.** `SWAR` (the byte-scan kernel, previously
+  internal to ADJSONCore) now lives in `ADFCore` as a public primitive — its proper shared home (both
+  ADJSON and ADHTML depend on ADFCore). `Escaper.writeEscaped` fast-forwards 8 bytes/step over safe runs.
+  *Measured:* escape/prose ≈ 5.0 → 3.9 µs (−54% vs the original byte-by-byte) **and** escape/text-heavy
+  (dense) ≈ 9.7 → 9.0 µs — SWAR is now faster on **both**, erasing the bulk-copy dense regression. The one
+  unsafe op (an unaligned `UInt64` word load) is **bounds-proven** (`index + 8 <= count`), confined to the
+  `withUTF8` closure, and never escapes — a stated invariant, not "guilty" unsafe.
+  - *Deferred — ADJSON adopting `ADFCore.SWAR` (de-dup):* ADJSON's copy stays for now; deduping needs
+    aligning ADFCore's import visibility (`public import`) across ADJSON's `@inlinable` encoder/tokenizer
+    hot files — a focused ADJSON PR with its full suite (which needs `ADTestKit`, unavailable here).
+  - *Deferred — `Span`/`RawSpan` for the entity escaper (A1):* the growable `[UInt8]` sink can't `append`
+    a `Span` without an unsafe bridge yet (Span↔Array interop), so Span would relocate rather than remove
+    unsafe; the current word load is already bounds-proven. Revisit as the Span/Array surface matures.
 - **`borrowing _render` — attempted, reverted.** Making the `HTML._render` *requirement* `borrowing Self`
   is the only way to borrow in the generic lowering path (concrete witnesses don't help — generic
   `_HTMLPair`/`_HTMLArray` dispatch through the requirement's convention), but it's all-or-nothing and two
