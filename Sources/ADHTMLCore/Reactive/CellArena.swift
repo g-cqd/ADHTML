@@ -22,6 +22,14 @@ public final class CellArena: Sendable {
         }
     }
 
+    /// Dedup key for a `@State` cell: the component scope + the property name. A struct (not the former
+    /// `"\(scope).\(key)"` string) so a repeated read does not allocate a fresh interpolated String each
+    /// time — it hashes the existing `key` literal and the scalar `scope` in place.
+    private struct StateKey: Hashable {
+        let scope: UInt64
+        let key: String
+    }
+
     private struct State {
         var cells: [Cell] = []
         var nextIndex: UInt64 = 0
@@ -29,9 +37,9 @@ public final class CellArena: Sendable {
         var collecting: [CellID]?
         /// Monotonic per-render component scope counter (see ``freshScope()``).
         var nextScope: UInt64 = 0
-        /// `"scope.key"` → the cell backing a `@State` property, so repeated reads dedup (see
+        /// `(scope, key)` → the cell backing a `@State` property, so repeated reads dedup (see
         /// ``stateCell(scope:key:default:)``).
-        var stateKeys: [String: CellID] = [:]
+        var stateKeys: [StateKey: CellID] = [:]
     }
 
     private let state = Mutex(State())
@@ -81,7 +89,7 @@ public final class CellArena: Sendable {
     public func stateCell<Value: WireEncodable>(scope: UInt64, key: String, default defaultValue: Value)
         -> Signal<Value>
     {
-        let composite = "\(scope).\(key)"
+        let composite = StateKey(scope: scope, key: key)
         let id = state.withLock { lock -> CellID in
             if let existing = lock.stateKeys[composite] { return existing }
             let id = CellID(lock.nextIndex)
