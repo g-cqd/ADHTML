@@ -62,7 +62,7 @@ struct HTMLTreeTests {
                             el(
                                 "tr", [:],
                                 [el("td", [:], [.text("a")]), el("td", [:], [.text("b")])]),
-                            el("tr", [:], [el("td", [:], [.text("c")])]),
+                            el("tr", [:], [el("td", [:], [.text("c")])])
                         ])
                 ])
     }
@@ -91,9 +91,11 @@ struct HTMLTreeTests {
     }
 
     @Test func accessorsWalkTheParsedTree() {
-        let article = HTMLNode.parse(
-            "<article><h1>T</h1><p>one <a href=\"/x\">two</a> three</p></article>"
-        ).first
+        let article =
+            HTMLNode.parse(
+                "<article><h1>T</h1><p>one <a href=\"/x\">two</a> three</p></article>"
+            )
+            .first
         #expect(article?.textContent == "Tone two three")
         #expect(article?.elements(tag: "a").first?.attribute("href") == "/x")
         #expect(article?.firstElement(tag: "h1")?.textContent == "T")

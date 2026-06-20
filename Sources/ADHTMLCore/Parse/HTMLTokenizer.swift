@@ -559,12 +559,11 @@ private final class Machine {
                 let isDigit = scalar >= "0" && scalar <= "9"
                 let isHexDigit =
                     isDigit || (scalar >= "a" && scalar <= "f") || (scalar >= "A" && scalar <= "F")
-                if isHex ? isHexDigit : isDigit {
-                    digits.unicodeScalars.append(scalar)
-                    advance()
-                } else {
+                guard isHex ? isHexDigit : isDigit else {
                     break
                 }
+                digits.unicodeScalars.append(scalar)
+                advance()
             }
             if index < scalars.count, scalars[index] == ";" { advance() }
             if let value = UInt32(digits, radix: isHex ? 16 : 10), let scalar = Unicode.Scalar(value) {
@@ -626,10 +625,9 @@ private final class Machine {
                 let s = scalars[i]
                 let isDigit = s >= "0" && s <= "9"
                 let isHexDigit = isDigit || (s >= "a" && s <= "f") || (s >= "A" && s <= "F")
-                if isHex ? isHexDigit : isDigit {
-                    digits.unicodeScalars.append(s)
-                    i += 1
-                } else { break }
+                guard isHex ? isHexDigit : isDigit else { break }
+                digits.unicodeScalars.append(s)
+                i += 1
             }
             if i < scalars.count, scalars[i] == ";" { i += 1 }
             if let value = UInt32(digits, radix: isHex ? 16 : 10), let scalar = Unicode.Scalar(value) {
@@ -669,5 +667,5 @@ let namedCharacterReferences: [String: String] = [
     "ldquo": "\u{201C}", "rdquo": "\u{201D}", "middot": "\u{B7}", "bull": "\u{2022}",
     "deg": "\u{B0}", "times": "\u{D7}", "divide": "\u{F7}", "frac12": "\u{BD}",
     "laquo": "\u{AB}", "raquo": "\u{BB}", "rarr": "\u{2192}", "larr": "\u{2190}",
-    "harr": "\u{2194}", "hearts": "\u{2665}", "check": "\u{2713}", "cross": "\u{2717}",
+    "harr": "\u{2194}", "hearts": "\u{2665}", "check": "\u{2713}", "cross": "\u{2717}"
 ]

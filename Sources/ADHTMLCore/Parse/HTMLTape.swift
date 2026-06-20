@@ -446,7 +446,7 @@ extension HTMLTape {
         String(decoding: source[off ..< off + len], as: UTF8.self)
     }
     private func lowerName(_ off: Int, _ len: Int) -> String {
-        var bytes = [UInt8]()
+        var bytes: [UInt8] = []
         bytes.reserveCapacity(len)
         for k in off ..< off + len { bytes.append(lower(source[k])) }
         return String(decoding: bytes, as: UTF8.self)

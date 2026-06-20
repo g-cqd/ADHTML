@@ -146,4 +146,26 @@ nonisolated(unsafe) let benchmarks = {
             blackHole(try? div { _HTMLArray((0 ..< 100).map { _ in BenchCounter() }) }.renderHydratable(arena: arena))
         }
     }
+
+    // HTMLTape parser throughput + allocation gate. `mallocCountTotal` is the load-bearing signal:
+    // the byte-level tape builds with no per-node heap traffic (the owned source + the one slot
+    // array), so a jump in malloc count flags an allocation regression. node-dense is the worst case
+    // (3 tokens / 10 bytes); realistic is documentation-shaped markup.
+    Benchmark("parse/tape-node-dense") { bm in
+        let html = "<ul>" + String(repeating: "<li>x</li>", count: 10_000) + "</ul>"
+        for _ in bm.scaledIterations {
+            blackHole(HTMLTape.build(html).slotCount)
+        }
+    }
+
+    Benchmark("parse/tape-realistic") { bm in
+        let html = String(
+            repeating:
+                "<article class=\"card\"><h2><a href=\"/x\">Title</a></h2>"
+                + "<p>Body with <code>inline</code> and <em>emphasis</em> &amp; entities.</p></article>",
+            count: 2_000)
+        for _ in bm.scaledIterations {
+            blackHole(HTMLTape.build(html).slotCount)
+        }
+    }
 }

@@ -53,9 +53,9 @@ extension [HTMLNode] {
     }
 }
 
-private extension String {
+extension String {
     /// The remainder after `prefix`, or nil if `self` doesn't start with it.
-    func dropPrefix(_ prefix: String) -> String? {
+    fileprivate func dropPrefix(_ prefix: String) -> String? {
         hasPrefix(prefix) ? String(dropFirst(prefix.count)) : nil
     }
 }
@@ -94,16 +94,19 @@ public enum HTMLDocument {
     ///     nil, falls back to `main`, `article`, `.content`, `#content`, `#contents`, then `body`.
     ///   - preserveStructure: render section bodies as Markdown (true) or plain text (false).
     ///   - linkResolver: rewrites each `<a href>` when rendering Markdown (see `HTMLNode.markdown`).
+    /// - Returns: the page title, meta description, and the body split into heading/content sections.
     public static func extract(
         _ html: String, containerSelector: String? = nil, preserveStructure: Bool = false,
         linkResolver: ((String) -> String?)? = nil
     ) -> HTMLExtractedContent {
         let roots = HTMLNode.parse(html)
 
-        let title = metaContent(roots, property: "og:title")
+        let title =
+            metaContent(roots, property: "og:title")
             ?? roots.firstElement(matching: "title").map { $0.plainText() }.flatMap { $0.isEmpty ? nil : $0 }
             ?? roots.firstElement(matching: "h1").map { $0.plainText() }.flatMap { $0.isEmpty ? nil : $0 }
-        let description = metaContent(roots, name: "description")
+        let description =
+            metaContent(roots, name: "description")
             ?? metaContent(roots, property: "og:description")
 
         var container = containerSelector.flatMap { roots.firstElement(matching: $0) }

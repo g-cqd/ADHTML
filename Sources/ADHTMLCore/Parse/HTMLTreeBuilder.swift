@@ -163,12 +163,12 @@ private struct TreeBuilder {
 /// Elements that never have children (and so never push onto the open-element stack).
 private let voidElements: Set<String> = [
     "area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source",
-    "track", "wbr",
+    "track", "wbr"
 ]
 
 /// Block-level elements whose start tag implicitly closes an open `<p>`.
 private let blockElements: Set<String> = [
     "address", "article", "aside", "blockquote", "details", "div", "dl", "fieldset", "figcaption",
     "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hgroup", "hr", "main",
-    "menu", "nav", "ol", "p", "pre", "section", "table", "ul",
+    "menu", "nav", "ol", "p", "pre", "section", "table", "ul"
 ]

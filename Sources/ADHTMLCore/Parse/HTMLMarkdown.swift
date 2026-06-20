@@ -152,7 +152,7 @@ extension Array where Element == HTMLNode {
 private let blockTags: Set<String> = [
     "p", "div", "br", "h1", "h2", "h3", "h4", "h5", "h6", "li", "tr", "blockquote", "pre", "section",
     "article", "header", "footer", "nav", "aside", "main", "figure", "figcaption", "details", "summary",
-    "ul", "ol", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot",
+    "ul", "ol", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot"
 ]
 
 /// Elements stripped entirely (chrome / non-content), including their subtree.
@@ -257,7 +257,8 @@ private func trim(_ s: String) -> String {
     while start < end, s[start] == " " || s[start] == "\t" { start = s.index(after: start) }
     while end > start {
         let prev = s.index(before: end)
-        if s[prev] == " " || s[prev] == "\t" { end = prev } else { break }
+        guard s[prev] == " " || s[prev] == "\t" else { break }
+        end = prev
     }
     return String(s[start ..< end])
 }
@@ -268,7 +269,8 @@ private func trimNewlines(_ s: String) -> String {
     while start < end, s[start] == "\n" || s[start] == "\r" { start = s.index(after: start) }
     while end > start {
         let prev = s.index(before: end)
-        if s[prev] == "\n" || s[prev] == "\r" { end = prev } else { break }
+        guard s[prev] == "\n" || s[prev] == "\r" else { break }
+        end = prev
     }
     return String(s[start ..< end])
 }

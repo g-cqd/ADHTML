@@ -27,7 +27,7 @@ struct HTMLTapeRobustnessTests {
         "café <p>résumé — 日本語</p> 🎉", "<p title=\"é&amp;\">😀</p>",
         String(repeating: "<a><b><c>", count: 200) + "text",  // deep nesting / many tags
         String(repeating: "x", count: 5000),  // long text run (exercises the SWAR path)
-        "<p>" + String(repeating: "&amp;", count: 1000) + "</p>",  // entity-dense
+        "<p>" + String(repeating: "&amp;", count: 1000) + "</p>"  // entity-dense
     ])
     func malformedInputNeverCrashes(_ html: String) {
         // Build + fully materialize; navigation must also terminate. A crash/OOB/hang here fails.
@@ -50,7 +50,7 @@ struct HTMLTapeRobustnessTests {
         var rng = SeededRNG(seed: 0xAD11_0FF5_E701)
         let alphabet: [Character] = [
             "<", ">", "/", "=", "\"", "'", "&", ";", "#", "!", "-", "x", "y", "a", "b", "p", " ",
-            "\n", "1", "é",
+            "\n", "1", "é"
         ]
         for _ in 0 ..< 400 {
             let length = rng.int(in: 1 ... 256)

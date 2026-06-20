@@ -17,10 +17,10 @@ struct HTMLTapeTests {
                     name: "a",
                     attributes: [
                         .init(name: "href", value: "x"), .init(name: "class", value: "y"),
-                        .init(name: "disabled", value: ""),
+                        .init(name: "disabled", value: "")
                     ], selfClosing: false),
                 .text("text"),
-                .endTag(name: "a"),
+                .endTag(name: "a")
             ])
     }
 
@@ -45,7 +45,7 @@ struct HTMLTapeTests {
             tape("<script>if (a<b) x('</p>')</script>") == [
                 .startTag(name: "script", attributes: [], selfClosing: false),
                 .text("if (a<b) x('</p>')"),
-                .endTag(name: "script"),
+                .endTag(name: "script")
             ])
     }
 
@@ -54,7 +54,7 @@ struct HTMLTapeTests {
             tape("<style>a{color:red}</style>") == [
                 .startTag(name: "style", attributes: [], selfClosing: false),
                 .text("a{color:red}"),
-                .endTag(name: "style"),
+                .endTag(name: "style")
             ])
     }
 
@@ -63,7 +63,7 @@ struct HTMLTapeTests {
             tape("<title>A &amp; B</title>") == [
                 .startTag(name: "title", attributes: [], selfClosing: false),
                 .text("A & B"),
-                .endTag(name: "title"),
+                .endTag(name: "title")
             ])
     }
 
