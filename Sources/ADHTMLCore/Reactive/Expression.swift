@@ -22,12 +22,22 @@ public enum WireExpr: Sendable, Equatable {
 }
 
 /// The closed binary operator set. Raw values are the wire tokens; the client evaluator mirrors them
-/// (a Swift test + a JS test each pin the same token set — add an op → update both sides).
+/// (a Swift test + a JS test each pin the same token set — add an op → update both sides). Arithmetic +
+/// string concat yield the operand type; comparisons + boolean logic yield `Bool`. (Division and a
+/// ternary are deliberately out of v1: `/` is partial, and a ternary needs a non-binary node.)
 public enum BinaryOp: String, Sendable, Equatable, CaseIterable {
     case add = "+"
     case sub = "-"
     case mul = "*"
     case concat = "++"
+    case eq = "=="
+    case neq = "!="
+    case lt = "<"
+    case lte = "<="
+    case gt = ">"
+    case gte = ">="
+    case and = "&&"
+    case or = "||"
 }
 
 extension WireExpr {
@@ -110,4 +120,38 @@ public func * <V: WireEncodable & Numeric>(lhs: Reactive<V>, rhs: Reactive<V>) -
 /// Reactive string concatenation.
 public func + (lhs: Reactive<String>, rhs: Reactive<String>) -> Reactive<String> {
     Reactive(.binary(.concat, lhs.expr, rhs.expr), lhs.value + rhs.value)
+}
+
+// MARK: - Comparisons (-> Reactive<Bool>)
+
+public func == <V: WireEncodable & Equatable>(lhs: Reactive<V>, rhs: Reactive<V>) -> Reactive<Bool> {
+    Reactive(.binary(.eq, lhs.expr, rhs.expr), lhs.value == rhs.value)
+}
+public func != <V: WireEncodable & Equatable>(lhs: Reactive<V>, rhs: Reactive<V>) -> Reactive<Bool> {
+    Reactive(.binary(.neq, lhs.expr, rhs.expr), lhs.value != rhs.value)
+}
+public func < <V: WireEncodable & Comparable>(lhs: Reactive<V>, rhs: Reactive<V>) -> Reactive<Bool> {
+    Reactive(.binary(.lt, lhs.expr, rhs.expr), lhs.value < rhs.value)
+}
+public func <= <V: WireEncodable & Comparable>(lhs: Reactive<V>, rhs: Reactive<V>) -> Reactive<Bool> {
+    Reactive(.binary(.lte, lhs.expr, rhs.expr), lhs.value <= rhs.value)
+}
+public func > <V: WireEncodable & Comparable>(lhs: Reactive<V>, rhs: Reactive<V>) -> Reactive<Bool> {
+    Reactive(.binary(.gt, lhs.expr, rhs.expr), lhs.value > rhs.value)
+}
+public func >= <V: WireEncodable & Comparable>(lhs: Reactive<V>, rhs: Reactive<V>) -> Reactive<Bool> {
+    Reactive(.binary(.gte, lhs.expr, rhs.expr), lhs.value >= rhs.value)
+}
+
+// MARK: - Boolean logic (eager: both operands build the wire expr — not short-circuiting)
+
+public func && (lhs: Reactive<Bool>, rhs: Reactive<Bool>) -> Reactive<Bool> {
+    Reactive(.binary(.and, lhs.expr, rhs.expr), lhs.value && rhs.value)
+}
+public func || (lhs: Reactive<Bool>, rhs: Reactive<Bool>) -> Reactive<Bool> {
+    Reactive(.binary(.or, lhs.expr, rhs.expr), lhs.value || rhs.value)
+}
+/// Logical NOT, modelled as `operand == false` so no extra (unary) node shape is needed.
+public prefix func ! (operand: Reactive<Bool>) -> Reactive<Bool> {
+    Reactive(.binary(.eq, operand.expr, .bool(false)), !operand.value)
 }

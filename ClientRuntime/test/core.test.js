@@ -90,5 +90,12 @@ test("evalExpr covers each binary op (parity with Swift BinaryOp.rawValue)", () 
   expect(evalExpr({ o: "-", l: { c: 0 }, r: { i: 3 } }, cells)).toBe(4);
   expect(evalExpr({ o: "*", l: { c: 0 }, r: { i: 3 } }, cells)).toBe(21);
   expect(evalExpr({ o: "++", l: { s: "a" }, r: { s: "b" } }, cells)).toBe("ab");
-  expect([...BINARY_OPS]).toEqual(["+", "-", "*", "++"]); // mirrors Swift BinaryOp
+  expect(evalExpr({ o: "==", l: { c: 0 }, r: { i: 7 } }, cells)).toBe(true);
+  expect(evalExpr({ o: "!=", l: { c: 0 }, r: { i: 1 } }, cells)).toBe(true);
+  expect(evalExpr({ o: ">", l: { c: 0 }, r: { i: 3 } }, cells)).toBe(true);
+  expect(evalExpr({ o: "<=", l: { c: 0 }, r: { i: 7 } }, cells)).toBe(true);
+  expect(evalExpr({ o: "&&", l: { b: true }, r: { o: "<", l: { c: 0 }, r: { i: 9 } } }, cells)).toBe(true);
+  expect(evalExpr({ o: "||", l: { b: false }, r: { b: false } }, cells)).toBe(false);
+  // mirrors Swift BinaryOp.allCases
+  expect([...BINARY_OPS]).toEqual(["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||"]);
 });

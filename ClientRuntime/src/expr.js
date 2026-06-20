@@ -12,7 +12,7 @@
 /** @typedef {{visit: WireExprJSON} | {fold: string}} Work */
 
 /** The binary op tokens this evaluator supports — must equal Swift `BinaryOp.rawValue` (parity test). */
-export const BINARY_OPS = ["+", "-", "*", "++"];
+export const BINARY_OPS = ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||"];
 
 /** Evaluate `expr` over `cells`, reading each referenced cell via `.get()` so an enclosing effect
  * subscribes to it (reactive recompute). Iterative post-order.
@@ -55,6 +55,22 @@ function applyOp(op, lhs, rhs) {
       return /** @type {number} */ (lhs) * /** @type {number} */ (rhs);
     case "++":
       return String(lhs) + String(rhs);
+    case "==":
+      return lhs === rhs;
+    case "!=":
+      return lhs !== rhs;
+    case "<":
+      return /** @type {number} */ (lhs) < /** @type {number} */ (rhs);
+    case "<=":
+      return /** @type {number} */ (lhs) <= /** @type {number} */ (rhs);
+    case ">":
+      return /** @type {number} */ (lhs) > /** @type {number} */ (rhs);
+    case ">=":
+      return /** @type {number} */ (lhs) >= /** @type {number} */ (rhs);
+    case "&&":
+      return Boolean(lhs) && Boolean(rhs);
+    case "||":
+      return Boolean(lhs) || Boolean(rhs);
     default:
       return undefined;  // unknown op (forward-compatible: an older runtime ignores a newer formula)
   }

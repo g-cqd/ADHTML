@@ -133,6 +133,33 @@ struct WireTests {
 
     @Test
     func `the binary op set matches the client evaluator (Swift<->JS parity)`() {
-        #expect(Set(BinaryOp.allCases.map(\.rawValue)) == ["+", "-", "*", "++"])
+        #expect(
+            Set(BinaryOp.allCases.map(\.rawValue))
+                == ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||"])
+    }
+
+    @Test
+    func `comparison and boolean operators build reactive Bool expressions`() {
+        let arena = CellArena()
+        let count = arena.signal(3)
+        let flag = arena.signal(true)
+        #expect((count.reactive > 2).value == true)
+        #expect((count.reactive == 3).value == true)
+        #expect((count.reactive != 4).value == true)
+        #expect((flag.reactive && (count.reactive < 5)).value == true)
+        #expect((flag.reactive || false).value == true)
+        #expect((!flag.reactive).value == false)
+
+        guard case .binary(let op, _, _) = (count.reactive >= 3).expr else {
+            Issue.record("expected a binary expr")
+            return
+        }
+        #expect(op == .gte)
+        // `!flag` is modelled as `flag == false` (no separate unary node).
+        guard case .binary(.eq, _, .bool(let constant)) = (!flag.reactive).expr else {
+            Issue.record("expected eq-false")
+            return
+        }
+        #expect(constant == false)
     }
 }
