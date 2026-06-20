@@ -44,6 +44,16 @@ public struct ForEach<Row: HTML>: HTML {
             templateRow: row(EachItem(value: nil)))
     }
 
+    /// A CLIENT list over a `Computed<[String]>` (P3 + P5) — e.g. a `filter`-derived suggestion list whose
+    /// value is recomputed in-browser. Same template + initial-rows lowering, keyed off the computed cell.
+    public init(_ items: Computed<[String]>, @HTMLBuilder row: (EachItem) -> Row) {
+        self.init(
+            rows: items.stored.map { row(EachItem(value: $0)) },
+            eachCell: items.id,
+            filterCell: nil,
+            templateRow: row(EachItem(value: nil)))
+    }
+
     @inlinable
     public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
         if let eachCell = html.eachCell {  // client mode: emit the row template before the initial rows
