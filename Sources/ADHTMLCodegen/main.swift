@@ -239,7 +239,8 @@ func emitTags() -> String {
             if element.void {
                 out += """
                         public enum \(typeName(element.html)): \(inherit) {
-                            public static let name: StaticString = "\(element.html)"
+                            public static let openMarkup: StaticString = "<\(element.html)"
+                            public static let closeMarkup: StaticString = "</\(element.html)>"
                             public static let isVoid = true
                         }
 
@@ -247,7 +248,8 @@ func emitTags() -> String {
             } else {
                 out += """
                         public enum \(typeName(element.html)): \(inherit) {
-                            public static let name: StaticString = "\(element.html)"
+                            public static let openMarkup: StaticString = "<\(element.html)"
+                            public static let closeMarkup: StaticString = "</\(element.html)>"
                         }
 
                     """

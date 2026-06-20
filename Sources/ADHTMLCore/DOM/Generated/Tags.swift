@@ -7,374 +7,486 @@
 public enum Tags {
     // MARK: Main root & document metadata
     public enum Html: HTMLTag {
-        public static let name: StaticString = "html"
+        public static let openMarkup: StaticString = "<html"
+        public static let closeMarkup: StaticString = "</html>"
     }
     public enum Head: HTMLTag {
-        public static let name: StaticString = "head"
+        public static let openMarkup: StaticString = "<head"
+        public static let closeMarkup: StaticString = "</head>"
     }
     public enum Title: HTMLTag {
-        public static let name: StaticString = "title"
+        public static let openMarkup: StaticString = "<title"
+        public static let closeMarkup: StaticString = "</title>"
     }
     public enum Base: HasHref, HasTarget {
-        public static let name: StaticString = "base"
+        public static let openMarkup: StaticString = "<base"
+        public static let closeMarkup: StaticString = "</base>"
         public static let isVoid = true
     }
     public enum Link: HasHref, HasRel, HasType {
-        public static let name: StaticString = "link"
+        public static let openMarkup: StaticString = "<link"
+        public static let closeMarkup: StaticString = "</link>"
         public static let isVoid = true
     }
     public enum Meta: HasName, HasContent {
-        public static let name: StaticString = "meta"
+        public static let openMarkup: StaticString = "<meta"
+        public static let closeMarkup: StaticString = "</meta>"
         public static let isVoid = true
     }
     public enum Style: HasType {
-        public static let name: StaticString = "style"
+        public static let openMarkup: StaticString = "<style"
+        public static let closeMarkup: StaticString = "</style>"
     }
     public enum Body: HTMLTag {
-        public static let name: StaticString = "body"
+        public static let openMarkup: StaticString = "<body"
+        public static let closeMarkup: StaticString = "</body>"
     }
 
     // MARK: Content sectioning
     public enum Address: HTMLTag {
-        public static let name: StaticString = "address"
+        public static let openMarkup: StaticString = "<address"
+        public static let closeMarkup: StaticString = "</address>"
     }
     public enum Article: HTMLTag {
-        public static let name: StaticString = "article"
+        public static let openMarkup: StaticString = "<article"
+        public static let closeMarkup: StaticString = "</article>"
     }
     public enum Aside: HTMLTag {
-        public static let name: StaticString = "aside"
+        public static let openMarkup: StaticString = "<aside"
+        public static let closeMarkup: StaticString = "</aside>"
     }
     public enum Footer: HTMLTag {
-        public static let name: StaticString = "footer"
+        public static let openMarkup: StaticString = "<footer"
+        public static let closeMarkup: StaticString = "</footer>"
     }
     public enum Header: HTMLTag {
-        public static let name: StaticString = "header"
+        public static let openMarkup: StaticString = "<header"
+        public static let closeMarkup: StaticString = "</header>"
     }
     public enum Hgroup: HTMLTag {
-        public static let name: StaticString = "hgroup"
+        public static let openMarkup: StaticString = "<hgroup"
+        public static let closeMarkup: StaticString = "</hgroup>"
     }
     public enum H1: HTMLTag {
-        public static let name: StaticString = "h1"
+        public static let openMarkup: StaticString = "<h1"
+        public static let closeMarkup: StaticString = "</h1>"
     }
     public enum H2: HTMLTag {
-        public static let name: StaticString = "h2"
+        public static let openMarkup: StaticString = "<h2"
+        public static let closeMarkup: StaticString = "</h2>"
     }
     public enum H3: HTMLTag {
-        public static let name: StaticString = "h3"
+        public static let openMarkup: StaticString = "<h3"
+        public static let closeMarkup: StaticString = "</h3>"
     }
     public enum H4: HTMLTag {
-        public static let name: StaticString = "h4"
+        public static let openMarkup: StaticString = "<h4"
+        public static let closeMarkup: StaticString = "</h4>"
     }
     public enum H5: HTMLTag {
-        public static let name: StaticString = "h5"
+        public static let openMarkup: StaticString = "<h5"
+        public static let closeMarkup: StaticString = "</h5>"
     }
     public enum H6: HTMLTag {
-        public static let name: StaticString = "h6"
+        public static let openMarkup: StaticString = "<h6"
+        public static let closeMarkup: StaticString = "</h6>"
     }
     public enum Main: HTMLTag {
-        public static let name: StaticString = "main"
+        public static let openMarkup: StaticString = "<main"
+        public static let closeMarkup: StaticString = "</main>"
     }
     public enum Nav: HTMLTag {
-        public static let name: StaticString = "nav"
+        public static let openMarkup: StaticString = "<nav"
+        public static let closeMarkup: StaticString = "</nav>"
     }
     public enum Section: HTMLTag {
-        public static let name: StaticString = "section"
+        public static let openMarkup: StaticString = "<section"
+        public static let closeMarkup: StaticString = "</section>"
     }
     public enum Search: HTMLTag {
-        public static let name: StaticString = "search"
+        public static let openMarkup: StaticString = "<search"
+        public static let closeMarkup: StaticString = "</search>"
     }
 
     // MARK: Text content
     public enum Blockquote: HTMLTag {
-        public static let name: StaticString = "blockquote"
+        public static let openMarkup: StaticString = "<blockquote"
+        public static let closeMarkup: StaticString = "</blockquote>"
     }
     public enum Dd: HTMLTag {
-        public static let name: StaticString = "dd"
+        public static let openMarkup: StaticString = "<dd"
+        public static let closeMarkup: StaticString = "</dd>"
     }
     public enum Div: HTMLTag {
-        public static let name: StaticString = "div"
+        public static let openMarkup: StaticString = "<div"
+        public static let closeMarkup: StaticString = "</div>"
     }
     public enum Dl: HTMLTag {
-        public static let name: StaticString = "dl"
+        public static let openMarkup: StaticString = "<dl"
+        public static let closeMarkup: StaticString = "</dl>"
     }
     public enum Dt: HTMLTag {
-        public static let name: StaticString = "dt"
+        public static let openMarkup: StaticString = "<dt"
+        public static let closeMarkup: StaticString = "</dt>"
     }
     public enum Figcaption: HTMLTag {
-        public static let name: StaticString = "figcaption"
+        public static let openMarkup: StaticString = "<figcaption"
+        public static let closeMarkup: StaticString = "</figcaption>"
     }
     public enum Figure: HTMLTag {
-        public static let name: StaticString = "figure"
+        public static let openMarkup: StaticString = "<figure"
+        public static let closeMarkup: StaticString = "</figure>"
     }
     public enum Hr: HTMLTag {
-        public static let name: StaticString = "hr"
+        public static let openMarkup: StaticString = "<hr"
+        public static let closeMarkup: StaticString = "</hr>"
         public static let isVoid = true
     }
     public enum Li: HasValue {
-        public static let name: StaticString = "li"
+        public static let openMarkup: StaticString = "<li"
+        public static let closeMarkup: StaticString = "</li>"
     }
     public enum Menu: HTMLTag {
-        public static let name: StaticString = "menu"
+        public static let openMarkup: StaticString = "<menu"
+        public static let closeMarkup: StaticString = "</menu>"
     }
     public enum Ol: HasType {
-        public static let name: StaticString = "ol"
+        public static let openMarkup: StaticString = "<ol"
+        public static let closeMarkup: StaticString = "</ol>"
     }
     public enum P: HTMLTag {
-        public static let name: StaticString = "p"
+        public static let openMarkup: StaticString = "<p"
+        public static let closeMarkup: StaticString = "</p>"
     }
     public enum Pre: HTMLTag {
-        public static let name: StaticString = "pre"
+        public static let openMarkup: StaticString = "<pre"
+        public static let closeMarkup: StaticString = "</pre>"
     }
     public enum Ul: HTMLTag {
-        public static let name: StaticString = "ul"
+        public static let openMarkup: StaticString = "<ul"
+        public static let closeMarkup: StaticString = "</ul>"
     }
 
     // MARK: Inline text semantics
     public enum A: HasHref, HasRel, HasTarget {
-        public static let name: StaticString = "a"
+        public static let openMarkup: StaticString = "<a"
+        public static let closeMarkup: StaticString = "</a>"
     }
     public enum Abbr: HTMLTag {
-        public static let name: StaticString = "abbr"
+        public static let openMarkup: StaticString = "<abbr"
+        public static let closeMarkup: StaticString = "</abbr>"
     }
     public enum B: HTMLTag {
-        public static let name: StaticString = "b"
+        public static let openMarkup: StaticString = "<b"
+        public static let closeMarkup: StaticString = "</b>"
     }
     public enum Bdi: HTMLTag {
-        public static let name: StaticString = "bdi"
+        public static let openMarkup: StaticString = "<bdi"
+        public static let closeMarkup: StaticString = "</bdi>"
     }
     public enum Bdo: HTMLTag {
-        public static let name: StaticString = "bdo"
+        public static let openMarkup: StaticString = "<bdo"
+        public static let closeMarkup: StaticString = "</bdo>"
     }
     public enum Br: HTMLTag {
-        public static let name: StaticString = "br"
+        public static let openMarkup: StaticString = "<br"
+        public static let closeMarkup: StaticString = "</br>"
         public static let isVoid = true
     }
     public enum Cite: HTMLTag {
-        public static let name: StaticString = "cite"
+        public static let openMarkup: StaticString = "<cite"
+        public static let closeMarkup: StaticString = "</cite>"
     }
     public enum Code: HTMLTag {
-        public static let name: StaticString = "code"
+        public static let openMarkup: StaticString = "<code"
+        public static let closeMarkup: StaticString = "</code>"
     }
     public enum Data: HasValue {
-        public static let name: StaticString = "data"
+        public static let openMarkup: StaticString = "<data"
+        public static let closeMarkup: StaticString = "</data>"
     }
     public enum Dfn: HTMLTag {
-        public static let name: StaticString = "dfn"
+        public static let openMarkup: StaticString = "<dfn"
+        public static let closeMarkup: StaticString = "</dfn>"
     }
     public enum Em: HTMLTag {
-        public static let name: StaticString = "em"
+        public static let openMarkup: StaticString = "<em"
+        public static let closeMarkup: StaticString = "</em>"
     }
     public enum I: HTMLTag {
-        public static let name: StaticString = "i"
+        public static let openMarkup: StaticString = "<i"
+        public static let closeMarkup: StaticString = "</i>"
     }
     public enum Kbd: HTMLTag {
-        public static let name: StaticString = "kbd"
+        public static let openMarkup: StaticString = "<kbd"
+        public static let closeMarkup: StaticString = "</kbd>"
     }
     public enum Mark: HTMLTag {
-        public static let name: StaticString = "mark"
+        public static let openMarkup: StaticString = "<mark"
+        public static let closeMarkup: StaticString = "</mark>"
     }
     public enum Q: HTMLTag {
-        public static let name: StaticString = "q"
+        public static let openMarkup: StaticString = "<q"
+        public static let closeMarkup: StaticString = "</q>"
     }
     public enum Rp: HTMLTag {
-        public static let name: StaticString = "rp"
+        public static let openMarkup: StaticString = "<rp"
+        public static let closeMarkup: StaticString = "</rp>"
     }
     public enum Rt: HTMLTag {
-        public static let name: StaticString = "rt"
+        public static let openMarkup: StaticString = "<rt"
+        public static let closeMarkup: StaticString = "</rt>"
     }
     public enum Ruby: HTMLTag {
-        public static let name: StaticString = "ruby"
+        public static let openMarkup: StaticString = "<ruby"
+        public static let closeMarkup: StaticString = "</ruby>"
     }
     public enum S: HTMLTag {
-        public static let name: StaticString = "s"
+        public static let openMarkup: StaticString = "<s"
+        public static let closeMarkup: StaticString = "</s>"
     }
     public enum Samp: HTMLTag {
-        public static let name: StaticString = "samp"
+        public static let openMarkup: StaticString = "<samp"
+        public static let closeMarkup: StaticString = "</samp>"
     }
     public enum Small: HTMLTag {
-        public static let name: StaticString = "small"
+        public static let openMarkup: StaticString = "<small"
+        public static let closeMarkup: StaticString = "</small>"
     }
     public enum Span: HTMLTag {
-        public static let name: StaticString = "span"
+        public static let openMarkup: StaticString = "<span"
+        public static let closeMarkup: StaticString = "</span>"
     }
     public enum Strong: HTMLTag {
-        public static let name: StaticString = "strong"
+        public static let openMarkup: StaticString = "<strong"
+        public static let closeMarkup: StaticString = "</strong>"
     }
     public enum Sub: HTMLTag {
-        public static let name: StaticString = "sub"
+        public static let openMarkup: StaticString = "<sub"
+        public static let closeMarkup: StaticString = "</sub>"
     }
     public enum Sup: HTMLTag {
-        public static let name: StaticString = "sup"
+        public static let openMarkup: StaticString = "<sup"
+        public static let closeMarkup: StaticString = "</sup>"
     }
     public enum Time: HTMLTag {
-        public static let name: StaticString = "time"
+        public static let openMarkup: StaticString = "<time"
+        public static let closeMarkup: StaticString = "</time>"
     }
     public enum U: HTMLTag {
-        public static let name: StaticString = "u"
+        public static let openMarkup: StaticString = "<u"
+        public static let closeMarkup: StaticString = "</u>"
     }
     public enum Var: HTMLTag {
-        public static let name: StaticString = "var"
+        public static let openMarkup: StaticString = "<var"
+        public static let closeMarkup: StaticString = "</var>"
     }
     public enum Wbr: HTMLTag {
-        public static let name: StaticString = "wbr"
+        public static let openMarkup: StaticString = "<wbr"
+        public static let closeMarkup: StaticString = "</wbr>"
         public static let isVoid = true
     }
 
     // MARK: Image & multimedia
     public enum Area: HasHref, HasAlt, HasRel, HasTarget {
-        public static let name: StaticString = "area"
+        public static let openMarkup: StaticString = "<area"
+        public static let closeMarkup: StaticString = "</area>"
         public static let isVoid = true
     }
     public enum Audio: HasSrc {
-        public static let name: StaticString = "audio"
+        public static let openMarkup: StaticString = "<audio"
+        public static let closeMarkup: StaticString = "</audio>"
     }
     public enum Img: HasSrc, HasAlt {
-        public static let name: StaticString = "img"
+        public static let openMarkup: StaticString = "<img"
+        public static let closeMarkup: StaticString = "</img>"
         public static let isVoid = true
     }
     public enum Map: HasName {
-        public static let name: StaticString = "map"
+        public static let openMarkup: StaticString = "<map"
+        public static let closeMarkup: StaticString = "</map>"
     }
     public enum Track: HasSrc {
-        public static let name: StaticString = "track"
+        public static let openMarkup: StaticString = "<track"
+        public static let closeMarkup: StaticString = "</track>"
         public static let isVoid = true
     }
     public enum Video: HasSrc {
-        public static let name: StaticString = "video"
+        public static let openMarkup: StaticString = "<video"
+        public static let closeMarkup: StaticString = "</video>"
     }
 
     // MARK: Embedded content
     public enum Embed: HasSrc, HasType {
-        public static let name: StaticString = "embed"
+        public static let openMarkup: StaticString = "<embed"
+        public static let closeMarkup: StaticString = "</embed>"
         public static let isVoid = true
     }
     public enum Iframe: HasSrc, HasName {
-        public static let name: StaticString = "iframe"
+        public static let openMarkup: StaticString = "<iframe"
+        public static let closeMarkup: StaticString = "</iframe>"
     }
     public enum Object: HasType, HasName {
-        public static let name: StaticString = "object"
+        public static let openMarkup: StaticString = "<object"
+        public static let closeMarkup: StaticString = "</object>"
     }
     public enum Picture: HTMLTag {
-        public static let name: StaticString = "picture"
+        public static let openMarkup: StaticString = "<picture"
+        public static let closeMarkup: StaticString = "</picture>"
     }
     public enum Source: HasSrc, HasType {
-        public static let name: StaticString = "source"
+        public static let openMarkup: StaticString = "<source"
+        public static let closeMarkup: StaticString = "</source>"
         public static let isVoid = true
     }
 
     // MARK: Scripting
     public enum Canvas: HTMLTag {
-        public static let name: StaticString = "canvas"
+        public static let openMarkup: StaticString = "<canvas"
+        public static let closeMarkup: StaticString = "</canvas>"
     }
     public enum Noscript: HTMLTag {
-        public static let name: StaticString = "noscript"
+        public static let openMarkup: StaticString = "<noscript"
+        public static let closeMarkup: StaticString = "</noscript>"
     }
     public enum Script: HasSrc, HasType {
-        public static let name: StaticString = "script"
+        public static let openMarkup: StaticString = "<script"
+        public static let closeMarkup: StaticString = "</script>"
     }
 
     // MARK: Demarcating edits
     public enum Del: HTMLTag {
-        public static let name: StaticString = "del"
+        public static let openMarkup: StaticString = "<del"
+        public static let closeMarkup: StaticString = "</del>"
     }
     public enum Ins: HTMLTag {
-        public static let name: StaticString = "ins"
+        public static let openMarkup: StaticString = "<ins"
+        public static let closeMarkup: StaticString = "</ins>"
     }
 
     // MARK: Table content
     public enum Caption: HTMLTag {
-        public static let name: StaticString = "caption"
+        public static let openMarkup: StaticString = "<caption"
+        public static let closeMarkup: StaticString = "</caption>"
     }
     public enum Col: HTMLTag {
-        public static let name: StaticString = "col"
+        public static let openMarkup: StaticString = "<col"
+        public static let closeMarkup: StaticString = "</col>"
         public static let isVoid = true
     }
     public enum Colgroup: HTMLTag {
-        public static let name: StaticString = "colgroup"
+        public static let openMarkup: StaticString = "<colgroup"
+        public static let closeMarkup: StaticString = "</colgroup>"
     }
     public enum Table: HTMLTag {
-        public static let name: StaticString = "table"
+        public static let openMarkup: StaticString = "<table"
+        public static let closeMarkup: StaticString = "</table>"
     }
     public enum Tbody: HTMLTag {
-        public static let name: StaticString = "tbody"
+        public static let openMarkup: StaticString = "<tbody"
+        public static let closeMarkup: StaticString = "</tbody>"
     }
     public enum Td: HTMLTag {
-        public static let name: StaticString = "td"
+        public static let openMarkup: StaticString = "<td"
+        public static let closeMarkup: StaticString = "</td>"
     }
     public enum Tfoot: HTMLTag {
-        public static let name: StaticString = "tfoot"
+        public static let openMarkup: StaticString = "<tfoot"
+        public static let closeMarkup: StaticString = "</tfoot>"
     }
     public enum Th: HTMLTag {
-        public static let name: StaticString = "th"
+        public static let openMarkup: StaticString = "<th"
+        public static let closeMarkup: StaticString = "</th>"
     }
     public enum Thead: HTMLTag {
-        public static let name: StaticString = "thead"
+        public static let openMarkup: StaticString = "<thead"
+        public static let closeMarkup: StaticString = "</thead>"
     }
     public enum Tr: HTMLTag {
-        public static let name: StaticString = "tr"
+        public static let openMarkup: StaticString = "<tr"
+        public static let closeMarkup: StaticString = "</tr>"
     }
 
     // MARK: Forms
     public enum Button: HasType, HasName, HasValue, HasDisabled {
-        public static let name: StaticString = "button"
+        public static let openMarkup: StaticString = "<button"
+        public static let closeMarkup: StaticString = "</button>"
     }
     public enum Datalist: HTMLTag {
-        public static let name: StaticString = "datalist"
+        public static let openMarkup: StaticString = "<datalist"
+        public static let closeMarkup: StaticString = "</datalist>"
     }
     public enum Fieldset: HasName, HasDisabled {
-        public static let name: StaticString = "fieldset"
+        public static let openMarkup: StaticString = "<fieldset"
+        public static let closeMarkup: StaticString = "</fieldset>"
     }
     public enum Form: HasName, HasAction, HasMethod, HasTarget {
-        public static let name: StaticString = "form"
+        public static let openMarkup: StaticString = "<form"
+        public static let closeMarkup: StaticString = "</form>"
     }
     public enum Input: HasSrc, HasType, HasName, HasValue, HasPlaceholder, HasDisabled, HasAlt {
-        public static let name: StaticString = "input"
+        public static let openMarkup: StaticString = "<input"
+        public static let closeMarkup: StaticString = "</input>"
         public static let isVoid = true
     }
     public enum Label: HasFor {
-        public static let name: StaticString = "label"
+        public static let openMarkup: StaticString = "<label"
+        public static let closeMarkup: StaticString = "</label>"
     }
     public enum Legend: HTMLTag {
-        public static let name: StaticString = "legend"
+        public static let openMarkup: StaticString = "<legend"
+        public static let closeMarkup: StaticString = "</legend>"
     }
     public enum Meter: HasValue {
-        public static let name: StaticString = "meter"
+        public static let openMarkup: StaticString = "<meter"
+        public static let closeMarkup: StaticString = "</meter>"
     }
     public enum Optgroup: HasDisabled {
-        public static let name: StaticString = "optgroup"
+        public static let openMarkup: StaticString = "<optgroup"
+        public static let closeMarkup: StaticString = "</optgroup>"
     }
     public enum Option: HasValue, HasDisabled {
-        public static let name: StaticString = "option"
+        public static let openMarkup: StaticString = "<option"
+        public static let closeMarkup: StaticString = "</option>"
     }
     public enum Output: HasFor, HasName {
-        public static let name: StaticString = "output"
+        public static let openMarkup: StaticString = "<output"
+        public static let closeMarkup: StaticString = "</output>"
     }
     public enum Progress: HasValue {
-        public static let name: StaticString = "progress"
+        public static let openMarkup: StaticString = "<progress"
+        public static let closeMarkup: StaticString = "</progress>"
     }
     public enum Select: HasName, HasDisabled {
-        public static let name: StaticString = "select"
+        public static let openMarkup: StaticString = "<select"
+        public static let closeMarkup: StaticString = "</select>"
     }
     public enum Textarea: HasName, HasPlaceholder, HasDisabled {
-        public static let name: StaticString = "textarea"
+        public static let openMarkup: StaticString = "<textarea"
+        public static let closeMarkup: StaticString = "</textarea>"
     }
 
     // MARK: Interactive elements
     public enum Details: HasName {
-        public static let name: StaticString = "details"
+        public static let openMarkup: StaticString = "<details"
+        public static let closeMarkup: StaticString = "</details>"
     }
     public enum Dialog: HTMLTag {
-        public static let name: StaticString = "dialog"
+        public static let openMarkup: StaticString = "<dialog"
+        public static let closeMarkup: StaticString = "</dialog>"
     }
     public enum Summary: HTMLTag {
-        public static let name: StaticString = "summary"
+        public static let openMarkup: StaticString = "<summary"
+        public static let closeMarkup: StaticString = "</summary>"
     }
 
     // MARK: Web components
     public enum Slot: HasName {
-        public static let name: StaticString = "slot"
+        public static let openMarkup: StaticString = "<slot"
+        public static let closeMarkup: StaticString = "</slot>"
     }
     public enum Template: HTMLTag {
-        public static let name: StaticString = "template"
+        public static let openMarkup: StaticString = "<template"
+        public static let closeMarkup: StaticString = "</template>"
     }
 }

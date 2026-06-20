@@ -157,6 +157,14 @@ measure("render/document", iterations: 20_000) {
     documentFixture().render().utf8.count
 }
 
+// The real server path: renderBytes() -> socket, with no String round-trip.
+measure("renderBytes/document", iterations: 20_000) {
+    documentFixture().renderBytes().count
+}
+measure("renderBytes/wide-10k", iterations: 300) {
+    div { _HTMLArray(rows10k.map { row in p { row } }) }.renderBytes().count
+}
+
 measure("render/reactive-100-islands", iterations: 1_000) {
     let arena = CellArena()
     let view = div { _HTMLArray((0 ..< 100).map { _ in ProbeCounter() }) }
@@ -174,5 +182,7 @@ measure("phase/emit-10k", iterations: 300) {
     Renderer.render(wide10kProgram, into: &sink)
     return sink.bytes.count
 }
+// Render-only of the PREBUILT view (direct path): the gap vs render/wide-list-10k is the build cost.
+measure("phase/render-prebuilt-10k", iterations: 300) { wideView.renderBytes().count }
 
 print("checksum: \(checksum)")

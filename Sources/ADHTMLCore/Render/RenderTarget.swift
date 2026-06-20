@@ -29,9 +29,8 @@ public protocol RenderTarget {
 @usableFromInline
 enum HTMLBytes {
     @inlinable @inline(__always)
-    static func openTagStart(_ name: StaticString, into sink: inout some HTMLByteSink) {
-        sink.writeByte(0x3C)  // <
-        sink.writeStatic(name)
+    static func openTagStart(_ markup: StaticString, into sink: inout some HTMLByteSink) {
+        sink.writeStatic(markup)  // "<tag" (precomputed, includes the leading '<')
     }
     @inlinable @inline(__always)
     static func attribute(
@@ -53,11 +52,8 @@ enum HTMLBytes {
     @inlinable @inline(__always)
     static func raw(_ bytes: [UInt8], into sink: inout some HTMLByteSink) { sink.write(bytes) }
     @inlinable @inline(__always)
-    static func closeTag(_ name: StaticString, into sink: inout some HTMLByteSink) {
-        sink.writeByte(0x3C)  // <
-        sink.writeByte(0x2F)  // /
-        sink.writeStatic(name)
-        sink.writeByte(0x3E)  // >
+    static func closeTag(_ markup: StaticString, into sink: inout some HTMLByteSink) {
+        sink.writeStatic(markup)  // "</tag>" (precomputed)
     }
     @inlinable @inline(__always)
     static func islandOpen(id: IslandID, on: LoadStrategy, into sink: inout some HTMLByteSink) {

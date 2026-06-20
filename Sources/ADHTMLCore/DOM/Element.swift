@@ -15,7 +15,7 @@ public struct HTMLElement<Tag: HTMLTag, Content: HTML>: HTML {
 
     @inlinable
     public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
-        target.openTagStart(Tag.name)
+        target.openTagStart(Tag.openMarkup)
         for entry in html.attributes.entries {
             target.attribute(name: entry.name, value: entry.value, context: entry.context)
         }
@@ -24,7 +24,7 @@ public struct HTMLElement<Tag: HTMLTag, Content: HTML>: HTML {
         } else {
             target.openTagEnd()
             Content._render(html.content, into: &target)
-            target.closeTag(Tag.name)
+            target.closeTag(Tag.closeMarkup)
         }
     }
 }
