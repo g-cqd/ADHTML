@@ -26,10 +26,28 @@ public enum HTMLOp: Sendable {
 }
 
 /// A flat, ordered list of ``HTMLOp``s produced by lowering an ``HTML`` tree. Walked iteratively by
-/// ``Renderer``.
+/// ``Renderer``. As a ``RenderTarget`` it records each render token as an opcode — the materialized path
+/// for `maxDepth`, hydration island-collection, and streaming (`render()`/`renderBytes()` use the
+/// single-pass `DirectTarget` instead).
 public struct HTMLProgram: Sendable {
     public private(set) var ops: ContiguousArray<HTMLOp> = []
     public init() {}
-    /// Append one opcode. Used by ``HTML/_render(_:into:)`` implementations.
+    /// Append one opcode. Used by ``HTMLProgram``'s ``RenderTarget`` conformance.
     public mutating func append(_ op: HTMLOp) { ops.append(op) }
+}
+
+extension HTMLProgram: RenderTarget {
+    @inlinable public mutating func openTagStart(_ name: StaticString) { append(.openTagStart(name)) }
+    @inlinable public mutating func attribute(name: String, value: String, context: EscapeContext) {
+        append(.attribute(name: name, value: value, context: context))
+    }
+    @inlinable public mutating func openTagEnd() { append(.openTagEnd) }
+    @inlinable public mutating func voidTagEnd() { append(.voidTagEnd) }
+    @inlinable public mutating func text(_ value: String) { append(.text(value)) }
+    @inlinable public mutating func raw(_ bytes: [UInt8]) { append(.raw(bytes)) }
+    @inlinable public mutating func closeTag(_ name: StaticString) { append(.closeTag(name)) }
+    @inlinable public mutating func islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID]) {
+        append(.islandOpen(id: id, on: on, scope: scope))
+    }
+    @inlinable public mutating func islandClose() { append(.islandClose) }
 }

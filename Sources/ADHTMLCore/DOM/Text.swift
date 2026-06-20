@@ -7,8 +7,8 @@ public struct Text: HTML {
     public let value: String
     public init(_ value: String) { self.value = value }
     @inlinable
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        program.append(.text(html.value))
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
+        target.text(html.value)
     }
 }
 
@@ -22,7 +22,7 @@ public struct RawHTML: HTML {
     /// Emit `bytes` verbatim. The caller guarantees they are already safe.
     public init(unsafelyEscaped bytes: [UInt8]) { self.bytes = bytes }
     @inlinable
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        program.append(.raw(html.bytes))
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
+        target.raw(html.bytes)
     }
 }

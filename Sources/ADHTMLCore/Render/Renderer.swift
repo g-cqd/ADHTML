@@ -37,58 +37,43 @@ public enum Renderer {
         }
     }
 
-    /// Emit one opcode. The shared byte-writing body of the sync and async render paths.
+    /// Emit one opcode through the shared byte-writers (`HTMLBytes`) — the program-replay path
+    /// (`maxDepth`, hydration, streaming). `render()`/`renderBytes()` bypass opcodes entirely via
+    /// `DirectTarget`.
     static func emit(_ op: HTMLOp, into sink: inout some HTMLByteSink) {
         switch op {
-            case .openTagStart(let name):
-                sink.writeByte(0x3C)  // <
-                sink.writeStatic(name)
+            case .openTagStart(let name): HTMLBytes.openTagStart(name, into: &sink)
             case .attribute(let name, let value, let context):
-                sink.writeByte(0x20)  // space
-                sink.writeUTF8(name)
-                sink.writeByte(0x3D)  // =
-                sink.writeByte(0x22)  // "
-                Escaper.write(value, context: context, into: &sink)
-                sink.writeByte(0x22)  // "
-            case .openTagEnd, .voidTagEnd:
-                sink.writeByte(0x3E)  // >
-            case .text(let value):
-                Escaper.write(value, context: .text, into: &sink)
-            case .raw(let bytes):
-                sink.write(bytes)
-            case .closeTag(let name):
-                sink.writeByte(0x3C)  // <
-                sink.writeByte(0x2F)  // /
-                sink.writeStatic(name)
-                sink.writeByte(0x3E)  // >
-            case .islandOpen(let id, let on, _):
-                sink.writeStatic("<div data-adh-island data-adh-id=\"")
-                Escaper.write(id.raw, context: .attribute, into: &sink)
-                sink.writeStatic("\" data-adh-on=\"")
-                Escaper.write(on.attributeValue, context: .attribute, into: &sink)
-                sink.writeStatic("\">")
-            case .islandClose:
-                sink.writeStatic("</div>")
+                HTMLBytes.attribute(name: name, value: value, context: context, into: &sink)
+            case .openTagEnd, .voidTagEnd: HTMLBytes.tagEnd(into: &sink)
+            case .text(let value): HTMLBytes.text(value, into: &sink)
+            case .raw(let bytes): HTMLBytes.raw(bytes, into: &sink)
+            case .closeTag(let name): HTMLBytes.closeTag(name, into: &sink)
+            case .islandOpen(let id, let on, _): HTMLBytes.islandOpen(id: id, on: on, into: &sink)
+            case .islandClose: HTMLBytes.islandClose(into: &sink)
         }
     }
 }
 
 extension HTML {
-    /// Render to bytes (`text/html` UTF-8). No depth ceiling — for trusted, statically-built views.
+    /// Render to bytes (`text/html` UTF-8) in a SINGLE pass — lowering writes straight to the byte buffer
+    /// via `DirectTarget`, with no intermediate opcode program. The whole static view tree specializes +
+    /// inlines, so this is the fast path. No depth ceiling (the static DSL is type-bounded in depth).
+    @inlinable
     public consuming func renderBytes() -> [UInt8] {
-        var program = HTMLProgram()
-        Self._render(self, into: &program)
-        var sink = ArraySink(reservingCapacity: program.ops.count * 16)
-        Renderer.render(program, into: &sink)
-        return sink.bytes
+        var target = DirectTarget(sink: ArraySink(reservingCapacity: 512))
+        Self._render(self, into: &target)
+        return target.sink.bytes
     }
 
     /// Render to a `String`.
+    @inlinable
     public consuming func render() -> String {
         String(decoding: self.renderBytes(), as: UTF8.self)
     }
 
-    /// Render to bytes with an open-tag-depth ceiling; throws on adversarial nesting (failure-safe).
+    /// Render to bytes with an open-tag-depth ceiling; throws on adversarial nesting (failure-safe). Uses
+    /// the materialized opcode path (`HTMLProgram`) so the ceiling is enforced during the iterative emit.
     public consuming func renderBytes(maxDepth: Int) throws -> [UInt8] {
         var program = HTMLProgram()
         Self._render(self, into: &program)

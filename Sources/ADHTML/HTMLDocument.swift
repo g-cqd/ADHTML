@@ -3,8 +3,9 @@
 public struct HTMLDocument<Content: HTML>: HTML {
     public let content: Content
     public init(@HTMLBuilder _ content: () -> Content) { self.content = content() }
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        program.append(.raw(Array("<!doctype html>".utf8)))
-        Content._render(html.content, into: &program)
+    @inlinable
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
+        target.raw(Array("<!doctype html>".utf8))
+        Content._render(html.content, into: &target)
     }
 }

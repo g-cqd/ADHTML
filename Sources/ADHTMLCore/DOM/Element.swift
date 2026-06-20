@@ -13,17 +13,18 @@ public struct HTMLElement<Tag: HTMLTag, Content: HTML>: HTML {
         self.content = content
     }
 
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        program.append(.openTagStart(Tag.name))
+    @inlinable
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
+        target.openTagStart(Tag.name)
         for entry in html.attributes.entries {
-            program.append(.attribute(name: entry.name, value: entry.value, context: entry.context))
+            target.attribute(name: entry.name, value: entry.value, context: entry.context)
         }
         if Tag.isVoid {
-            program.append(.voidTagEnd)
+            target.voidTagEnd()
         } else {
-            program.append(.openTagEnd)
-            Content._render(html.content, into: &program)
-            program.append(.closeTag(Tag.name))
+            target.openTagEnd()
+            Content._render(html.content, into: &target)
+            target.closeTag(Tag.name)
         }
     }
 }

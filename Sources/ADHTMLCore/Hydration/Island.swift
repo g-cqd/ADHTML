@@ -20,9 +20,10 @@ public struct Island<Content: HTML>: HTML {
         self.content = content()
     }
 
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        program.append(.islandOpen(id: html.id, on: html.on, scope: html.scope))
-        Content._render(html.content, into: &program)
-        program.append(.islandClose)
+    @inlinable
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
+        target.islandOpen(id: html.id, on: html.on, scope: html.scope)
+        Content._render(html.content, into: &target)
+        target.islandClose()
     }
 }

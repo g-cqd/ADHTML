@@ -33,7 +33,7 @@ public enum HTMLBuilder {
 public struct EmptyHTML: HTML {
     public init() {}
     @inlinable
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {}
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {}
 }
 
 /// Two adjacent nodes (the result-builder accumulator). Lowers left then right.
@@ -45,9 +45,9 @@ public struct _HTMLPair<Left: HTML, Right: HTML>: HTML {
         self.right = right
     }
     @inlinable
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        Left._render(html.left, into: &program)
-        Right._render(html.right, into: &program)
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
+        Left._render(html.left, into: &target)
+        Right._render(html.right, into: &target)
     }
 }
 
@@ -56,8 +56,8 @@ public struct _HTMLOptional<Wrapped: HTML>: HTML {
     public let wrapped: Wrapped?
     @inlinable public init(_ wrapped: Wrapped?) { self.wrapped = wrapped }
     @inlinable
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        if let wrapped = html.wrapped { Wrapped._render(wrapped, into: &program) }
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
+        if let wrapped = html.wrapped { Wrapped._render(wrapped, into: &target) }
     }
 }
 
@@ -66,10 +66,10 @@ public enum _HTMLEither<First: HTML, Second: HTML>: HTML {
     case first(First)
     case second(Second)
     @inlinable
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
         switch html {
-            case .first(let first): First._render(first, into: &program)
-            case .second(let second): Second._render(second, into: &program)
+            case .first(let first): First._render(first, into: &target)
+            case .second(let second): Second._render(second, into: &target)
         }
     }
 }
@@ -79,7 +79,7 @@ public struct _HTMLArray<Element: HTML>: HTML {
     public let elements: [Element]
     @inlinable public init(_ elements: [Element]) { self.elements = elements }
     @inlinable
-    public static func _render(_ html: Self, into program: inout HTMLProgram) {
-        for element in html.elements { Element._render(element, into: &program) }
+    public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
+        for element in html.elements { Element._render(element, into: &target) }
     }
 }
