@@ -35,7 +35,9 @@
     ["optimistic", "w"],
     ["oob", "x"],
     ["keymap", "y"],
-    ["link", "z"]
+    ["link", "z"],
+    ["component", "0"],
+    ["scope", "1"]
   ],
   "//behaviors": "Closed client-behavior names — the value of an event binding (`c:click=\"a#0#1\"`).",
   "behaviors": [

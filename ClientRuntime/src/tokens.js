@@ -28,6 +28,8 @@ export const T = {
   oob: "data-x",
   keymap: "data-y",
   link: "data-z",
+  component: "data-0",
+  scope: "data-1",
 };
 
 export const B = {

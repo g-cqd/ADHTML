@@ -9,10 +9,10 @@ import Testing
 struct WireTokensTests {
     @Test
     func `attribute tokens are data- prefixed single chars (valid HTML), unique, covering the set`() {
-        #expect(WireToken.all.count == 26)
+        #expect(WireToken.all.count == 28)
         // The generator prefixes the attribute category with `data-` (valid HTML5 custom data attributes).
         #expect(WireToken.all.allSatisfy { $0.token.hasPrefix("data-") && $0.token.count == 6 })
-        #expect(Set(WireToken.all.map(\.token)).count == 26)  // all distinct
+        #expect(Set(WireToken.all.map(\.token)).count == 28)  // all distinct
         // A few anchors (mirrors wire-tokens.json + the data- prefix).
         #expect(WireToken.island == "data-a")
         #expect(WireToken.id == "data-b")
@@ -22,6 +22,8 @@ struct WireTokensTests {
         #expect(WireToken.action == "data-p")
         #expect(WireToken.oob == "data-x")
         #expect(WireToken.link == "data-z")  // P7 boost
+        #expect(WireToken.component == "data-0")  // Track 4 — component-scoped-asset mount root
+        #expect(WireToken.scope == "data-1")  // Track 4 — CSS scope ancestor
     }
 
     @Test

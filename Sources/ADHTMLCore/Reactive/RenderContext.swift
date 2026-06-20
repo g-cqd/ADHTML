@@ -11,14 +11,17 @@ public enum ADHTMLRenderContext {
     /// The active context, or `nil` during a non-hydratable (static) render.
     @TaskLocal public static var current: Context?
 
-    /// An arena to register reactive cells in, plus the scope id of the component currently rendering.
+    /// An arena to register reactive cells in, plus the scope id of the component currently rendering, plus
+    /// the optional component-scoped-asset sink (Track 4; `nil` on the static render path).
     public struct Context: Sendable {
         public let arena: CellArena
         public let scope: UInt64
+        public let assets: AssetSink?
 
-        public init(arena: CellArena, scope: UInt64) {
+        public init(arena: CellArena, scope: UInt64, assets: AssetSink? = nil) {
             self.arena = arena
             self.scope = scope
+            self.assets = assets
         }
     }
 
@@ -48,6 +51,6 @@ public enum ADHTMLRenderContext {
     /// `nil` when there is no active context, so a pure static render stays allocation-free.
     static func child() -> Context? {
         guard let parent = current else { return nil }
-        return Context(arena: parent.arena, scope: parent.arena.freshScope())
+        return Context(arena: parent.arena, scope: parent.arena.freshScope(), assets: parent.assets)
     }
 }

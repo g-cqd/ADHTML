@@ -18,7 +18,8 @@ extension HTML {
         // and each nested component claims a fresh scope. `node` is a copy of the consumed `self`.
         var program = HTMLProgram()
         let node = self
-        let root = ADHTMLRenderContext.Context(arena: arena, scope: arena.freshScope())
+        let assets = AssetSink()
+        let root = ADHTMLRenderContext.Context(arena: arena, scope: arena.freshScope(), assets: assets)
         ADHTMLRenderContext.$current.withValue(root) {
             Self._render(node, into: &program)
         }
@@ -49,6 +50,9 @@ extension HTML {
 
         let state = try WireSerializer.scriptBytes(cells: arena.cells, islands: islands)
         var out = sink.bytes
+        // Component-scoped CSS (Track 4): inject the deduped `<style>` BEFORE the state script — present in
+        // the initial response (no async load), so no-JS clients get the scoped styling and there is no FOUC.
+        out.append(contentsOf: assets.styleTag())
         out.append(contentsOf: Self.scriptOpen)
         out.append(contentsOf: state)
         out.append(contentsOf: Self.scriptClose)

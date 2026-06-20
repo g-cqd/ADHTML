@@ -60,7 +60,8 @@ extension HTML {
     ) async throws(StreamRenderError<Sink.Failure>) {
         var program = HTMLProgram()
         let node = self
-        let root = ADHTMLRenderContext.Context(arena: arena, scope: arena.freshScope())
+        let assets = AssetSink()
+        let root = ADHTMLRenderContext.Context(arena: arena, scope: arena.freshScope(), assets: assets)
         ADHTMLRenderContext.$current.withValue(root) {
             Self._render(node, into: &program)
         }
@@ -81,7 +82,9 @@ extension HTML {
 
         do {
             try await AsyncRenderer.render(program, into: sink, chunkBytes: chunkBytes)
-            var tail = Self.scriptOpen
+            // Component-scoped CSS (Track 4): the deduped `<style>` precedes the state script in the tail.
+            var tail = assets.styleTag()
+            tail.append(contentsOf: Self.scriptOpen)
             tail.append(contentsOf: stateBytes)
             tail.append(contentsOf: Self.scriptClose)
             try await sink.write(tail)
