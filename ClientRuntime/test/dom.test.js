@@ -137,6 +137,72 @@ test("a value binding writes to an input's value", () => {
   expect(input.value).toBe("hello");
 });
 
+test("P2 class-merge: classList.toggle merges, never clobbering the static class", () => {
+  document.body.innerHTML = `
+    <div data-adh-island data-adh-id="i" data-adh-on="load">
+      <button data-adh-on:click="toggle#0">t</button>
+      <div id="box" class="card" data-adh-class="active:0">box</div>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"i","on":"load","scope":[0]}]}
+    </script>`;
+  hydrate(document);
+  const box = document.getElementById("box");
+  expect(box.className).toBe("card");  // cell false -> active absent, static card kept
+  document.querySelector("button").click();
+  expect(box.classList.contains("active")).toBe(true);
+  expect(box.classList.contains("card")).toBe(true);  // merge, not clobber
+  document.querySelector("button").click();
+  expect(box.classList.contains("active")).toBe(false);
+  expect(box.classList.contains("card")).toBe(true);
+});
+
+test("P2 class-merge splits the cell off the LAST colon (Tailwind-variant class names)", () => {
+  document.body.innerHTML = `
+    <div data-adh-island data-adh-id="i" data-adh-on="load">
+      <div id="box" data-adh-class="hover:bg-blue:0">box</div>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[{"$":"sig","v":true}],"islands":[{"id":"i","on":"load","scope":[0]}]}
+    </script>`;
+  hydrate(document);
+  expect(document.getElementById("box").classList.contains("hover:bg-blue")).toBe(true);
+});
+
+test("P6 show toggles display, keeping the node in the DOM", () => {
+  document.body.innerHTML = `
+    <div data-adh-island data-adh-id="i" data-adh-on="load">
+      <button data-adh-on:click="toggle#0">t</button>
+      <p id="msg" data-adh-show="0" style="display:none">hi</p>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"i","on":"load","scope":[0]}]}
+    </script>`;
+  hydrate(document);
+  const msg = document.getElementById("msg");
+  expect(msg.style.display).toBe("none");  // cell false
+  document.querySelector("button").click();
+  expect(msg.style.display).toBe("");  // cell true -> shown
+  expect(document.getElementById("msg")).toBe(msg);  // same node, never unmounted
+});
+
+test("P6 When mounts/unmounts the template content on the cell", () => {
+  document.body.innerHTML = `
+    <div data-adh-island data-adh-id="i" data-adh-on="load">
+      <button data-adh-on:click="toggle#0">t</button>
+      <template data-adh-if="0"><p id="panel">panel</p></template>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"i","on":"load","scope":[0]}]}
+    </script>`;
+  hydrate(document);
+  expect(document.getElementById("panel")).toBeNull();  // cell false -> not mounted (absent without JS too)
+  document.querySelector("button").click();
+  expect(document.getElementById("panel")?.textContent).toBe("panel");  // mounted
+  document.querySelector("button").click();
+  expect(document.getElementById("panel")).toBeNull();  // unmounted
+});
+
 test("morph reconciles a subtree and preserves a node by id", () => {
   document.body.innerHTML = `<div id="root"><p id="keep">old</p><span>gone</span></div>`;
   const root = document.getElementById("root");

@@ -43,6 +43,46 @@ function bindElements(root, cells) {
   }
 }
 
+/** Wire the declarative directives within `root` (RFC-0021 P2/P6). Each is one signal effect over a cell:
+ *  • `data-adh-class="name:cell;name2:cell2"` — MERGE class toggles (`classList.toggle`, never clobbers
+ *    the static `className`); the name may itself contain `:` (Tailwind variants), so split on the LAST.
+ *  • `data-adh-show="cell"` — toggle `display` (the node stays in the DOM).
+ *  • `template[data-adh-if="cell"]` — mount/unmount: clone the template's content after it when truthy,
+ *    remove it when falsy (the content is absent without JS — the on-demand-reveal fallback).
+ * @param {Element} root @param {Array<import("./signals").Signal<unknown>>} cells @returns {void} */
+function bindDirectives(root, cells) {
+  for (const element of root.querySelectorAll("[data-adh-class]")) {
+    for (const pair of (element.getAttribute("data-adh-class") ?? "").split(";")) {
+      const at = pair.lastIndexOf(":");
+      if (at < 1) continue;
+      const name = pair.slice(0, at);
+      const cell = cells[Number(pair.slice(at + 1))];
+      if (cell) effect(() => element.classList.toggle(name, !!cell.get()));
+    }
+  }
+  for (const element of root.querySelectorAll("[data-adh-show]")) {
+    const cell = cells[Number(element.getAttribute("data-adh-show"))];
+    if (cell) effect(() => void (/** @type {HTMLElement} */ (element).style.display = cell.get() ? "" : "none"));
+  }
+  for (const template of root.querySelectorAll("template[data-adh-if]")) {
+    const cell = cells[Number(template.getAttribute("data-adh-if"))];
+    if (!cell) continue;
+    /** @type {ChildNode[]} */
+    let mounted = [];
+    effect(() => {
+      const on = !!cell.get();
+      if (on && !mounted.length) {
+        const fragment = /** @type {HTMLTemplateElement} */ (template).content.cloneNode(true);
+        mounted = [.../** @type {DocumentFragment} */ (fragment).childNodes];
+        template.after(fragment);
+      } else if (!on && mounted.length) {
+        for (const node of mounted) node.remove();
+        mounted = [];
+      }
+    });
+  }
+}
+
 /** True when `node`'s enclosing island has wired (or it has none) — the lazy-island gate shared by
  * behaviors and actions: a `visible`/`idle` island stays inert until it actually loads.
  * @param {Element} node @returns {boolean} */
@@ -88,6 +128,7 @@ function onSubmit(state, event, doc) {
 /** @param {Element} root @param {Array<import("./signals").Signal<unknown>>} cells @returns {void} */
 function wireIsland(root, cells) {
   bindElements(root, cells);
+  bindDirectives(root, cells);  // P2 class-merge + P6 conditional (show / if)
   wired.add(root);  // the document-level listener now delivers this island's events
 }
 
