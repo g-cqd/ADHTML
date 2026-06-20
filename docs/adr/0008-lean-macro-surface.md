@@ -43,3 +43,29 @@ swift-syntax gating are locked.
   the timing-flag gate; benchmark macro-heavy vs hand-written modules if cost grows.
 - `@dynamicMemberLookup` is used only where it genuinely improves ergonomics (e.g. typed environment
   access), never as a stringly back door that would defeat ADR-0009's compile-time guarantees.
+
+## Build-system note — swiftbuild macro-in-test-bundle mislink (2026-06-20 investigation, RFC-0020)
+
+The reason every build takes `--build-system native` is a **swiftbuild bug, not an ADHTML structuring
+problem** — confirmed by isolating the failure on the pinned toolchain:
+
+- **Libraries and executables build CLEAN under the default `swiftbuild` engine** (`swift build` →
+  "Build complete!"; the `ADHTML` umbrella + its executables link fine).
+- **Only TEST bundles fail.** `swift build --build-tests` under swiftbuild produces *undefined SwiftSyntax
+  symbols* referenced from `ADHTMLMacros-…-testable.o` — i.e. swiftbuild links the macro **plugin** target
+  into a test bundle (transitively, via the umbrella) as if it were an ordinary link-time dependency,
+  without linking SwiftSyntax. A correct build links a `.macro` target into the *compiler* (a host
+  plugin run at build time), never into a downstream test executable. The classic `native` engine does
+  this correctly.
+
+There is **no ADHTML-side restructure that fixes it**: the `.macro` declaration is already correct, and
+any test that compiles macro-annotated code must run the plugin — the mislink is in how swiftbuild scopes
+the plugin's link, not in the package shape. Tracked as an upstream swift-package-manager/swiftbuild issue;
+drop `--build-system native` once fixed.
+
+**Actionable consequence (narrows the prior "native everywhere"):** a *consumer* (e.g. the spare-parts
+app) **can adopt the `@Component`/`Page` umbrella for `swift build` / `swift run` under the default build
+system today** — the library it links builds clean. Only the consumer's **test targets that transitively
+link the umbrella** need `--build-system native` (or can stay on the Foundation-free `ADHTMLCore`, which
+carries no macro and builds tests clean under swiftbuild). This unblocks the RFC-0020 Tier-1 ergonomic
+jump for the app's source/runtime without waiting on the toolchain fix.
