@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { applyBehavior, parseInvocation } from "../src/behaviors";
+import { BINARY_OPS, evalExpr } from "../src/expr";
 import { Signal, effect } from "../src/signals";
 import { WIRE_VERSION, parseState } from "../src/wire";
 
@@ -67,4 +68,27 @@ test("parseState builds signals and enforces the wire version", () => {
 
 test("the runtime wire version matches ADHTMLCore.wireFormatVersion (= 1)", () => {
   expect(WIRE_VERSION).toBe(1);
+});
+
+test("a cmp cell with an expression recomputes reactively from its deps (no SSE)", () => {
+  const state = parseState({
+    v: WIRE_VERSION,
+    cells: [
+      { $: "sig", v: 3 }, // count = 3
+      { $: "cmp", v: 6, e: { o: "*", l: { c: 0 }, r: { i: 2 } } }, // doubled = count * 2
+    ],
+    islands: [],
+  });
+  expect(state.cells[1]!.peek()).toBe(6); // server value, re-derived on hydrate
+  state.cells[0]!.set(10); // count changes client-side
+  expect(state.cells[1]!.peek()).toBe(20); // doubled recomputed in-browser, no round-trip
+});
+
+test("evalExpr covers each binary op (parity with Swift BinaryOp.rawValue)", () => {
+  const cells = [new Signal(7)];
+  expect(evalExpr({ o: "+", l: { c: 0 }, r: { i: 3 } }, cells)).toBe(10);
+  expect(evalExpr({ o: "-", l: { c: 0 }, r: { i: 3 } }, cells)).toBe(4);
+  expect(evalExpr({ o: "*", l: { c: 0 }, r: { i: 3 } }, cells)).toBe(21);
+  expect(evalExpr({ o: "++", l: { s: "a" }, r: { s: "b" } }, cells)).toBe("ab");
+  expect([...BINARY_OPS]).toEqual(["+", "-", "*", "++"]); // mirrors Swift BinaryOp
 });

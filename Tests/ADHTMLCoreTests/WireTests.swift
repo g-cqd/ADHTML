@@ -93,4 +93,36 @@ struct WireTests {
 
         #expect(html.contains(##"data-adh-on:click="increment#0#1""##))
     }
+
+    @Test
+    func `a reactive computed serializes a client-recomputable expression (e)`() throws {
+        let arena = CellArena()
+        let count = arena.signal(3)
+        let doubled = arena.computed(count.reactive * 2)
+        #expect(doubled.value == 6)
+
+        let view = Island("i", scope: [doubled.id]) { span { "" } }
+        let html = try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
+
+        #expect(html.contains(#""$":"cmp""#))
+        #expect(html.contains(#""v":6"#))  // server-evaluated initial value
+        // `count` reindexed to 0; the formula is `cell(0) * 2`.
+        #expect(html.contains(#""e":{"o":"*","l":{"c":0},"r":{"i":2}}"#))
+    }
+
+    @Test
+    func `a closure computed carries no expression`() throws {
+        let arena = CellArena()
+        let base = arena.signal(5)
+        let derived = arena.computed { base.value + 1 }
+        let view = Island("i", scope: [derived.id]) { span { "" } }
+        let html = try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
+        #expect(html.contains(#""$":"cmp""#))
+        #expect(!html.contains(#""e":"#))  // opaque closure -> no client formula
+    }
+
+    @Test
+    func `the binary op set matches the client evaluator (Swift<->JS parity)`() {
+        #expect(Set(BinaryOp.allCases.map(\.rawValue)) == ["+", "-", "*", "++"])
+    }
 }

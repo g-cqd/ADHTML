@@ -65,7 +65,7 @@ public enum WireSerializer {
         }
         while let index = worklist.popLast() {
             guard index >= 0, index < cells.count, reachable.insert(index).inserted else { continue }
-            if case .computed(let dependencies) = cells[index].kind {
+            if case .computed(let dependencies, _) = cells[index].kind {
                 for dependency in dependencies { worklist.append(Int(dependency.raw)) }
             }
         }
@@ -93,12 +93,61 @@ public enum WireSerializer {
             case .signal:
                 object["$"] = .string("sig")
                 object["v"] = try json(cell.value)
-            case .computed(let dependencies):
+            case .computed(let dependencies, let expr):
                 object["$"] = .string("cmp")
                 object["d"] = .array(remap(dependencies, oldToNew))
                 object["v"] = try json(cell.value)
+                if let expr { object["e"] = try encodeExpr(expr, oldToNew: oldToNew) }
         }
         return .object(object)
+    }
+
+    /// Serialize a client-recomputable `WireExpr` to compact JSON, reindexing its cell refs (old → new)
+    /// like `d`. Iterative post-order (no recursion, ADR-0002) under the same `maxValueDepth` cap.
+    /// Encoding: cell `{"c":idx}`, literals `{"i"|"d"|"b"|"s": …}`, binary `{"o":op,"l":…,"r":…}`.
+    private static func encodeExpr(_ root: WireExpr, oldToNew: [Int: Int]) throws(WireError) -> JSONValue {
+        enum Work {
+            case visit(WireExpr)
+            case fold(BinaryOp)
+        }
+        var work: [Work] = [.visit(root)]
+        var values: [JSONValue] = []
+        while let item = work.popLast() {
+            if work.count > Self.maxValueDepth {
+                throw WireError.encoding("wire expression nesting exceeds \(Self.maxValueDepth)")
+            }
+            switch item {
+                case .visit(.binary(let op, let lhs, let rhs)):
+                    work.append(.fold(op))
+                    work.append(.visit(rhs))
+                    work.append(.visit(lhs))
+                case .visit(let leaf):
+                    values.append(exprLeaf(leaf, oldToNew: oldToNew))
+                case .fold(let op):
+                    let rhs = values.removeLast()
+                    let lhs = values.removeLast()
+                    var node = OrderedDictionary<String, JSONValue>()
+                    node["o"] = .string(op.rawValue)
+                    node["l"] = lhs
+                    node["r"] = rhs
+                    values.append(.object(node))
+            }
+        }
+        return values.removeLast()
+    }
+
+    /// A leaf `WireExpr` (cell ref or literal) as compact JSON; cell refs are reindexed.
+    private static func exprLeaf(_ expr: WireExpr, oldToNew: [Int: Int]) -> JSONValue {
+        var node = OrderedDictionary<String, JSONValue>()
+        switch expr {
+            case .cell(let id): node["c"] = .int(Int64(oldToNew[Int(id.raw)] ?? Int(id.raw)))
+            case .int(let value): node["i"] = .int(value)
+            case .double(let value): node["d"] = .number(value)
+            case .bool(let value): node["b"] = .bool(value)
+            case .string(let value): node["s"] = .string(value)
+            case .binary: break  // handled by encodeExpr's fold; never reached here
+        }
+        return .object(node)
     }
 
     private static func encodeIsland(_ island: WireIsland, oldToNew: [Int: Int]) -> JSONValue {

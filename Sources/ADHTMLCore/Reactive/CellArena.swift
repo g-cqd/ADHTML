@@ -18,7 +18,10 @@ public final class CellArena: Sendable {
 
         public enum Kind: Sendable, Equatable {
             case signal
-            case computed(dependencies: [CellID])
+            /// A derived cell. `expr` is the client-recomputable formula when built from the `Reactive`
+            /// DSL (``CellArena/computed(_:)-(Reactive<Value>)``), else `nil` (server-evaluated closure,
+            /// updated by SSE patch).
+            case computed(dependencies: [CellID], expr: WireExpr?)
         }
     }
 
@@ -53,8 +56,9 @@ public final class CellArena: Sendable {
         return Signal(arena: self, id: id, stored: initial)
     }
 
-    /// Create a computed cell. `body` is evaluated once now (the server's single render pass); reads of
-    /// other cells during it become this cell's recorded dependencies.
+    /// Create a computed cell from an opaque closure. `body` is evaluated once now (the server's single
+    /// render pass); reads of other cells during it become this cell's recorded dependencies. The client
+    /// cannot re-run the closure, so the cell's value is server-fixed (updated by SSE patch).
     public func computed<Value: WireEncodable>(_ body: () -> Value) -> Computed<Value> {
         state.withLock { $0.collecting = [] }
         let result = body()
@@ -63,8 +67,19 @@ public final class CellArena: Sendable {
             lock.collecting = nil
             return deps
         }
-        let id = register(.computed(dependencies: dependencies), value: result.wireValue)
+        let id = register(.computed(dependencies: dependencies, expr: nil), value: result.wireValue)
         return Computed(arena: self, id: id, stored: result)
+    }
+
+    /// Create a computed cell from a ``Reactive`` expression. Evaluated once now for the initial value
+    /// AND serialized as a `WireExpr` (the cell's `e`) so the client re-evaluates it reactively — a
+    /// derived cell that updates in-browser with no server round-trip. Its dependencies are the cells the
+    /// expression references.
+    public func computed<Value: WireEncodable>(_ reactive: Reactive<Value>) -> Computed<Value> {
+        let id = register(
+            .computed(dependencies: reactive.expr.cellRefs, expr: reactive.expr),
+            value: reactive.value.wireValue)
+        return Computed(arena: self, id: id, stored: reactive.value)
     }
 
     /// Record that the currently-evaluating computed (if any) read cell `id`.
