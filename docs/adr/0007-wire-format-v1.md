@@ -39,3 +39,22 @@ runtime matches the emitted version.
 - **Negative**: a documented schema to keep in lockstep with the runtime — mitigated by the version
   field + CI parity test and `WireEncodable` round-trip property tests.
 - **Security**: the inline `<script>` is `scriptJSON`-escaped (ADR-0003) and CSP nonce/hash-compatible.
+
+## Amendment — P5 op-table + array cells (RFC-0021, 2026-06-20)
+
+The client-recomputable expression `e` (a `cmp` cell's formula) grows, on **both** sides together (a
+Swift `UnaryOp`/`BinaryOp.allCases` ↔ JS `UNARY_OPS`/`BINARY_OPS` parity test), staying a closed set with
+no `eval`:
+
+- **A unary node** `{"u":op,"x":<expr>}` joins the existing leaf / `{"o",l,r}` binary node. Ops:
+  `lc` (`String.lowercased`), `len` (`Collection.count`). The serializer's iterative encoder gains a
+  `foldUnary` work item; the JS evaluator a `ufold`; `cellRefs` walks the operand. Forward-compatible: an
+  older runtime returns `undefined` for an unknown op.
+- **A `has` binary op** — substring (`String.includes`) OR array membership (`Array.includes`), the client
+  picking by operand type. Yields `Bool`. Powers the combobox filter predicate (`item.lowercased().has(
+  query.lowercased())`) and the exact-match guard.
+- **Array cells** need **no** format change — `WireValue.array` (ADR-0004) already serializes
+  `Signal<[String]>` as a JSON array; P3's client list and the `commit`/`removeLast` behaviors operate on
+  it directly.
+- `highlight(text, query)` is a runtime helper (not a wire node): it emits **escaped** text with the match
+  wrapped in a literal `<mark>` — XSS-safe, no `RawHTML`, no user markup reaches the DOM (unit-tested).

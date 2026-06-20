@@ -4,15 +4,19 @@
 // work + value stacks), matching the engine's no-recursion stance.
 
 /**
- * A serialized expression node: a cell ref `{c}`, a literal `{i|d|b|s}`, or a binary `{o,l,r}`.
+ * A serialized expression node: a cell ref `{c}`, a literal `{i|d|b|s}`, a binary `{o,l,r}`, or a unary
+ * `{u,x}`.
  * @typedef {{c: number} | {i: number} | {d: number} | {b: boolean} | {s: string}
- *   | {o: string, l: WireExprJSON, r: WireExprJSON}} WireExprJSON
+ *   | {o: string, l: WireExprJSON, r: WireExprJSON} | {u: string, x: WireExprJSON}} WireExprJSON
  */
 
-/** @typedef {{visit: WireExprJSON} | {fold: string}} Work */
+/** @typedef {{visit: WireExprJSON} | {fold: string} | {ufold: string}} Work */
 
 /** The binary op tokens this evaluator supports — must equal Swift `BinaryOp.rawValue` (parity test). */
-export const BINARY_OPS = ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||"];
+export const BINARY_OPS = ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "has"];
+
+/** The unary op tokens — must equal Swift `UnaryOp.rawValue` (parity test). */
+export const UNARY_OPS = ["lc", "len"];
 
 /** Failure-safe ceiling on the work the evaluator does for one formula — the client-side mirror of the
  * server's `WireSerializer.maxValueDepth` cap. A well-formed `e` from the Swift DSL is tiny; this bounds an
@@ -38,9 +42,12 @@ export function evalExpr(expr, cells) {
       const rhs = values.pop();
       const lhs = values.pop();
       values.push(applyOp(item.fold, lhs, rhs));
+    } else if ("ufold" in item) {
+      values.push(applyUnary(item.ufold, values.pop()));
     } else {
       const node = item.visit;
       if ("o" in node) work.push({ fold: node.o }, { visit: node.r }, { visit: node.l });
+      else if ("u" in node) work.push({ ufold: node.u }, { visit: node.x });
       else if ("c" in node) values.push(cells[node.c]?.get());
       else if ("i" in node) values.push(node.i);
       else if ("d" in node) values.push(node.d);
@@ -49,6 +56,29 @@ export function evalExpr(expr, cells) {
     }
   }
   return values.pop();
+}
+
+/** @param {string} op @param {unknown} x @returns {unknown} */
+function applyUnary(op, x) {
+  if (op === "lc") return String(x).toLowerCase();
+  if (op === "len") return /** @type {{length?: number}} */ (x)?.length ?? 0;
+  return undefined;  // forward-compatible
+}
+
+/** Escape `&`/`<`/`>` for element-content insertion (P5 — quotes need no escaping in text content). */
+const esc = (/** @type {string} */ s) =>
+  s.replace(/[&<>]/g, (c) => (c === "&" ? "&amp;" : c === "<" ? "&lt;" : "&gt;"));
+
+/** P5 `highlight(text, query)` → HTML with the first case-insensitive match of `query` wrapped in
+ * `<mark>`. **XSS-safe**: every text run is escaped; only the literal `<mark>`/`</mark>` is unescaped — no
+ * `RawHTML`, no user markup reaches the DOM. An empty/absent match returns the escaped text verbatim.
+ * @param {unknown} text @param {unknown} query @returns {string} */
+export function highlight(text, query) {
+  const t = String(text);
+  const q = String(query);
+  const at = q ? t.toLowerCase().indexOf(q.toLowerCase()) : -1;
+  if (at < 0) return esc(t);
+  return esc(t.slice(0, at)) + "<mark>" + esc(t.slice(at, at + q.length)) + "</mark>" + esc(t.slice(at + q.length));
 }
 
 /** @param {string} op @param {unknown} lhs @param {unknown} rhs @returns {unknown} */
@@ -78,6 +108,8 @@ function applyOp(op, lhs, rhs) {
       return Boolean(lhs) && Boolean(rhs);
     case "||":
       return Boolean(lhs) || Boolean(rhs);
+    case "has":  // string substring (includes "") OR array membership — picks by operand type
+      return Array.isArray(lhs) ? lhs.includes(rhs) : String(lhs).includes(String(rhs));
     default:
       return undefined;  // unknown op (forward-compatible: an older runtime ignores a newer formula)
   }

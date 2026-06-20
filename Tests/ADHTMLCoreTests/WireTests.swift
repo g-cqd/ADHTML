@@ -151,7 +151,7 @@ struct WireTests {
     func `the binary op set matches the client evaluator (Swift<->JS parity)`() {
         #expect(
             Set(BinaryOp.allCases.map(\.rawValue))
-                == ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||"])
+                == ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "has"])
     }
 
     @Test

@@ -146,6 +146,7 @@ public enum WireSerializer {
         enum Work {
             case visit(WireExpr)
             case fold(BinaryOp)
+            case foldUnary(UnaryOp)
         }
         var work: [Work] = [.visit(root)]
         var values: [JSONValue] = []
@@ -158,6 +159,9 @@ public enum WireSerializer {
                     work.append(.fold(op))
                     work.append(.visit(rhs))
                     work.append(.visit(lhs))
+                case .visit(.unary(let op, let operand)):
+                    work.append(.foldUnary(op))
+                    work.append(.visit(operand))
                 case .visit(let leaf):
                     values.append(exprLeaf(leaf, oldToNew: oldToNew))
                 case .fold(let op):
@@ -167,6 +171,12 @@ public enum WireSerializer {
                     node["o"] = .string(op.rawValue)
                     node["l"] = lhs
                     node["r"] = rhs
+                    values.append(.object(node))
+                case .foldUnary(let op):
+                    let operand = values.removeLast()
+                    var node = OrderedDictionary<String, JSONValue>()
+                    node["u"] = .string(op.rawValue)
+                    node["x"] = operand
                     values.append(.object(node))
             }
         }
@@ -182,7 +192,7 @@ public enum WireSerializer {
             case .double(let value): node["d"] = .number(value)
             case .bool(let value): node["b"] = .bool(value)
             case .string(let value): node["s"] = .string(value)
-            case .binary: break  // handled by encodeExpr's fold; never reached here
+            case .binary, .unary: break  // handled by encodeExpr's fold; never reached here
         }
         return .object(node)
     }

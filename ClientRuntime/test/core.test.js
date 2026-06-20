@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 
 import { BEHAVIOR_NAMES, applyBehavior, parseInvocation } from "../src/behaviors";
-import { BINARY_OPS, evalExpr } from "../src/expr";
+import { BINARY_OPS, UNARY_OPS, evalExpr, highlight } from "../src/expr";
 import { Signal, effect } from "../src/signals";
 import { WIRE_VERSION, parseState } from "../src/wire";
 
@@ -70,6 +70,17 @@ test("the extended behaviors mirror the Swift registry (P4: setFromValue/listMov
   expect(list[0].peek()).toEqual(["a"]);
 });
 
+test("P5 highlight wraps the match in <mark> and escapes everything else (XSS-safe, no RawHTML)", () => {
+  expect(highlight("Banana", "an")).toBe("B<mark>an</mark>ana"); // first case-insensitive match
+  expect(highlight("BANANA", "an")).toBe("B<mark>AN</mark>ANA"); // case-insensitive, original case kept
+  expect(highlight("plum", "xyz")).toBe("plum"); // no match -> escaped text verbatim
+  expect(highlight("a&b", "")).toBe("a&amp;b"); // empty query -> just escaped
+  // A hostile item cannot inject markup: the text is escaped, only <mark> is literal.
+  expect(highlight("<img src=x onerror=alert(1)>", "img")).toBe(
+    "&lt;<mark>img</mark> src=x onerror=alert(1)&gt;",
+  );
+});
+
 test("the behavior-name set is closed and matches Swift Behavior.names (parity)", () => {
   expect([...BEHAVIOR_NAMES]).toEqual([
     "increment", "toggle", "set", "setFromValue", "listMove", "commit", "removeLast",
@@ -130,5 +141,21 @@ test("evalExpr covers each binary op (parity with Swift BinaryOp.rawValue)", () 
   expect(evalExpr({ o: "&&", l: { b: true }, r: { o: "<", l: { c: 0 }, r: { i: 9 } } }, cells)).toBe(true);
   expect(evalExpr({ o: "||", l: { b: false }, r: { b: false } }, cells)).toBe(false);
   // mirrors Swift BinaryOp.allCases
-  expect([...BINARY_OPS]).toEqual(["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||"]);
+  expect([...BINARY_OPS]).toEqual(
+    ["+", "-", "*", "++", "==", "!=", "<", "<=", ">", ">=", "&&", "||", "has"],
+  );
+});
+
+test("evalExpr covers the P5 ops: lc/len unary, has binary (parity with Swift UnaryOp/BinaryOp)", () => {
+  const cells = [new Signal("Hello"), new Signal(["a", "b", "c"])];
+  expect(evalExpr({ u: "lc", x: { c: 0 } }, cells)).toBe("hello");
+  expect(evalExpr({ u: "len", x: { c: 1 } }, cells)).toBe(3);
+  expect(evalExpr({ o: "has", l: { c: 0 }, r: { s: "ell" } }, cells)).toBe(true); // substring
+  expect(evalExpr({ o: "has", l: { c: 0 }, r: { s: "" } }, cells)).toBe(true); // empty needle
+  expect(evalExpr({ o: "has", l: { c: 1 }, r: { s: "b" } }, cells)).toBe(true); // array membership
+  expect(evalExpr({ o: "has", l: { c: 1 }, r: { s: "z" } }, cells)).toBe(false);
+  // case-insensitive substring composes lc + has (the combobox filter predicate)
+  const folded = { o: "has", l: { u: "lc", x: { c: 0 } }, r: { s: "ell" } };
+  expect(evalExpr(folded, cells)).toBe(true);
+  expect([...UNARY_OPS]).toEqual(["lc", "len"]);
 });

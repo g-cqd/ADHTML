@@ -19,6 +19,17 @@ public enum WireExpr: Sendable, Equatable {
     case string(String)
     /// A binary operation over two sub-expressions.
     indirect case binary(BinaryOp, WireExpr, WireExpr)
+    /// A unary operation over one sub-expression (P5: `lowercased`, `count`).
+    indirect case unary(UnaryOp, WireExpr)
+}
+
+/// The closed unary operator set (P5). Raw values are the wire tokens; the client evaluator mirrors them
+/// (a Swift + a JS test pin the same set). String/collection transforms used by client filters & display.
+public enum UnaryOp: String, Sendable, Equatable, CaseIterable {
+    /// `String.lowercased()` — case-folding for case-insensitive `contains`.
+    case lowercased = "lc"
+    /// `Collection.count` — a client list's live length (e.g. the bound for `listMove`).
+    case count = "len"
 }
 
 /// The closed binary operator set. Raw values are the wire tokens; the client evaluator mirrors them
@@ -38,6 +49,9 @@ public enum BinaryOp: String, Sendable, Equatable, CaseIterable {
     case gte = ">="
     case and = "&&"
     case or = "||"
+    /// Substring / membership test (P5). String `lhs.contains(rhs)`, or array `lhs.contains(element)` —
+    /// the client picks by operand type. Yields `Bool`. Powers the combobox filter + exact-match check.
+    case contains = "has"
 }
 
 extension WireExpr {
@@ -52,6 +66,8 @@ extension WireExpr {
                 case .binary(_, let lhs, let rhs):
                     stack.append(lhs)
                     stack.append(rhs)
+                case .unary(_, let operand):
+                    stack.append(operand)
                 default: break
             }
         }
@@ -154,4 +170,34 @@ public func || (lhs: Reactive<Bool>, rhs: Reactive<Bool>) -> Reactive<Bool> {
 /// Logical NOT, modelled as `operand == false` so no extra (unary) node shape is needed.
 public prefix func ! (operand: Reactive<Bool>) -> Reactive<Bool> {
     Reactive(.binary(.eq, operand.expr, .bool(false)), !operand.value)
+}
+
+// MARK: - P5: string + collection ops (client-recomputable, ADR-0007 amend)
+
+extension Reactive where Value == String {
+    /// Case-fold this string reactive (`lowercased`) — for case-insensitive `contains`.
+    public func lowercased() -> Reactive<String> {
+        Reactive(.unary(.lowercased, expr), value.lowercased())
+    }
+    /// Whether this string reactive contains `other` (substring test) → `Reactive<Bool>`. The initial
+    /// (server) value uses stdlib `firstRange(of:)` — Foundation-free, like the rest of the core — and an
+    /// empty needle matches (mirrors JS `String.includes("") === true`, so SSR and the client agree).
+    public func contains(_ other: Reactive<String>) -> Reactive<Bool> {
+        let initial = other.value.isEmpty || value.firstRange(of: other.value) != nil
+        return Reactive<Bool>(.binary(.contains, expr, other.expr), initial)
+    }
+}
+
+extension Reactive where Value == [String] {
+    /// Whether this array reactive contains `element` → `Reactive<Bool>` (exact-match / "add new" guard).
+    public func contains(_ element: Reactive<String>) -> Reactive<Bool> {
+        Reactive<Bool>(.binary(.contains, expr, element.expr), value.contains(element.value))
+    }
+}
+
+extension Reactive where Value: Collection {
+    /// The live length of this collection reactive (`count`) → `Reactive<Int>` (e.g. a `listMove` bound).
+    public var count: Reactive<Int> {
+        Reactive<Int>(.unary(.count, expr), value.count)
+    }
 }
