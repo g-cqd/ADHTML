@@ -43,6 +43,9 @@ public final class CellArena: Sendable {
         /// `(scope, key)` → the cell backing a `@State` property, so repeated reads dedup (see
         /// ``stateCell(scope:key:default:)``).
         var stateKeys: [StateKey: CellID] = [:]
+        /// `scope` → the cells created within it, so an ``InteractiveComponent`` can INFER its island
+        /// scope (the cells it owns) instead of the author hand-listing a `scope:` allowlist.
+        var scopeCells: [UInt64: [CellID]] = [:]
     }
 
     private let state = Mutex(State())
@@ -111,6 +114,7 @@ public final class CellArena: Sendable {
             lock.nextIndex += 1
             lock.cells.append(Cell(id: id, kind: .signal, value: defaultValue.wireValue))
             lock.stateKeys[composite] = id
+            lock.scopeCells[scope, default: []].append(id)
             return id
         }
         return Signal(arena: self, id: id, stored: defaultValue)
@@ -119,11 +123,18 @@ public final class CellArena: Sendable {
     /// All recorded cells, in creation order — the wire serializer's input.
     public var cells: [Cell] { state.withLock { $0.cells } }
 
+    /// The cells created within a component's render `scope` — the inferred island scope for an
+    /// ``InteractiveComponent`` (the data-leak boundary, computed instead of hand-listed as `scope:`).
+    func cells(inScope scope: UInt64) -> [CellID] { state.withLock { $0.scopeCells[scope] ?? [] } }
+
     private func register(_ kind: Cell.Kind, value: WireValue) -> CellID {
-        state.withLock { lock -> CellID in
+        // Attribute the cell to the component currently rendering (if any), so its island can infer scope.
+        let scope = ADHTMLRenderContext.current?.scope
+        return state.withLock { lock -> CellID in
             let id = CellID(lock.nextIndex)
             lock.nextIndex += 1
             lock.cells.append(Cell(id: id, kind: kind, value: value))
+            if let scope { lock.scopeCells[scope, default: []].append(id) }
             return id
         }
     }

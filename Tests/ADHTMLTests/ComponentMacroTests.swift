@@ -2,19 +2,19 @@ import ADHTML
 import Testing
 
 // End-to-end tests for `@Component` + `@State` through the umbrella + the ADHTMLMacros plugin
-// (declaration -> plugin -> expansion -> behavior). The components are file-scope (extension macros
-// cannot attach to nested types). Each `@State` proves a different facet: type inference from a literal,
-// an explicit annotation, and that the inferred Signal type is correct (a wrong type would fail the
-// `Behavior.increment`/`.toggle` call site). Build with `--build-system native` (see CONTRIBUTING).
+// (declaration -> plugin -> expansion -> behavior). A component with `@State` is an InteractiveComponent:
+// it AUTO-WRAPS its body in a hydration island with an inferred scope, so the author writes NO `Island`,
+// `scope:`, or `.id` (RFC-0005 §3.0). Components are file-scope (extension macros cannot attach to nested
+// types). Build with `--build-system native` (see CONTRIBUTING).
 
 @Component
 struct MacroCounter {
     @State var count = 0  // inferred Signal<Int>
 
     var body: some HTML {
-        Island("counter", scope: [countSignal.id]) {
-            button { "+" }.on("click", Behavior.increment(countSignal))
-            span { String(count) }.bind(.text, to: countSignal.id)
+        div {
+            button { "+" }.on(.click, Behavior.increment(countSignal))
+            span { String(count) }.bind(.text, to: countSignal)
         }
     }
 }
@@ -25,21 +25,20 @@ struct MacroToggle {
     @State var label = "off"  // inferred Signal<String>
 
     var body: some HTML {
-        Island("toggle", scope: [isOnSignal.id, labelSignal.id]) {
-            button { label }
-                .on("click", Behavior.toggle(isOnSignal))
-                .bind(.class, to: labelSignal.id)
-        }
+        button { label }
+            .on(.click, Behavior.toggle(isOnSignal))
+            .bind(.class, to: labelSignal)
     }
 }
 
 struct ComponentMacroTests {
     @Test
-    func `@Component + @State render and wire a counter end to end`() throws {
+    func `@Component + @State auto-wrap as an island and wire a counter end to end`() throws {
         let arena = CellArena()
         let html = String(decoding: try MacroCounter().renderHydratable(arena: arena), as: UTF8.self)
 
-        #expect(html.contains(#"<div data-adh-island data-adh-id="counter" data-adh-on="load">"#))
+        // No Island/scope/.id authored — the component became an island automatically (inferred scope).
+        #expect(html.contains(#"<div data-adh-island data-adh-id="c1" data-adh-on="load">"#))
         #expect(html.contains(#"data-adh-on:click="increment#0#1""#))
         #expect(html.contains(#"<span data-adh-bind:text="0">0</span>"#))
         #expect(html.contains(#"<script type="application/adh-state+json" id="adh-state">"#))
@@ -65,18 +64,23 @@ struct ComponentMacroTests {
         #expect(html.contains(">off</button>"))
 
         #expect(arena.cells.count == 2)
-        #expect(arena.cells[0].value == .bool(false))  // isOn
-        #expect(arena.cells[1].value == .string("off"))  // label
+        #expect(arena.cells[0].value == .bool(false))  // isOn (read first, in the behavior)
+        #expect(arena.cells[1].value == .string("off"))  // label (read in the binding)
     }
 
     @Test
-    func `sibling macro components get distinct cells`() throws {
+    func `sibling macro components get distinct islands and distinct cells`() throws {
         let arena = CellArena()
-        _ = try div {
-            MacroCounter(count: 1)
-            MacroCounter(count: 2)
-        }
-        .renderHydratable(arena: arena)
+        let html = String(
+            decoding: try div {
+                MacroCounter(count: 1)
+                MacroCounter(count: 2)
+            }
+            .renderHydratable(arena: arena),
+            as: UTF8.self)
+        // Each instance is its own island (distinct ids), each with its own cell.
+        #expect(html.contains(#"data-adh-id="c1""#))
+        #expect(html.contains(#"data-adh-id="c2""#))
         #expect(arena.cells.count == 2)
         #expect(arena.cells[0].value == .int(1))
         #expect(arena.cells[1].value == .int(2))

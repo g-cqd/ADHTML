@@ -32,6 +32,17 @@ extension HTMLElement {
         bind(target, to: computed.id)
     }
 
+    /// Bind a derived `Reactive` expression — a plain computed property like
+    /// `var total: Reactive<Int> { $a.reactive + $b.reactive }`. Registers it as a client-recomputable
+    /// computed cell in the ambient arena (so it updates in-browser) and binds to it. A no-op in a static
+    /// render (no ambient context).
+    public consuming func bind<Value: WireEncodable>(_ target: BindTarget, to reactive: Reactive<Value>)
+        -> Self
+    {
+        guard let context = ADHTMLRenderContext.current else { return self }
+        return bind(target, to: context.arena.computed(reactive).id)
+    }
+
     /// Wire a client behavior to a typed DOM event — `.on(.click, …)`.
     public consuming func on(_ event: DOMEvent, _ invocation: BehaviorInvocation) -> Self {
         on(event.name, invocation)

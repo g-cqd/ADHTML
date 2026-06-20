@@ -2,13 +2,11 @@ public import SwiftSyntax
 internal import SwiftSyntaxBuilder
 public import SwiftSyntaxMacros
 
-/// `@Component` — conforms a type to `Component`, the SwiftUI-style authoring marker for a composed
-/// view (ADR-0008). Sugar for writing `: Component`; it pairs with `@State` so a reactive component
-/// reads as `@Component struct Counter { @State var count = 0; var body: some HTML { … } }`.
-///
-/// The per-instance render scoping that makes `@State` cells distinct across instances lives in the
-/// `Component` protocol's default `_render`, so this macro only needs to add the conformance — nothing
-/// is synthesized into the body, keeping the expansion trivial and inspectable.
+/// `@Component` — conforms a type to `Component` (SwiftUI-style marker for a composed view, ADR-0008). A
+/// component with `@State`/`@Derived` additionally gets `static var isIsland { true }`, so it AUTO-WRAPS
+/// its body in a hydration island with an inferred scope — the author writes no `Island`/`scope`/`.id`
+/// (RFC-0005 §3.0). A static one stays a plain `Component` and renders inline (no island, no JS).
+/// Per-instance render scoping + the island wrap live in the `Component` default `_render`.
 public struct ComponentMacro: ExtensionMacro {
     public static func expansion(
         of node: AttributeSyntax,
@@ -17,9 +15,49 @@ public struct ComponentMacro: ExtensionMacro {
         conformingTo protocols: [TypeSyntax],
         in context: some MacroExpansionContext
     ) throws -> [ExtensionDeclSyntax] {
-        // `protocols` is the subset of the declared `conformances:` the type does not already state.
-        // Empty means the author already wrote `: Component`, so adding it again would be redundant.
+        // `protocols` is empty when the author already wrote `: Component`, so adding it again is redundant.
         guard !protocols.isEmpty else { return [] }
-        return [try ExtensionDeclSyntax("extension \(type.trimmed): Component {}")]
+        guard hasReactiveState(declaration) else {
+            return [try ExtensionDeclSyntax("extension \(type.trimmed): Component {}")]
+        }
+        // Interactive: flip `isIsland` so the component auto-wraps as an island. Mirror the type's access
+        // so the witness is visible enough for a `public` component's conformance.
+        let access = accessModifier(declaration)
+        return [
+            try ExtensionDeclSyntax(
+                """
+                extension \(type.trimmed): Component {
+                    \(raw: access)static var isIsland: Bool { true }
+                }
+                """)
+        ]
     }
+}
+
+/// Whether the type has any `@State` / `@Derived` member — i.e. it is interactive (renders as an island).
+private func hasReactiveState(_ declaration: some DeclGroupSyntax) -> Bool {
+    for member in declaration.memberBlock.members {
+        guard let varDecl = member.decl.as(VariableDeclSyntax.self) else { continue }
+        for attribute in varDecl.attributes {
+            let name =
+                attribute.as(AttributeSyntax.self)?.attributeName
+                .as(IdentifierTypeSyntax.self)?
+                .name.text
+            if name == "State" || name == "Derived" { return true }
+        }
+    }
+    return false
+}
+
+/// The access-control keyword to mirror onto the generated `isIsland` (`"public "`, `"package "`, …), or
+/// `""` for the default level — so a `public` component's island witness is public enough.
+private func accessModifier(_ declaration: some DeclGroupSyntax) -> String {
+    let levels: Set<TokenKind> = [
+        .keyword(.public), .keyword(.package), .keyword(.internal),
+        .keyword(.fileprivate), .keyword(.private)
+    ]
+    guard let modifier = declaration.modifiers.first(where: { levels.contains($0.name.tokenKind) }) else {
+        return ""
+    }
+    return modifier.name.text + " "
 }

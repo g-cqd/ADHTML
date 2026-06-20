@@ -55,6 +55,31 @@ Make **"interactive component"** the authoring unit and **"island"** an inferred
   `@Derived var total: Int { apples + oranges }` parses the body into a `WireExpr` (closed op set;
   out-of-set bodies diagnose or opt into `serverComputed`).
 
+## Implementation status (2026-06-20)
+
+- **Phases A + B + C landed.** Phase A (typed `DOMEvent` + `Signal`/`Computed` `.bind` overloads).
+  Phase B/C unified: `CellArena` tracks cells per render scope (`cells(inScope:)`); `Component` gains a
+  defaulted `static var isIsland` (the `@Component` macro flips it to `true` for a type with `@State`/
+  `@Derived`) + `static var hydration` (default `.load`, overridable). The single `Component._render`
+  branches: an `isIsland` component wraps its body in `islandOpen(id:"c<scope>", on: hydration,
+  scope: cells(inScope:))` / `islandClose` — scope **inferred**, not hand-listed. Static components render
+  inline. This replaced the original "marker protocol `Interactive` with its own `_render`" design, which
+  hit a Swift limitation (`@HTMLBuilder` inference + `_render` ambiguity don't propagate through a protocol
+  refinement). The id is `c<scope-number>` (deterministic per render) for now; the stable XXH64-of-path id
+  (cross-render SSE morph targeting) is the M1-cont. / #44 work.
+- **Computed properties via `.bind(_:to: Reactive)`** (no `@Derived` macro): an author writes a plain
+  `var total: Reactive<Int> { aSignal.reactive + bSignal.reactive }` and binds it; the bind registers a
+  client-recomputable computed cell in the ambient arena. The `@Derived`-macro form + the wider expression
+  set (`/`, comparisons, boolean, ternary) remain Phase D follow-ups.
+- **Known limitation:** result-builder inference does **not** apply to a *multi-statement* `body` when the
+  `Component` conformance is added by the macro extension, so an interactive component's `body` must be a
+  single root element (`var body: some HTML { div { … } }`) — idiomatic, but a wart vs. SwiftUI's bare
+  multi-statement `body`. Tracked as a follow-up (a macro/`@HTMLBuilder` fix).
+- **Migration:** components authored with `@Component` + `@State` no longer write an explicit `Island`
+  (they auto-island); `ComponentMacroTests` migrated. Manual `: Component` conformances (PerfProbe,
+  benchmarks, `StateContextTests`/`StreamingTests`) keep `isIsland == false` and their explicit `Island`,
+  so they are unaffected.
+
 ## Consequences
 
 - **Positive:** developer-facing interactive code becomes `@State` + `@Derived` + events + bindings with

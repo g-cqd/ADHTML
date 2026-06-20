@@ -7,12 +7,13 @@
 public macro attr(_ name: String) -> String =
     #externalMacro(module: "ADHTMLMacros", type: "AttributeNameMacro")
 
-/// Conform a type to ``Component`` — the SwiftUI-style marker for a composed view. Sugar for writing
-/// `: Component`; pairs with ``State()`` for reactive components, e.g.
-/// `@Component struct Counter { @State var count = 0; var body: some HTML { … } }`. Per-instance render
-/// scoping (so each instance's state cells are distinct) is intrinsic to `Component`, so this only adds
-/// the conformance.
-@attached(extension, conformances: Component)
+/// Conform a type to ``Component`` (SwiftUI-style marker for a composed view), or to
+/// ``InteractiveComponent`` when it has ``State()``/``Derived()`` — then it AUTO-WRAPS its body in a
+/// hydration island with an inferred scope, so you never write `Island`/`scope`/`.id`
+/// (`@Component struct Counter { @State var count = 0; var body: some HTML { … } }` is a resumable
+/// counter). A static component renders inline (no island, no JS). Per-instance render scoping is
+/// intrinsic to the protocol default, so this only adds the conformance.
+@attached(extension, conformances: Component, names: named(isIsland))
 public macro Component() =
     #externalMacro(module: "ADHTMLMacros", type: "ComponentMacro")
 
