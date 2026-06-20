@@ -54,7 +54,6 @@ let adtestkitDependency = adPackage(env: "ADTESTKIT_PATH", url: "https://github.
 var packageDependencies: [Package.Dependency] = [
     adfoundationDependency,
     adjsonDependency,
-    adtestkitDependency,
     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "603.0.0"),
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0")
 ]
@@ -72,6 +71,10 @@ if isNIO {
     // primitives (.html/.stream/.sse/Static/CSPNonce); ADHTMLNIO forwards ADHTML's AsyncHTMLByteSink to
     // ADServe's ResponseBodyWriter (both `[UInt8]`, shaped 1:1). Resolves from ADSERVE_PATH locally.
     packageDependencies.append(adPackage(env: "ADSERVE_PATH", url: "https://github.com/g-cqd/ADServe.git"))
+    // ADTestKit (AsyncEventProbe …) backs the gated ADHTMLNIOTests. Gated with the NIO target that uses
+    // it, so a default build doesn't resolve an unused dependency. Promote to the default graph when other
+    // test targets adopt it.
+    packageDependencies.append(adtestkitDependency)
 }
 if isMarkdown {
     packageDependencies.append(.package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0"))
@@ -150,7 +153,15 @@ let package = Package(
         // A lightweight, network-free release perf probe over ADHTMLCore (no swift-syntax / DEV deps).
         // Run: `swift run -c release ADHTMLPerfProbe`. Complements the ordo-one suite (the CI gate with
         // mallocCountTotal) for quick local before/after wall-clock measurement. Not a product.
-        .executableTarget(name: "ADHTMLPerfProbe", dependencies: ["ADHTMLCore"], swiftSettings: strictSettings)
+        .executableTarget(name: "ADHTMLPerfProbe", dependencies: ["ADHTMLCore"], swiftSettings: strictSettings),
+
+        // A multi-file example app (RFC-0005 §7): components across files, implicit islands (@State ->
+        // auto-island), a slotted layout, typed attribute enums + events. Built (not a product) so the
+        // authoring DSL stays compilable; `swift run Storefront` prints the catalog page. Uses the
+        // umbrella (macros) -> build with `--build-system native`.
+        .executableTarget(
+            name: "Storefront", dependencies: ["ADHTML"], path: "Examples/Storefront",
+            swiftSettings: strictSettings)
     ]
 )
 
