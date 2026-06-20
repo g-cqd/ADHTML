@@ -1,0 +1,11 @@
+{
+  "name": "adh-runtime",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "ADHTML client runtime — a tiny, dependency-free interpreter of the hydration wire format.",
+  "scripts": {
+    "test": "bun test",
+    "build": "bun run build.ts"
+  }
+}
