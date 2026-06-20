@@ -175,6 +175,8 @@ if isSRI {
             name: "ADHTMLSRI",
             dependencies: ["ADHTMLCore", .product(name: "Crypto", package: "swift-crypto")],
             swiftSettings: strictSettings))
+    package.targets.append(
+        .testTarget(name: "ADHTMLSRITests", dependencies: ["ADHTMLSRI"], swiftSettings: testSettings))
 }
 if isObs {
     package.products.append(.library(name: "ADHTMLObservability", targets: ["ADHTMLObservability"]))

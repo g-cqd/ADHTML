@@ -145,6 +145,21 @@ jobs:
           path: crash-*
           if-no-files-found: ignore
 
+  sri:
+    name: SRI (gated, swift-crypto)
+    needs: build-test
+    # The `ADHTML_SRI` target pulls swift-crypto, so it is gated out of the default build; this job
+    # builds + runs its tests (canonical SHA-256 vectors) so the gated code never rots.
+    runs-on: macos-26
+    env:
+      ADHTML_SRI: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Build & test the SRI target
+        run: swift test --build-system native --filter ADHTMLSRITests
+
   docs-check:
     name: Build docs (link check)
     needs: build-test
