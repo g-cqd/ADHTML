@@ -78,11 +78,17 @@ struct HTMLTapeTests {
         #expect(HTMLTape.build(html).materialize() == HTMLTokenizer.tokenize(html))
     }
 
-    /// The tape index accessor agrees with the bulk materialization.
-    @Test func tokenAtMatchesMaterialize() {
-        let built = HTMLTape.build("<p class=\"a\">hi</p>")
+    /// Walking the tape with `token(at:)` + `nextIndex(after:)` agrees with bulk materialization —
+    /// including a start tag whose inline attribute slots must be skipped.
+    @Test func tapeNavigationMatchesMaterialize() {
+        let built = HTMLTape.build("<p class=\"a\" id='b'>hi</p>")
         let bulk = built.materialize()
-        #expect(built.count == bulk.count)
-        for i in 0 ..< built.count { #expect(built.token(at: i) == bulk[i]) }
+        var walked: [HTMLToken] = []
+        var i = 0
+        while i < built.slotCount {
+            walked.append(built.token(at: i))
+            i = built.nextIndex(after: i)
+        }
+        #expect(walked == bulk)
     }
 }

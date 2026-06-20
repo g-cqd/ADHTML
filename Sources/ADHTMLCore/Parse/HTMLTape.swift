@@ -1,214 +1,150 @@
 // HTMLTape — the high-performance byte-level HTML tokenizer. Where `HTMLTokenizer` is the
 // correctness-first reference (a `[Unicode.Scalar]` state machine emitting `[HTMLToken]` with a
-// String per token), this scans the raw UTF-8 bytes ONCE and records a flat preorder tape of
-// `UInt64` slots holding zero-copy (offset, length) ranges into the source — no per-token String,
-// no scalar expansion. It is modeled on ADJSON's tape parser and built on the family's shared
-// kernels: `ADFCore.TapeSlot` (the slot bit-packing, promoted from ADJSON), `ADFCore.ASCII`
-// (classification), and `ADFCore.SWAR` (the word-at-a-time stop-mask used to find the next `<`).
+// String per token), this scans the raw UTF-8 bytes ONCE into a single flat preorder tape of
+// `UInt64` slots holding zero-copy (offset, length) ranges — no per-token String, no scalar
+// expansion, and (crucially) NO side allocations: a start tag and its attributes are encoded inline
+// in the one tape (ADJSON's "everything in the tape" rule), so a build allocates exactly twice — the
+// owned source bytes and the slot array — with zero per-node heap traffic.
 //
-// `materialize()` reconstructs `[HTMLToken]` (lazily decoding entities + lowercasing names) so the
-// same correctness oracle proves both paths; tree construction will instead walk the tape directly,
-// touching the cold side-arrays only for the start tags it needs.
-//
-// The scanner is a value type (ADJSON's `TapeBuilder` shape): the input `[UInt8]` plus growable
-// arrays, mutating methods — no closure-capture boxing on the hot path, and no raw pointers, so the
-// strict-memory-safety surface (SE-0458) stays empty. Byte reads are scalar, not SWAR: node-dense
-// markup has short text runs where an 8-byte stride is pure overhead (~25× the reference tokenizer
-// on a node-dense fixture; ~0.57 GB/s).
+// Built on the family's shared kernels: `ADFCore.TapeSlot` (the slot bit-packing, promoted from
+// ADJSON) and `ADFCore.ASCII`. Byte access is a raw `UnsafePointer<UInt8>` threaded as a parameter
+// with `unsafe` at the read sites — the same pattern ADFCore.ByteCompare / ADHTMLCore.URLScheme use,
+// and the path ADJSON deliberately takes for decode speed (its Span note is a Codable constraint, not
+// a perf one). `materialize()` reconstructs `[HTMLToken]` (lazy entity-decode + name-lowercasing) so
+// the reference tokenizer remains the differential oracle; tree construction walks the tape directly.
 
 import ADFCore
 
 // MARK: - Slot kinds (the 4-bit TapeSlot tag)
 
-private enum HTMLTapeKind {
-    static let text: UInt8 = 0  // aux = (length << 1) | needsDecode,  low = byte offset
-    static let startTag: UInt8 = 1  // low = index into `starts` (name + attrs + selfClosing live there)
-    static let endTag: UInt8 = 2  // aux = length << 1,  low = byte offset of the tag name
-    static let comment: UInt8 = 3  // aux = length << 1,  low = byte offset of the comment body
-    static let doctype: UInt8 = 4  // aux = length << 1,  low = byte offset of the name
+private enum K {
+    static let text: UInt8 = 0  // aux = (length << 1) | needsDecode,        low = byte offset
+    static let startTag: UInt8 = 1  // aux = (nameLen << 15) | (attrCount << 1) | selfClosing, low = name off
+    static let endTag: UInt8 = 2  // aux = nameLen,                          low = name offset
+    static let comment: UInt8 = 3  // aux = length,                          low = body offset
+    static let doctype: UInt8 = 4  // aux = nameLen,                         low = name offset
     static let doctypeNil: UInt8 = 5  // a DOCTYPE with no name
+    static let attrName: UInt8 = 6  // aux = length,                          low = offset (follows startTag)
+    static let attrValue: UInt8 = 7  // aux = (length << 1) | needsDecode,     low = offset (follows attrName)
+
+    static let maxNameLen = 0xFFF  // 12 bits
+    static let maxAttrCount = 0x3FFF  // 14 bits
 }
 
 // MARK: - The tape
 
 public struct HTMLTape: Sendable {
-    /// A start tag's detail (name range + attribute span + self-closing), referenced from its slot's
-    /// `low`. Kept out of the main tape so the hot token stream stays one dense `UInt64` per token.
-    struct StartRecord: Sendable {
-        var nameOff: UInt32
-        var nameLen: UInt32
-        var attrStart: UInt32
-        var attrCount: UInt32
-        var selfClosing: Bool
-    }
-
-    /// One attribute: name range + value range (value may need entity decoding). Zero-length value =
-    /// a boolean/empty attribute (`disabled`).
-    struct AttrRecord: Sendable {
-        var nameOff: UInt32
-        var nameLen: UInt32
-        var valOff: UInt32
-        var valLen: UInt32
-        var valDecode: Bool
-    }
-
     let source: [UInt8]
     let slots: ContiguousArray<UInt64>
-    let starts: ContiguousArray<StartRecord>
-    let attrs: ContiguousArray<AttrRecord>
 
-    /// Number of tokens on the tape.
-    public var count: Int { slots.count }
+    /// Number of raw slots (start tags with attributes span more than one slot — walk with
+    /// `materialize()` / `token(at:)` / `nextIndex(after:)`, not by treating each slot as a token).
+    public var slotCount: Int { slots.count }
 
-    /// Tokenize `html` into a tape. One pass over the UTF-8 bytes; allocations are the three growable
-    /// arrays (pre-reserved) plus the owned source copy.
+    /// Tokenize `html` into a tape. One pass over the UTF-8 bytes; allocations are the owned source
+    /// copy plus the single pre-reserved slot array — no per-node heap traffic.
     public static func build(_ html: String) -> HTMLTape {
         let source = Array(html.utf8)
-        guard !source.isEmpty else {
-            return HTMLTape(source: source, slots: [], starts: [], attrs: [])
+        guard !source.isEmpty else { return HTMLTape(source: source, slots: []) }
+        var scanner = Scanner(n: source.count)
+        source.withUnsafeBufferPointer { buf in
+            unsafe scanner.run(buf.baseAddress!)
         }
-        var scanner = Scanner(source)
-        scanner.run()
-        return HTMLTape(source: source, slots: scanner.slots, starts: scanner.starts, attrs: scanner.attrs)
+        return HTMLTape(source: source, slots: scanner.slots)
     }
 }
 
 // MARK: - The byte scanner
 
 extension HTMLTape {
-    /// A one-pass tokenizer over a borrowed UTF-8 buffer. Local to `build`; the pointer never escapes.
+    /// One-pass tokenizer. Holds only the growing tape (+ length); the byte pointer is a parameter,
+    /// not storage, so there is no unsafe struct state and the pointer cannot escape `build`.
     fileprivate struct Scanner {
-        let bytes: [UInt8]
-        let n: Int
         var slots = ContiguousArray<UInt64>()
-        var starts = ContiguousArray<HTMLTape.StartRecord>()
-        var attrs = ContiguousArray<HTMLTape.AttrRecord>()
+        let n: Int
 
-        init(_ bytes: [UInt8]) {
-            self.bytes = bytes  // shared COW buffer (no copy); HTMLTape keeps the same `source`
-            self.n = bytes.count
+        init(n: Int) {
+            self.n = n
             slots.reserveCapacity(n / 3 + 16)  // a token every few bytes; avoid mid-scan regrowth
-            starts.reserveCapacity(n / 8 + 8)
-            attrs.reserveCapacity(n / 12 + 8)
         }
 
-        // Safe, bounds-checked byte read (every access funnels through here). No raw pointers: the
-        // scanner stores the `[UInt8]` and the strict-memory-safety surface stays empty.
-        @inline(__always) func b(_ k: Int) -> UInt8 { bytes[k] }
-        @inline(__always) mutating func emit(_ tag: UInt8, _ off: Int, _ len: Int, _ decode: Bool = false) {
-            slots.append(TapeSlot.make(tag: tag, aux: (UInt64(len) << 1) | (decode ? 1 : 0), low: off))
+        @inline(__always) mutating func emit(_ tag: UInt8, _ off: Int, _ aux: UInt64) {
+            slots.append(TapeSlot.make(tag: tag, aux: aux, low: off))
         }
 
-        // Case-insensitive compare of base[off ..< off+lit.count] to an ASCII byte literal.
-        func ciEqual(_ off: Int, _ lit: [UInt8]) -> Bool {
-            for j in 0 ..< lit.count where lower(b(off + j)) != lit[j] { return false }
-            return true
-        }
-        func matchesDoctype(_ off: Int) -> Bool { off + litDoctype.count <= n && ciEqual(off, litDoctype) }
-        // `</name` matches when the name equals (case-insensitive) and the next byte ends the tag.
-        func matchesEndName(_ at: Int, _ nameOff: Int, _ nameLen: Int) -> Bool {
-            guard at + nameLen <= n else { return false }
-            for j in 0 ..< nameLen where lower(b(at + j)) != lower(b(nameOff + j)) { return false }
-            let after = at + nameLen
-            if after >= n { return true }
-            let c = b(after)
-            return isSpace(c) || c == gt || c == slash
-        }
-        // Raw-text / RCDATA element? Returns the "decode entities" flag (true = RCDATA), or nil.
-        func rawTextKind(_ nameOff: Int, _ nameLen: Int) -> Bool? {
-            switch nameLen {
-                case 3: return ciEqual(nameOff, rawXmp) ? false : nil
-                case 5:
-                    if ciEqual(nameOff, rawStyle) { return false }
-                    if ciEqual(nameOff, rcTitle) { return true }
-                    return nil
-                case 6:
-                    if ciEqual(nameOff, rawScript) { return false }
-                    if ciEqual(nameOff, rawIframe) { return false }
-                    return nil
-                case 7: return ciEqual(nameOff, rawNoembed) ? false : nil
-                case 8:
-                    if ciEqual(nameOff, rawNoframes) { return false }
-                    if ciEqual(nameOff, rcTextarea) { return true }
-                    return nil
-                default: return nil
-            }
-        }
-
-        mutating func scanComment(_ cs: Int) -> Int {
-            var k = cs
-            while k + 2 < n, !(b(k) == dash && b(k + 1) == dash && b(k + 2) == gt) { k &+= 1 }
-            if k + 2 < n {  // found `-->`
-                emit(HTMLTapeKind.comment, cs, k - cs)
-                return k + 3
-            }
-            emit(HTMLTapeKind.comment, cs, n - cs)
-            return n
-        }
-        mutating func scanBogusComment(_ cs: Int) -> Int {
-            var k = cs
-            while k < n, b(k) != gt { k &+= 1 }
-            emit(HTMLTapeKind.comment, cs, k - cs)
-            return k < n ? k + 1 : n
-        }
-        mutating func scanDoctype(_ after: Int) -> Int {
-            var k = after
-            while k < n, isSpace(b(k)) { k &+= 1 }
-            let nameStart = k
-            while k < n, !isSpace(b(k)), b(k) != gt { k &+= 1 }
-            let nameLen = k - nameStart
-            while k < n, b(k) != gt { k &+= 1 }
-            if k < n { k &+= 1 }
-            if nameLen > 0 { emit(HTMLTapeKind.doctype, nameStart, nameLen) } else { emit(HTMLTapeKind.doctypeNil, 0, 0) }
-            return k
-        }
-        mutating func scanEndTag(_ ns: Int) -> Int {
-            var k = ns
-            while k < n, !isSpace(b(k)), b(k) != slash, b(k) != gt { k &+= 1 }
-            let nameLen = k - ns
-            while k < n, b(k) != gt { k &+= 1 }
-            if k < n { k &+= 1 }
-            emit(HTMLTapeKind.endTag, ns, nameLen)
-            return k
-        }
-        // Raw-text / RCDATA content runs verbatim to the matching end tag; markup inside is not parsed
-        // (RCDATA additionally entity-decodes, flagged on the text slot).
-        mutating func scanRawText(_ nameOff: Int, _ nameLen: Int, _ contentStart: Int, _ decode: Bool) -> Int {
-            var i = contentStart
+        mutating func run(_ p: UnsafePointer<UInt8>) {
+            var i = 0
             while i < n {
-                if b(i) == lt, i + 1 < n, b(i + 1) == slash, matchesEndName(i + 2, nameOff, nameLen) { break }
-                i &+= 1
+                if unsafe (p[i] == lt) {
+                    i = unsafe handleLT(p, i)
+                } else {
+                    // Text run to the next `<`, flagging `&` for lazy decode. Scalar, not SWAR:
+                    // node-dense markup has short runs where an 8-byte stride is pure overhead
+                    // (ADJSON measured the same regression on its whitespace skip).
+                    let start = i
+                    var decode = false
+                    while i < n {
+                        let c = unsafe p[i]
+                        if c == lt { break }
+                        if c == ampersand { decode = true }
+                        i &+= 1
+                    }
+                    emit(K.text, start, (UInt64(i - start) << 1) | (decode ? 1 : 0))
+                }
             }
-            if i - contentStart > 0 { emit(HTMLTapeKind.text, contentStart, i - contentStart, decode) }
-            if i < n {  // at `</name`
-                let closeNameOff = i + 2
-                var k = closeNameOff + nameLen
-                while k < n, b(k) != gt { k &+= 1 }
-                if k < n { k &+= 1 }
-                emit(HTMLTapeKind.endTag, closeNameOff, nameLen)
-                return k
-            }
-            return n
         }
 
-        mutating func scanStartTag(_ ns: Int) -> Int {
+        // Dispatch a `<...`: comment, doctype, end tag, start tag, or a literal `<`. Returns next index.
+        mutating func handleLT(_ p: UnsafePointer<UInt8>, _ i: Int) -> Int {
+            guard i + 1 < n else {
+                emit(K.text, i, 1 << 1)  // lone `<` at EOF is literal text
+                return n
+            }
+            let c = unsafe p[i + 1]
+            if c == bang {
+                if i + 3 < n, unsafe (p[i + 2] == dash), unsafe (p[i + 3] == dash) {
+                    return unsafe scanComment(p, i + 4)
+                }
+                if unsafe matchesDoctype(p, i + 2) { return unsafe scanDoctype(p, i + 9) }  // 2 + "DOCTYPE"
+                return unsafe scanBogusComment(p, i + 2)
+            }
+            if c == slash {
+                if i + 2 < n, ASCII.isAlpha(unsafe p[i + 2]) { return unsafe scanEndTag(p, i + 2) }
+                if i + 2 < n, unsafe (p[i + 2] == gt) { return i + 3 }  // `</>` — ignored
+                return unsafe scanBogusComment(p, i + 2)
+            }
+            if ASCII.isAlpha(c) { return unsafe scanStartTag(p, i + 1) }
+            emit(K.text, i, 1 << 1)  // literal `<`
+            return i + 1
+        }
+
+        // A start tag and its attributes, encoded inline: the start-tag slot (with nameLen, attrCount,
+        // selfClosing backpatched once the count is known) followed by one (attrName, attrValue) slot
+        // pair per attribute. No side arrays.
+        mutating func scanStartTag(_ p: UnsafePointer<UInt8>, _ ns: Int) -> Int {
             var k = ns
-            while k < n, !isSpace(b(k)), b(k) != slash, b(k) != gt { k &+= 1 }
+            while k < n {
+                let c = unsafe p[k]
+                if isSpace(c) || c == slash || c == gt { break }
+                k &+= 1
+            }
             let nameLen = k - ns
-            let attrStart = attrs.count
+            let startSlot = slots.count
+            slots.append(0)  // placeholder; backpatched below
+            var attrCount = 0
             var selfClosing = false
 
-            attributes: while k < n {
-                while k < n, isSpace(b(k)) { k &+= 1 }
+            while k < n {
+                while k < n, isSpace(unsafe p[k]) { k &+= 1 }
                 if k >= n { break }
-                let c = b(k)
+                let c = unsafe p[k]
                 if c == gt {
                     k &+= 1
                     break
                 }
                 if c == slash {
                     k &+= 1
-                    if k < n, b(k) == gt {
+                    if k < n, unsafe (p[k] == gt) {
                         selfClosing = true
                         k &+= 1
                         break
@@ -216,93 +152,177 @@ extension HTMLTape {
                     continue
                 }
                 let anStart = k
-                while k < n, !isSpace(b(k)), b(k) != eq, b(k) != slash, b(k) != gt { k &+= 1 }
+                while k < n {
+                    let a = unsafe p[k]
+                    if isSpace(a) || a == eq || a == slash || a == gt { break }
+                    k &+= 1
+                }
                 let anLen = k - anStart
                 var avOff = 0
                 var avLen = 0
                 var avDecode = false
-                while k < n, isSpace(b(k)) { k &+= 1 }
-                if k < n, b(k) == eq {
+                while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+                if k < n, unsafe (p[k] == eq) {
                     k &+= 1
-                    while k < n, isSpace(b(k)) { k &+= 1 }
-                    if k < n, b(k) == dquote || b(k) == squote {
-                        let q = b(k)
+                    while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+                    if k < n, unsafe (p[k] == dquote || p[k] == squote) {
+                        let q = unsafe p[k]
                         k &+= 1
                         avOff = k
-                        while k < n, b(k) != q {
-                            if b(k) == ampersand { avDecode = true }
+                        while k < n {
+                            let v = unsafe p[k]
+                            if v == q { break }
+                            if v == ampersand { avDecode = true }
                             k &+= 1
                         }
                         avLen = k - avOff
                         if k < n { k &+= 1 }  // closing quote
-                    } else {  // unquoted value
+                    } else {
                         avOff = k
-                        while k < n, !isSpace(b(k)), b(k) != gt {
-                            if b(k) == ampersand { avDecode = true }
+                        while k < n {
+                            let v = unsafe p[k]
+                            if isSpace(v) || v == gt { break }
+                            if v == ampersand { avDecode = true }
                             k &+= 1
                         }
                         avLen = k - avOff
                     }
                 }
                 if anLen > 0 {
-                    attrs.append(
-                        HTMLTape.AttrRecord(
-                            nameOff: UInt32(anStart), nameLen: UInt32(anLen),
-                            valOff: UInt32(avOff), valLen: UInt32(avLen), valDecode: avDecode))
+                    emit(K.attrName, anStart, UInt64(anLen))
+                    emit(K.attrValue, avOff, (UInt64(avLen) << 1) | (avDecode ? 1 : 0))
+                    attrCount &+= 1
                 }
             }
 
-            let startIndex = starts.count
-            starts.append(
-                HTMLTape.StartRecord(
-                    nameOff: UInt32(ns), nameLen: UInt32(nameLen),
-                    attrStart: UInt32(attrStart), attrCount: UInt32(attrs.count - attrStart),
-                    selfClosing: selfClosing))
-            slots.append(TapeSlot.make(tag: HTMLTapeKind.startTag, aux: 0, low: startIndex))
+            let nameField = UInt64(min(nameLen, K.maxNameLen)) << 15
+            let attrField = UInt64(min(attrCount, K.maxAttrCount)) << 1
+            slots[startSlot] = TapeSlot.make(
+                tag: K.startTag, aux: nameField | attrField | (selfClosing ? 1 : 0), low: ns)
 
-            if !selfClosing, let decode = rawTextKind(ns, nameLen) { return scanRawText(ns, nameLen, k, decode) }
+            if !selfClosing, let decode = unsafe rawTextKind(p, ns, nameLen) {
+                return unsafe scanRawText(p, ns, nameLen, k, decode)
+            }
             return k
         }
 
-        // Dispatch a `<...`: comment, doctype, end tag, start tag, or a literal `<`.
-        mutating func handleLT(_ i: Int) -> Int {
-            guard i + 1 < n else {  // a lone `<` at EOF is literal text
-                emit(HTMLTapeKind.text, i, 1)
-                return n
+        // Raw-text / RCDATA content runs verbatim to the matching end tag; markup inside is not parsed
+        // (RCDATA additionally entity-decodes, flagged on the text slot).
+        mutating func scanRawText(
+            _ p: UnsafePointer<UInt8>, _ nameOff: Int, _ nameLen: Int, _ contentStart: Int, _ decode: Bool
+        ) -> Int {
+            var i = contentStart
+            while i < n {
+                if unsafe (p[i] == lt), i + 1 < n, unsafe (p[i + 1] == slash),
+                    unsafe matchesEndName(p, i + 2, nameOff, nameLen)
+                {
+                    break
+                }
+                i &+= 1
             }
-            let c = b(i + 1)
-            if c == bang {
-                if i + 3 < n, b(i + 2) == dash, b(i + 3) == dash { return scanComment(i + 4) }
-                if matchesDoctype(i + 2) { return scanDoctype(i + 9) }  // 2 + len("DOCTYPE")
-                return scanBogusComment(i + 2)
+            if i - contentStart > 0 {
+                emit(K.text, contentStart, (UInt64(i - contentStart) << 1) | (decode ? 1 : 0))
             }
-            if c == slash {
-                if i + 2 < n, ASCII.isAlpha(b(i + 2)) { return scanEndTag(i + 2) }
-                if i + 2 < n, b(i + 2) == gt { return i + 3 }  // `</>` — ignored
-                return scanBogusComment(i + 2)
+            if i < n {  // at `</name`
+                let closeNameOff = i + 2
+                var k = closeNameOff + nameLen
+                while k < n, unsafe (p[k] != gt) { k &+= 1 }
+                if k < n { k &+= 1 }
+                emit(K.endTag, closeNameOff, UInt64(nameLen))
+                return k
             }
-            if ASCII.isAlpha(c) { return scanStartTag(i + 1) }
-            emit(HTMLTapeKind.text, i, 1)  // literal `<`
-            return i + 1
+            return n
         }
 
-        mutating func run() {
-            var i = 0
-            while i < n {
-                if b(i) == lt {
-                    i = handleLT(i)
-                } else {
-                    // Text run to the next `<`, flagging any `&` for lazy decode. Scalar (not SWAR):
-                    // node-dense HTML has short text runs where SWAR's 8-byte stride is pure overhead
-                    // (ADJSON measured the same regression for its whitespace skip).
-                    let start = i
-                    var decode = false
-                    while i < n, b(i) != lt {
-                        if b(i) == ampersand { decode = true }
-                        i &+= 1
-                    }
-                    emit(HTMLTapeKind.text, start, i - start, decode)
-                }
+        mutating func scanEndTag(_ p: UnsafePointer<UInt8>, _ ns: Int) -> Int {
+            var k = ns
+            while k < n {
+                let c = unsafe p[k]
+                if isSpace(c) || c == slash || c == gt { break }
+                k &+= 1
+            }
+            let nameLen = k - ns
+            while k < n, unsafe (p[k] != gt) { k &+= 1 }
+            if k < n { k &+= 1 }
+            emit(K.endTag, ns, UInt64(nameLen))
+            return k
+        }
+
+        mutating func scanComment(_ p: UnsafePointer<UInt8>, _ cs: Int) -> Int {
+            var k = cs
+            while k + 2 < n, unsafe (!(p[k] == dash && p[k + 1] == dash && p[k + 2] == gt)) {
+                k &+= 1
+            }
+            if k + 2 < n {  // found `-->`
+                emit(K.comment, cs, UInt64(k - cs))
+                return k + 3
+            }
+            emit(K.comment, cs, UInt64(n - cs))
+            return n
+        }
+
+        mutating func scanBogusComment(_ p: UnsafePointer<UInt8>, _ cs: Int) -> Int {
+            var k = cs
+            while k < n, unsafe (p[k] != gt) { k &+= 1 }
+            emit(K.comment, cs, UInt64(k - cs))
+            return k < n ? k + 1 : n
+        }
+
+        mutating func scanDoctype(_ p: UnsafePointer<UInt8>, _ after: Int) -> Int {
+            var k = after
+            while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+            let nameStart = k
+            while k < n {
+                let c = unsafe p[k]
+                if isSpace(c) || c == gt { break }
+                k &+= 1
+            }
+            let nameLen = k - nameStart
+            while k < n, unsafe (p[k] != gt) { k &+= 1 }
+            if k < n { k &+= 1 }
+            if nameLen > 0 { emit(K.doctype, nameStart, UInt64(nameLen)) } else { emit(K.doctypeNil, 0, 0) }
+            return k
+        }
+
+        // Case-insensitive compare of p[off ..< off+lit.count] to an ASCII byte literal.
+        func ciEqual(_ p: UnsafePointer<UInt8>, _ off: Int, _ lit: [UInt8]) -> Bool {
+            for j in 0 ..< lit.count where lower(unsafe p[off + j]) != lit[j] { return false }
+            return true
+        }
+        func matchesDoctype(_ p: UnsafePointer<UInt8>, _ off: Int) -> Bool {
+            guard off + litDoctype.count <= n else { return false }
+            return unsafe ciEqual(p, off, litDoctype)
+        }
+        // `</name` matches when the name equals (case-insensitive) and the next byte ends the tag.
+        func matchesEndName(_ p: UnsafePointer<UInt8>, _ at: Int, _ nameOff: Int, _ nameLen: Int) -> Bool {
+            guard at + nameLen <= n else { return false }
+            for j in 0 ..< nameLen where lower(unsafe p[at + j]) != lower(unsafe p[nameOff + j]) {
+                return false
+            }
+            let after = at + nameLen
+            if after >= n { return true }
+            let c = unsafe p[after]
+            return isSpace(c) || c == gt || c == slash
+        }
+        // Raw-text / RCDATA element? Returns the "decode entities" flag (true = RCDATA), or nil. A
+        // length switch rejects ordinary tags before any byte compare.
+        func rawTextKind(_ p: UnsafePointer<UInt8>, _ nameOff: Int, _ nameLen: Int) -> Bool? {
+            switch nameLen {
+                case 3: return unsafe ciEqual(p, nameOff, rawXmp) ? false : nil
+                case 5:
+                    if unsafe ciEqual(p, nameOff, rawStyle) { return false }
+                    if unsafe ciEqual(p, nameOff, rcTitle) { return true }
+                    return nil
+                case 6:
+                    if unsafe ciEqual(p, nameOff, rawScript) { return false }
+                    if unsafe ciEqual(p, nameOff, rawIframe) { return false }
+                    return nil
+                case 7: return unsafe ciEqual(p, nameOff, rawNoembed) ? false : nil
+                case 8:
+                    if unsafe ciEqual(p, nameOff, rawNoframes) { return false }
+                    if unsafe ciEqual(p, nameOff, rcTextarea) { return true }
+                    return nil
+                default: return nil
             }
         }
     }
@@ -338,43 +358,66 @@ private let litDoctype = Array("doctype".utf8)
 // MARK: - Materialize (tape -> [HTMLToken], the correctness path; safe array access only)
 
 extension HTMLTape {
-    /// The token at tape index `i`, building Strings lazily (entity-decoded text/values, lowercased
-    /// names). Tree construction will prefer this over `materialize()` to touch only what it needs.
-    public func token(at i: Int) -> HTMLToken {
+    /// The token starting at slot `i` plus the index of the next token's first slot. A start tag
+    /// consumes its inline attribute slots here, so the returned index skips past them.
+    func decoded(at i: Int) -> (HTMLToken, next: Int) {
         let s = slots[i]
         switch TapeSlot.tag(s) {
-            case HTMLTapeKind.text:
+            case K.text:
                 let aux = TapeSlot.aux(s)
-                return .text(text(TapeSlot.low(s), Int(aux >> 1), decode: aux & 1 == 1))
-            case HTMLTapeKind.startTag:
-                let rec = starts[TapeSlot.low(s)]
+                return (.text(text(TapeSlot.low(s), Int(aux >> 1), decode: aux & 1 == 1)), i + 1)
+            case K.startTag:
+                let aux = TapeSlot.aux(s)
+                let selfClosing = aux & 1 == 1
+                let attrCount = Int((aux >> 1) & 0x3FFF)
+                let nameLen = Int((aux >> 15) & 0xFFF)
                 var attributes: [HTMLAttribute] = []
-                attributes.reserveCapacity(Int(rec.attrCount))
-                for a in Int(rec.attrStart) ..< Int(rec.attrStart + rec.attrCount) {
-                    let r = attrs[a]
-                    let value = r.valLen == 0 ? "" : text(Int(r.valOff), Int(r.valLen), decode: r.valDecode)
+                attributes.reserveCapacity(attrCount)
+                var idx = i + 1
+                for _ in 0 ..< attrCount {
+                    let nameSlot = slots[idx]
+                    let valueSlot = slots[idx + 1]
+                    idx += 2
+                    let vAux = TapeSlot.aux(valueSlot)
+                    let vLen = Int(vAux >> 1)
+                    let value = vLen == 0 ? "" : text(TapeSlot.low(valueSlot), vLen, decode: vAux & 1 == 1)
                     attributes.append(
-                        HTMLAttribute(name: lowerName(Int(r.nameOff), Int(r.nameLen)), value: value))
+                        HTMLAttribute(
+                            name: lowerName(TapeSlot.low(nameSlot), Int(TapeSlot.aux(nameSlot))),
+                            value: value))
                 }
-                return .startTag(
-                    name: lowerName(Int(rec.nameOff), Int(rec.nameLen)), attributes: attributes,
-                    selfClosing: rec.selfClosing)
-            case HTMLTapeKind.endTag:
-                return .endTag(name: lowerName(TapeSlot.low(s), Int(TapeSlot.aux(s) >> 1)))
-            case HTMLTapeKind.comment:
-                return .comment(raw(TapeSlot.low(s), Int(TapeSlot.aux(s) >> 1)))
-            case HTMLTapeKind.doctype:
-                return .doctype(name: lowerName(TapeSlot.low(s), Int(TapeSlot.aux(s) >> 1)))
+                return (
+                    .startTag(
+                        name: lowerName(TapeSlot.low(s), nameLen), attributes: attributes,
+                        selfClosing: selfClosing), idx
+                )
+            case K.endTag:
+                return (.endTag(name: lowerName(TapeSlot.low(s), Int(TapeSlot.aux(s)))), i + 1)
+            case K.comment:
+                return (.comment(raw(TapeSlot.low(s), Int(TapeSlot.aux(s)))), i + 1)
+            case K.doctype:
+                return (.doctype(name: lowerName(TapeSlot.low(s), Int(TapeSlot.aux(s)))), i + 1)
             default:
-                return .doctype(name: nil)
+                return (.doctype(name: nil), i + 1)
         }
     }
+
+    /// The token starting at slot `i` (ignoring navigation). `i` must be a token-start slot.
+    public func token(at i: Int) -> HTMLToken { decoded(at: i).0 }
+
+    /// The first slot of the token after the one at `i`.
+    public func nextIndex(after i: Int) -> Int { decoded(at: i).next }
 
     /// Reconstruct the full `[HTMLToken]` stream (the correctness oracle for the tape).
     public func materialize() -> [HTMLToken] {
         var out: [HTMLToken] = []
         out.reserveCapacity(slots.count)
-        for i in 0 ..< slots.count { out.append(token(at: i)) }
+        var i = 0
+        while i < slots.count {
+            let (tok, next) = decoded(at: i)
+            out.append(tok)
+            i = next
+        }
         return out
     }
 
