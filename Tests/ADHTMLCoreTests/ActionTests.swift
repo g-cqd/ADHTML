@@ -10,9 +10,11 @@ struct ActionTests {
     func `live-search action emits the RFC wire verbatim (example A)`() {
         // RFC-0019 §3.1 / §4.A — input fetches a filtered fragment and morphs the target tbody.
         #expect(
-            input().attribute("name", "search").action(
-                .get("/parts/rows").trigger(.input).debounce(.milliseconds(200)).target("parts-rows")
-            ).render()
+            input().attribute("name", "search")
+                .action(
+                    .get("/parts/rows").trigger(.input).debounce(.milliseconds(200)).target("parts-rows")
+                )
+                .render()
                 == #"<input name="search" data-adh-action="get" data-adh-url="/parts/rows" "#
                 + #"data-adh-trigger="input" data-adh-debounce="200" data-adh-target="parts-rows" "#
                 + #"data-adh-swap="morph">"#
@@ -42,9 +44,11 @@ struct ActionTests {
         let arena = CellArena()
         let pending = arena.signal(false)
         #expect(
-            button { "remove" }.action(
-                .delete("/parts/1/manufacturers/2").target("mfr-chips").optimistic(Behavior.toggle(pending))
-            ).render()
+            button { "remove" }
+                .action(
+                    .delete("/parts/1/manufacturers/2").target("mfr-chips").optimistic(Behavior.toggle(pending))
+                )
+                .render()
                 == #"<button data-adh-action="delete" data-adh-url="/parts/1/manufacturers/2" "#
                 + #"data-adh-target="mfr-chips" data-adh-swap="morph" data-adh-optimistic="toggle#0">remove</button>"#
         )
@@ -78,5 +82,28 @@ struct ActionTests {
         #expect(Action.put("/x").method == "put")
         #expect(Action.patch("/x").method == "patch")
         #expect(Action.delete("/x").method == "delete")
+    }
+
+    @Test
+    func `every verb lowers to its data-adh-action token (exhaustive)`() {
+        let cases: [(Action, String)] = [
+            (.get("/p"), "get"), (.post("/p"), "post"), (.put("/p"), "put"),
+            (.patch("/p"), "patch"), (.delete("/p"), "delete")
+        ]
+        for (action, verb) in cases {
+            #expect(div {}.action(action).render().contains(##"data-adh-action="\##(verb)""##))
+        }
+    }
+
+    @Test
+    func `every swap mode lowers to its raw value (exhaustive)`() {
+        // The matrix is small and closed — assert each mode independently so a mis-mapped case (e.g.
+        // outOfBand emitting "oob") fails, not just the default.
+        let modes: [(Swap, String)] = [
+            (.morph, "morph"), (.innerHTML, "innerHTML"), (.append, "append"), (.outOfBand, "outOfBand")
+        ]
+        for (mode, raw) in modes {
+            #expect(div {}.action(.get("/p").swap(mode)).render().contains(##"data-adh-swap="\##(raw)""##))
+        }
     }
 }
