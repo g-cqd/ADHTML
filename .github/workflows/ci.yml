@@ -190,6 +190,30 @@ jobs:
             --disable-indexing --warnings-as-errors \
             --output-path "$PWD/_docs_check"
 
+  sanitizers:
+    name: Sanitizers (${{ matrix.name }})
+    needs: quality
+    # ASan+UBSan and TSan over the engine's unsafe surface (Escape/**, Render/**) and the Mutex-backed
+    # concurrency layer (CellArena, AsyncByteSink). Slow (TSan ~5-15×), so main / dispatch only, advisory
+    # for now — promote to a hard gate once stable. `--build-system native` (the macro/test-link caveat,
+    # ADR-0008). The two passes are mutually exclusive (ASan and TSan can't combine).
+    if: github.event_name != 'pull_request'
+    runs-on: macos-26
+    continue-on-error: true
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: thread, flags: "--sanitize=thread" }
+          - { name: address, flags: "--sanitize=address" }
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Test under the ${{ matrix.name }} sanitizer
+        run: swift test --build-system native ${{ matrix.flags }}
+
   runtime:
     name: Client runtime (bun)
     # The hand-written JS hydration runtime: strict typecheck, unit-test the DOM-free core + the DOM
