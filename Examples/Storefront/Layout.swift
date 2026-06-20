@@ -15,19 +15,21 @@ struct PageLayout<Content: HTML> {
     }
 
     var body: some HTML {
-        Page(head: {
-            meta().attribute("charset", "utf-8")
-            meta().name("viewport").content("width=device-width, initial-scale=1")
-            title { pageTitle }
-            link().rel(.stylesheet).href("/app.css")
-        }) {
-            nav {
-                a { "Acme Tools" }.href("/").class("brand")
-                a { "Cart" }.href("/cart")
-            }
-            .role(.navigation)
-            main { content }  // the slot
-            footer { p { "© 2026 Acme" } }
-        }
+        Page(
+            head: {
+                meta().attribute("charset", "utf-8")
+                meta().name("viewport").content("width=device-width, initial-scale=1")
+                title { pageTitle }
+                link().rel(.stylesheet).href("/app.css")
+            },
+            content: {
+                nav {
+                    a { "Acme Tools" }.href("/").class("brand")
+                    a { "Cart" }.href("/cart")
+                }
+                .role(.navigation)
+                main { content }  // the slot
+                footer { p { "© 2026 Acme" } }
+            })
     }
 }
