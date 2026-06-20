@@ -2,10 +2,9 @@ import Testing
 
 @testable import ADHTMLCore
 
-@Suite("Standard elements")
 struct ElementsTests {
-    @Test("a realistic page renders with document, sectioning, list, and form elements")
-    func realisticPage() {
+    @Test
+    func `a realistic page renders with document, sectioning, list, and form elements`() {
         let page =
             html {
                 head {
@@ -32,8 +31,8 @@ struct ElementsTests {
         #expect(page.hasSuffix("</main></body></html>"))
     }
 
-    @Test("void elements emit no closing tag")
-    func voidElements() {
+    @Test
+    func `void elements emit no closing tag`() {
         #expect(img().src("/logo.png").alt("Logo").render() == #"<img src="/logo.png" alt="Logo">"#)
         #expect(hr().render() == "<hr>")
         #expect(
@@ -41,8 +40,8 @@ struct ElementsTests {
                 == #"<input type="text" name="q" placeholder="Search">"#)
     }
 
-    @Test("trait-gated attributes render; global attributes apply anywhere")
-    func attributes() {
+    @Test
+    func `trait-gated attributes render; global attributes apply anywhere`() {
         #expect(label { "Name" }.htmlFor("n").render() == #"<label for="n">Name</label>"#)
         #expect(input().disabled().render() == #"<input disabled="">"#)
         #expect(
