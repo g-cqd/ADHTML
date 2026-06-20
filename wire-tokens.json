@@ -1,0 +1,33 @@
+{
+  "//": "SINGLE SOURCE OF TRUTH for ADHTML wire attribute tokens (RFC-0021 / ADR-0007). Generates BOTH",
+  "//2": "Sources/ADHTMLCore/Wire/WireTokens.swift and ClientRuntime/src/tokens.js — run `bun gen-tokens.js`",
+  "//3": "(also invoked by build.js). Short, htmx-style 'a-' prefix (non-data-*; browsers accept it like hx-*).",
+  "//4": "A Swift parity test (WireTokensTests) + a JS parity test re-derive from this file so the two cannot",
+  "//5": "drift. Compound attributes append a suffix: event -> 'a-on:click', bind -> 'a-b:text'.",
+  "tokens": {
+    "island": "a-i",
+    "id": "a-id",
+    "on": "a-on",
+    "connect": "a-c",
+    "bind": "a-b",
+    "classToggle": "a-cls",
+    "show": "a-show",
+    "if": "a-if",
+    "model": "a-m",
+    "keys": "a-k",
+    "prevent": "a-pd",
+    "stop": "a-sp",
+    "each": "a-each",
+    "eachText": "a-t",
+    "filter": "a-flt",
+    "action": "a-ac",
+    "url": "a-u",
+    "trigger": "a-tr",
+    "debounce": "a-db",
+    "include": "a-in",
+    "target": "a-tg",
+    "swap": "a-sw",
+    "optimistic": "a-op",
+    "oob": "a-oob"
+  }
+}

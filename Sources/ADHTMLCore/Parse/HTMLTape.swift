@@ -78,9 +78,11 @@ extension HTMLTape {
                 if unsafe (p[i] == lt) {
                     i = unsafe handleLT(p, i)
                 } else {
-                    // Text run to the next `<`, flagging `&` for lazy decode. Scalar, not SWAR:
-                    // node-dense markup has short runs where an 8-byte stride is pure overhead
-                    // (ADJSON measured the same regression on its whitespace skip).
+                    // Text run to the next `<`, flagging `&` for lazy decode. Hybrid scan: scalar
+                    // first (node-dense markup has short runs where an 8-byte stride is pure overhead
+                    // — ADJSON measured that regression), then, once a run proves long (>= 16 bytes),
+                    // a SWAR stop-mask skips whole 8-byte words containing neither `<` nor `&`. So
+                    // short runs never pay for SWAR and long prose runs skip ~8 bytes per step.
                     let start = i
                     var decode = false
                     while i < n {
@@ -88,6 +90,13 @@ extension HTMLTape {
                         if c == lt { break }
                         if c == ampersand { decode = true }
                         i &+= 1
+                        if i - start >= 16 {
+                            while i + 8 <= n {
+                                let w = unsafe UnsafeRawPointer(p + i).loadUnaligned(as: UInt64.self)
+                                if (SWAR.equals(w, lt) | SWAR.equals(w, ampersand)) != 0 { break }
+                                i &+= 8
+                            }
+                        }
                     }
                     emit(K.text, start, (UInt64(i - start) << 1) | (decode ? 1 : 0))
                 }
