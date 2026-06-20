@@ -72,8 +72,13 @@ deterministic by construction and the numbers are from quiescent runs.
   the bottleneck (prose ≈ 5 µs vs wide-list ≈ 175 µs) and word-loads would widen the unsafe surface
   against the memory-safety prism. Follow-up: promote `SWAR` to ADFCore and have ADJSON adopt it (removing
   the cross-repo duplicate) before SWAR-accelerating the entity escaper.
-- **`borrowing _render` — deferred.** A protocol-wide ownership change for an uncertain sub-few-percent
-  gain on a non-DSL path; the clear DSL CoW win is captured by (1).
+- **`borrowing _render` — attempted, reverted.** Making the `HTML._render` *requirement* `borrowing Self`
+  is the only way to borrow in the generic lowering path (concrete witnesses don't help — generic
+  `_HTMLPair`/`_HTMLArray` dispatch through the requirement's convention), but it's all-or-nothing and two
+  conformers can't borrow: the `Component` default captures `html` in the `withValue` closure, and
+  `_HTMLOptional` binds `if let … = html.wrapped` — both "borrowed and cannot be consumed." Workarounds
+  reintroduce the copies the borrow was meant to remove, so by-value lowering stays (its copies are
+  shallow CoW-bumps). Confirmed the original deferral was correct.
 
 ## "Identify" findings (this pass)
 
