@@ -37,8 +37,8 @@ public enum Renderer {
         }
     }
 
-    /// Emit one opcode. The shared byte-writing body of both render paths.
-    private static func emit(_ op: HTMLOp, into sink: inout some HTMLByteSink) {
+    /// Emit one opcode. The shared byte-writing body of the sync and async render paths.
+    static func emit(_ op: HTMLOp, into sink: inout some HTMLByteSink) {
         switch op {
             case .openTagStart(let name):
                 sink.writeByte(0x3C)  // <

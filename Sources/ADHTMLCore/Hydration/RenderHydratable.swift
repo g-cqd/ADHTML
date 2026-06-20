@@ -35,8 +35,8 @@ extension HTML {
         return out
     }
 
-    private static var scriptOpen: [UInt8] {
+    static var scriptOpen: [UInt8] {
         Array(#"<script type="application/adh-state+json" id="adh-state">"#.utf8)
     }
-    private static var scriptClose: [UInt8] { Array("</script>".utf8) }
+    static var scriptClose: [UInt8] { Array("</script>".utf8) }
 }

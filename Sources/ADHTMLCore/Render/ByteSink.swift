@@ -37,4 +37,6 @@ public struct ArraySink: HTMLByteSink {
     public mutating func write(_ buffer: UnsafeBufferPointer<UInt8>) {
         bytes.append(contentsOf: buffer)
     }
+    /// Empty the buffer while keeping its allocation — lets the async renderer reuse one chunk buffer.
+    public mutating func reset() { bytes.removeAll(keepingCapacity: true) }
 }
