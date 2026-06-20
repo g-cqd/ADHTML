@@ -37,7 +37,7 @@ bun run typecheck   # tsc --noEmit --checkJs over the JSDoc-typed src/ (strict)
 bun test            # DOM-free core (signals/wire/behaviors/expr) + DOM layer under happy-dom
 bun run build       # minify + size-gate -> adh-runtime.min.js (committed, SRI-pinned)
 bun run e2e         # real-browser smoke + perf (Playwright/chromium)
-bun profile/bench.js  # hot-path microbenchmarks (happy-dom; min over runs)
+bun run bench       # hot-path microbenchmarks (happy-dom; min over runs)
 ```
 
 ## How it works
@@ -64,6 +64,26 @@ bun profile/bench.js  # hot-path microbenchmarks (happy-dom; min over runs)
   bulk `hydrate()` + delegated-click interaction latency in native DOM (the honest numbers; happy-dom
   overstates absolute timings).
 - `bun run typecheck` / `bun run build` — strict `tsc --checkJs`; minify + the gzip-budget gate.
+
+## Benchmarks
+
+Optional, **not part of CI**. The cross-framework tools require internet (pull production builds from
+esm.sh / unpkg) and chromium (`bunx playwright install chromium`).
+
+- `bun run bench` — happy-dom hot-path microbenchmarks (signals fan-out, morph, hydrate). happy-dom is a
+  JS DOM (~100× slower than a browser), so use it for *relative* deltas, not absolute numbers.
+- `bun run bench:compare` — same-machine, same-workload comparison (500 SSR counters → make interactive →
+  2000 clicks) of ADHTML vs Vanilla, React, Vue, Preact, Alpine, petite-vue in **real chromium**. Reports
+  time-to-interactive + per-interaction latency. Every runtime is measured under the same machine load,
+  so the ranking is load-independent.
+- `bun run bench:size` — real gzipped runtime size of each framework's production bundle (same gzip method
+  as `build.js`).
+
+Representative result (chromium, 500 counters, min of 3): ADHTML is second only to hand-rolled vanilla on
+both time-to-interactive (**1.9 ms** vs ~5.3–5.5 ms for React/Vue/Preact) and interaction latency
+(**4.35 µs/click**), and is the smallest runtime measured (**2.2 KB** gzip vs 6.2 KB Preact, 37.5 KB Vue,
+46.8 KB React). Caveat: a counter workload favors fine-grained/island models; the TTI win is structural,
+the interaction gap narrows for large dynamic subtrees (which ADHTML updates via server-driven SSE `morph`).
 
 ## Known gaps (follow-ups)
 

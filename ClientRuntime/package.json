@@ -8,7 +8,10 @@
     "test": "bun test ./test",
     "typecheck": "tsc --noEmit",
     "build": "bun run build.js",
-    "e2e": "playwright test"
+    "e2e": "playwright test",
+    "bench": "bun profile/bench.js",
+    "bench:compare": "bun profile/framework-compare.mjs",
+    "bench:size": "bun profile/size-compare.mjs"
   },
   "devDependencies": {
     "@happy-dom/global-registrator": "^20.10.6",
