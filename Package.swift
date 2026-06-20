@@ -232,6 +232,9 @@ if isMarkdown {
             name: "ADHTMLMarkdown",
             dependencies: ["ADHTMLCore", .product(name: "Markdown", package: "swift-markdown")],
             swiftSettings: strictSettings))
+    package.targets.append(
+        .testTarget(
+            name: "ADHTMLMarkdownTests", dependencies: ["ADHTMLMarkdown"], swiftSettings: testSettings))
 }
 if isSRI {
     // swift-crypto SHA-256 — for Subresource Integrity of the client runtime only (ADR-0011).
