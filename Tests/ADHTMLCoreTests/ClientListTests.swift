@@ -3,7 +3,7 @@ import Testing
 @testable import ADHTMLCore
 
 // RFC-0021 P3 — a client list: `ForEach` over a `Signal<[String]>`. Lowers to a `<template
-// m="cell">ROW</template>` (the row structure with `EachText` slots) followed by the initial
+// data-m="cell">ROW</template>` (the row structure with `EachText` slots) followed by the initial
 // server rows from the signal's current value (the no-JS fallback). The runtime clones + morph-reconciles.
 struct ClientListTests {
     @Test
@@ -12,9 +12,9 @@ struct ClientListTests {
         let items = arena.signal(["a", "b"])  // id 0
         #expect(
             ForEach(items) { item in li { item.text } }.render()
-                == #"<template m="0"><li><span n=""></span></li></template>"#
-                + #"<li><span n="">a</span></li>"#
-                + #"<li><span n="">b</span></li>"#)
+                == #"<template data-m="0"><li><span data-n=""></span></li></template>"#
+                + #"<li><span data-n="">a</span></li>"#
+                + #"<li><span data-n="">b</span></li>"#)
     }
 
     @Test
@@ -24,9 +24,9 @@ struct ClientListTests {
         let query = arena.signal("")  // id 1
         #expect(
             ForEach(items, filteredBy: query) { item in li { item.text } }.render()
-                == #"<template m="0" o="1">"#
-                + #"<li><span n=""></span></li></template>"#
-                + #"<li><span n="">x</span></li>"#)
+                == #"<template data-m="0" data-o="1">"#
+                + #"<li><span data-n=""></span></li></template>"#
+                + #"<li><span data-n="">x</span></li>"#)
     }
 
     @Test
@@ -35,8 +35,8 @@ struct ClientListTests {
         let items = arena.signal(["<b>"])  // id 0
         #expect(
             ForEach(items) { item in li { item.text } }.render()
-                == #"<template m="0"><li><span n=""></span></li></template>"#
-                + #"<li><span n="">&lt;b&gt;</span></li>"#)
+                == #"<template data-m="0"><li><span data-n=""></span></li></template>"#
+                + #"<li><span data-n="">&lt;b&gt;</span></li>"#)
     }
 
     @Test
@@ -51,6 +51,6 @@ struct ClientListTests {
         let items = arena.signal([String]())  // id 0
         #expect(
             ForEach(items) { item in li { item.text } }.render()
-                == #"<template m="0"><li><span n=""></span></li></template>"#)
+                == #"<template data-m="0"><li><span data-n=""></span></li></template>"#)
     }
 }

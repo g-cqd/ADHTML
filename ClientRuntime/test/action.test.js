@@ -53,9 +53,9 @@ function mount(html) {
 test("a GET action fetches with the ADH-Request header + query string, then morphs the target", async () => {
   stubFetch(`<li id="r1">A</li><li id="r2">B</li>`);
   const doc = mount(`
-    <div a b="isle" c="load">
-      <input name="q" value="ab" p="get" q="/rows"
-             r="input" u="rows" v="a">
+    <div data-a data-b="isle" data-c="load">
+      <input name="q" value="ab" data-p="get" data-q="/rows"
+             data-r="input" data-u="rows" data-v="a">
     </div>
     <ul id="rows"><li id="r0">old</li></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -75,9 +75,9 @@ test("a GET action fetches with the ADH-Request header + query string, then morp
 test("debounce coalesces a burst of triggers into a single request", async () => {
   stubFetch(`<li>x</li>`);
   const doc = mount(`
-    <div a b="isle" c="load">
-      <input name="q" value="z" p="get" q="/rows"
-             r="input" s="20" u="rows">
+    <div data-a data-b="isle" data-c="load">
+      <input name="q" value="z" data-p="get" data-q="/rows"
+             data-r="input" data-s="20" data-u="rows">
     </div>
     <ul id="rows"></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -94,10 +94,10 @@ test("debounce coalesces a burst of triggers into a single request", async () =>
 test("optimistic applies a behavior to its cell instantly, before the response arrives", async () => {
   stubFetch(`<span>ignored</span>`);
   const doc = mount(`
-    <div a b="isle" c="load">
-      <span id="flag" e:text="0">false</span>
-      <button p="delete" q="/x" w="b#0"
-              u="t">remove</button>
+    <div data-a data-b="isle" data-c="load">
+      <span id="flag" data-e:text="0">false</span>
+      <button data-p="delete" data-q="/x" data-w="b#0"
+              data-u="t">remove</button>
     </div>
     <div id="t"></div>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"isle","on":"load","scope":[0]}]}</script>`);
@@ -113,8 +113,8 @@ test("optimistic applies a behavior to its cell instantly, before the response a
 test("a failed response is isolated — the target is untouched and nothing throws", async () => {
   stubFetch(`<li id="new">nope</li>`, false); // 500
   const doc = mount(`
-    <div a b="isle" c="load">
-      <button p="get" q="/rows" u="rows">go</button>
+    <div data-a data-b="isle" data-c="load">
+      <button data-p="get" data-q="/rows" data-u="rows">go</button>
     </div>
     <ul id="rows"><li id="keep">keep</li></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -128,11 +128,11 @@ test("a failed response is isolated — the target is untouched and nothing thro
 });
 
 test("an out-of-band swap morphs each response region (attributes + children) by id", async () => {
-  stubFetch(`<span x="pill" class="saved">Saved</span>`);
+  stubFetch(`<span data-x="pill" class="saved">Saved</span>`);
   const doc = mount(`
-    <div a b="isle" c="load">
-      <input name="title" value="x" p="post" q="/save"
-             r="change" v="d">
+    <div data-a data-b="isle" data-c="load">
+      <input name="title" value="x" data-p="post" data-q="/save"
+             data-r="change" data-v="d">
     </div>
     <span id="pill" class="idle">Idle</span>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -147,14 +147,14 @@ test("an out-of-band swap morphs each response region (attributes + children) by
 
 test("actionTrigger defaults: a <form> triggers on submit, anything else on click; explicit wins", () => {
   const form = document.createElement("form");
-  form.setAttribute("p", "post");
+  form.setAttribute("data-p", "post");
   expect(actionTrigger(form)).toBe("submit");
 
   const button = document.createElement("button");
-  button.setAttribute("p", "delete");
+  button.setAttribute("data-p", "delete");
   expect(actionTrigger(button)).toBe("click");
 
-  button.setAttribute("r", "change");
+  button.setAttribute("data-r", "change");
   expect(actionTrigger(button)).toBe("change");
 });
 
@@ -166,8 +166,8 @@ test("ACTION_METHODS mirrors the Swift Action.methods verb set (parity)", () => 
 test("an oversized action response is dropped before the DOM is touched (failure-safe size cap)", async () => {
   stubFetch("x".repeat(2 * 1024 * 1024 + 1));  // just over the 2 MiB cap
   const doc = mount(`
-    <div a b="isle" c="load">
-      <button p="get" q="/big" u="rows">go</button>
+    <div data-a data-b="isle" data-c="load">
+      <button data-p="get" data-q="/big" data-u="rows">go</button>
     </div>
     <ul id="rows"><li id="keep">keep</li></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);

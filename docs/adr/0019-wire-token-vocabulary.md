@@ -18,10 +18,13 @@ density.)
 
 A **single, Swift-generated, build-time-mangled** wire-token vocabulary.
 
-- **Source of truth: `wire-tokens.json`** — an ordered list of `[name, token]` pairs. Tokens are **single
-  base36 characters** (the whole alphabet+numerals — maximal density), bare (no prefix): no standard HTML
-  attribute is single-char, and `class`/`id`/`style` keep their real names, so there is no collision.
-  Compound attributes append a suffix (`on` → `c:click`, `bind` → `e:text`).
+- **Source of truth: `wire-tokens.json`** — an ordered list of `[name, token]` pairs, in three closed
+  categories (attribute names `T`, behavior values `B`, swap values `S`). Tokens are **single base36
+  characters** (maximal density). The spec stays bare; the **generator applies the `data-` prefix to the
+  attribute-name category only** (the one place it is applied) — so attribute names are valid HTML5 custom
+  data attributes (`data-a`, `data-b`, …, compound `data-c:click`), while behavior/swap **values** stay
+  bare (they are attribute values, not names: `data-c:click="a#0#1"`, `data-v="a"`). `class`/`id`/`style`
+  keep their real names.
 - **Generation is Swift-side, via a SwiftPM command plugin** (`generate-wire-tokens`, not a JS script):
   it regenerates BOTH `Sources/ADHTMLCore/Wire/WireTokens.swift` (the renderer's constants) and
   `ClientRuntime/src/tokens.js` (the runtime's constants) from the JSON, so they cannot drift. A command

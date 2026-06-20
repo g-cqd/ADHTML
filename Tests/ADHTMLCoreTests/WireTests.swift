@@ -19,7 +19,7 @@ struct WireTests {
         let html = try renderedCounter()
         #expect(
             html.hasPrefix(
-                #"<div a b="counter" c="visible"><span e:text="0">0</span></div>"#
+                #"<div data-a data-b="counter" data-c="visible"><span data-e:text="0">0</span></div>"#
             ))
         #expect(html.hasSuffix("</script>"))
     }
@@ -117,7 +117,7 @@ struct WireTests {
         }
         let html = try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
 
-        #expect(html.contains(##"c:click="a#0#1""##))
+        #expect(html.contains(##"data-c:click="a#0#1""##))
     }
 
     @Test

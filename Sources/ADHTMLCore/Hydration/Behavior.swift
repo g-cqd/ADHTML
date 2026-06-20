@@ -86,9 +86,18 @@ public enum Behavior {
         BehaviorInvocation(name: WireBehavior.commit, cell: tokens.id, params: [.int(Int64(query.id.raw))])
     }
 
-    /// Remove the last element of a string array — backspace-on-empty removes the last chip.
+    /// Remove the last element of a string array — backspace-on-empty removes the last chip. A no-op when
+    /// the triggering element has a non-empty `value` (so Backspace deletes text while typing, not a chip).
     public static func removeLast(_ tokens: Signal<[String]>) -> BehaviorInvocation {
         BehaviorInvocation(name: WireBehavior.removeLast, cell: tokens.id)
+    }
+
+    /// Append the **triggering element's text** to `tokens` and clear `query` — click a suggestion to
+    /// commit it (P9). A no-op when the element's text is empty.
+    public static func commitValue(_ tokens: Signal<[String]>, clearing query: Signal<String>)
+        -> BehaviorInvocation
+    {
+        BehaviorInvocation(name: WireBehavior.commitValue, cell: tokens.id, params: [.int(Int64(query.id.raw))])
     }
 }
 

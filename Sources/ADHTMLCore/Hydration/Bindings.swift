@@ -76,6 +76,15 @@ extension HTMLElement {
     /// `stopPropagation()` the event when this element's behavior fires (`data-adh-stop`).
     public consuming func stopPropagation() -> Self { attribute(WireToken.stop, "") }
 
+    /// Map several `event.key`s to behaviors on ONE element (P9 — the combobox keyboard, where Enter,
+    /// Backspace, the arrows each do something different and a single `.on(.keydown,)` can't). Emits the
+    /// keymap attribute as `key:behavior;key2:behavior2`; the client fires the matching entry on `keydown`
+    /// and prevents the default for navigation keys (Enter / Arrow* / Escape / Tab).
+    public consuming func keymap(_ entries: [(key: String, behavior: BehaviorInvocation)]) -> Self {
+        let value = entries.map { "\($0.key):\($0.behavior.attributeValue)" }.joined(separator: ";")
+        return attribute(WireToken.keymap, value)
+    }
+
     // MARK: - P2: class-merge (ADR-0017)
 
     /// Toggle the presence of CSS class `name` on this element from a boolean cell, **merging** — it

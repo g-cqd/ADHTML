@@ -8,23 +8,24 @@ import Testing
 // renderer ↔ token wiring can't silently break. (A `regenerate + git diff` CI step guards staleness.)
 struct WireTokensTests {
     @Test
-    func `the generated tokens are single-char, unique, and cover the closed set`() {
-        #expect(WireToken.all.count == 24)
-        #expect(WireToken.all.allSatisfy { $0.token.count == 1 })  // maximal density: 1 char each
-        #expect(Set(WireToken.all.map(\.token)).count == 24)  // all distinct
-        // A few anchors (mirrors wire-tokens.json).
-        #expect(WireToken.island == "a")
-        #expect(WireToken.id == "b")
-        #expect(WireToken.on == "c")
-        #expect(WireToken.bind == "e")
-        #expect(WireToken.classToggle == "f")
-        #expect(WireToken.action == "p")
-        #expect(WireToken.oob == "x")
+    func `attribute tokens are data- prefixed single chars (valid HTML), unique, covering the set`() {
+        #expect(WireToken.all.count == 25)
+        // The generator prefixes the attribute category with `data-` (valid HTML5 custom data attributes).
+        #expect(WireToken.all.allSatisfy { $0.token.hasPrefix("data-") && $0.token.count == 6 })
+        #expect(Set(WireToken.all.map(\.token)).count == 25)  // all distinct
+        // A few anchors (mirrors wire-tokens.json + the data- prefix).
+        #expect(WireToken.island == "data-a")
+        #expect(WireToken.id == "data-b")
+        #expect(WireToken.on == "data-c")
+        #expect(WireToken.bind == "data-e")
+        #expect(WireToken.classToggle == "data-f")
+        #expect(WireToken.action == "data-p")
+        #expect(WireToken.oob == "data-x")
     }
 
     @Test
-    func `behavior + swap value tokens are generated single-char and used by the wire`() {
-        #expect(WireBehavior.all.map(\.token) == ["a", "b", "c", "d", "e", "f", "g"])
+    func `behavior + swap value tokens are bare single chars (attribute VALUES, not names)`() {
+        #expect(WireBehavior.all.map(\.token) == ["a", "b", "c", "d", "e", "f", "g", "h"])
         #expect(WireSwap.all.map(\.token) == ["a", "b", "c", "d"])
         // The factories + the Swap emit use the tokens.
         #expect(Behavior.increment(CellArena().signal(0)).attributeValue == "\(WireBehavior.increment)#0#1")

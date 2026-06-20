@@ -11,8 +11,8 @@ struct EventVocabTests {
     func `model emits i and the initial value (no FOUC)`() {
         let arena = CellArena()
         let query = arena.signal("hi")  // id 0
-        #expect(input().model(query).render() == #"<input i="0" value="hi">"#)
-        #expect(input().model(CellID(2)).render() == #"<input i="2">"#)
+        #expect(input().model(query).render() == #"<input data-i="0" value="hi">"#)
+        #expect(input().model(CellID(2)).render() == #"<input data-i="2">"#)
     }
 
     // MARK: P4 — event refinements
@@ -24,9 +24,9 @@ struct EventVocabTests {
         #expect(
             input().on(.keydown, Behavior.setFromValue(query)).keys("Enter", "Escape")
                 .preventDefault().render()
-                == #"<input c:keydown="d#0" j="Enter,Escape" "#
-                + #"k="">"#)
-        #expect(div { "x" }.stopPropagation().render() == #"<div l="">x</div>"#)
+                == #"<input data-c:keydown="d#0" data-j="Enter,Escape" "#
+                + #"data-k="">"#)
+        #expect(div { "x" }.stopPropagation().render() == #"<div data-l="">x</div>"#)
     }
 
     // MARK: P4 — the new behaviors' wire tokens
@@ -44,11 +44,27 @@ struct EventVocabTests {
         #expect(Behavior.listMove(index, by: -1, within: count, wrap: true).attributeValue == "e#1#-1#2#true")
         #expect(Behavior.commit(tokens, from: query).attributeValue == "f#3#0")
         #expect(Behavior.removeLast(tokens).attributeValue == "g#3")
+        #expect(Behavior.commitValue(tokens, clearing: query).attributeValue == "h#3#0")
+    }
+
+    @Test
+    func `keymap maps several keys to behaviors on one element (P9)`() {
+        let arena = CellArena()
+        let tokens = arena.signal([String]())  // id 0
+        let query = arena.signal("")  // id 1
+        #expect(
+            input().model(query)
+                .keymap([
+                    ("Enter", Behavior.commit(tokens, from: query)),
+                    ("Backspace", Behavior.removeLast(tokens))
+                ])
+                .render()
+                == #"<input data-i="1" value="" data-y="Enter:f#0#1;Backspace:g#0">"#)
     }
 
     @Test
     func `the behavior-token set is closed and matches the runtime (Swift<->JS parity)`() {
-        // 1-char tokens generated from wire-tokens.json (increment=a … removeLast=g).
-        #expect(Behavior.names == ["a", "b", "c", "d", "e", "f", "g"])
+        // 1-char tokens generated from wire-tokens.json (increment=a … commitValue=h).
+        #expect(Behavior.names == ["a", "b", "c", "d", "e", "f", "g", "h"])
     }
 }

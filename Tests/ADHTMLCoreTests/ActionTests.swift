@@ -15,9 +15,9 @@ struct ActionTests {
                     .get("/parts/rows").trigger(.input).debounce(.milliseconds(200)).target("parts-rows")
                 )
                 .render()
-                == #"<input name="search" p="get" q="/parts/rows" "#
-                + #"r="input" s="200" u="parts-rows" "#
-                + #"v="a">"#
+                == #"<input name="search" data-p="get" data-q="/parts/rows" "#
+                + #"data-r="input" data-s="200" data-u="parts-rows" "#
+                + #"data-v="a">"#
         )
     }
 
@@ -25,7 +25,7 @@ struct ActionTests {
     func `swap defaults to morph and is emitted explicitly`() {
         #expect(
             div { "x" }.action(.get("/x")).render()
-                == #"<div p="get" q="/x" v="a">x</div>"#
+                == #"<div data-p="get" data-q="/x" data-v="a">x</div>"#
         )
     }
 
@@ -34,8 +34,8 @@ struct ActionTests {
         #expect(
             input().action(.get("/manufacturers/options").include("q", "kind").swap(.append).target("opts"))
                 .render()
-                == #"<input p="get" q="/manufacturers/options" "#
-                + #"t="q,kind" u="opts" v="c">"#
+                == #"<input data-p="get" data-q="/manufacturers/options" "#
+                + #"data-t="q,kind" data-u="opts" data-v="c">"#
         )
     }
 
@@ -49,8 +49,8 @@ struct ActionTests {
                     .delete("/parts/1/manufacturers/2").target("mfr-chips").optimistic(Behavior.toggle(pending))
                 )
                 .render()
-                == #"<button p="delete" q="/parts/1/manufacturers/2" "#
-                + #"u="mfr-chips" v="a" w="b#0">remove</button>"#
+                == #"<button data-p="delete" data-q="/parts/1/manufacturers/2" "#
+                + #"data-u="mfr-chips" data-v="a" data-w="b#0">remove</button>"#
         )
     }
 
@@ -58,8 +58,8 @@ struct ActionTests {
     func `inline auto-save uses change + out-of-band swap (example D)`() {
         #expect(
             input().action(.post("/parts/1").trigger(.change).swap(.outOfBand)).render()
-                == #"<input p="post" q="/parts/1" "#
-                + #"r="change" v="d">"#
+                == #"<input data-p="post" data-q="/parts/1" "#
+                + #"data-r="change" data-v="d">"#
         )
     }
 
@@ -67,7 +67,7 @@ struct ActionTests {
     func `debounce converts a Duration to whole milliseconds`() {
         #expect(
             input().action(.get("/x").debounce(.seconds(1))).render()
-                == #"<input p="get" q="/x" s="1000" v="a">"#
+                == #"<input data-p="get" data-q="/x" data-s="1000" data-v="a">"#
         )
         #expect(Action.get("/x").debounce(.milliseconds(150)).debounceMilliseconds == 150)
         #expect(Action.get("/x").debounceMilliseconds == nil)
@@ -91,7 +91,7 @@ struct ActionTests {
             (.patch("/p"), "patch"), (.delete("/p"), "delete")
         ]
         for (action, verb) in cases {
-            #expect(div {}.action(action).render().contains(##"p="\##(verb)""##))
+            #expect(div {}.action(action).render().contains(##"data-p="\##(verb)""##))
         }
     }
 
@@ -103,7 +103,7 @@ struct ActionTests {
             (.morph, "a"), (.innerHTML, "b"), (.append, "c"), (.outOfBand, "d")
         ]
         for (mode, raw) in modes {
-            #expect(div {}.action(.get("/p").swap(mode)).render().contains(##"v="\##(raw)""##))
+            #expect(div {}.action(.get("/p").swap(mode)).render().contains(##"data-v="\##(raw)""##))
         }
     }
 }

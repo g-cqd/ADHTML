@@ -59,18 +59,18 @@ enum HTMLBytes {
     static func islandOpen(
         id: IslandID, on: LoadStrategy, connect: String?, key: String?, into sink: inout some HTMLByteSink
     ) {
-        sink.writeStatic("<div a")
+        sink.writeStatic("<div data-a")
         if let key {  // a Region's stable plain `id` — a getElementById morph target; absent ⇒ unchanged bytes
             sink.writeStatic(" id=\"")
             Escaper.write(key, context: .attribute, into: &sink)
             sink.writeStatic("\"")
         }
-        sink.writeStatic(" b=\"")
+        sink.writeStatic(" data-b=\"")
         Escaper.write(id.raw, context: .attribute, into: &sink)
-        sink.writeStatic("\" c=\"")
+        sink.writeStatic("\" data-c=\"")
         Escaper.write(on.attributeValue, context: .attribute, into: &sink)
         if let connect {  // declarative SSE subscription (RFC-0019 §6.3-H); absent ⇒ byte-identical to before
-            sink.writeStatic("\" d=\"")
+            sink.writeStatic("\" data-d=\"")
             Escaper.write(connect, context: .attribute, into: &sink)
         }
         sink.writeStatic("\">")

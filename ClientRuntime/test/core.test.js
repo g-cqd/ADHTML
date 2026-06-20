@@ -8,12 +8,13 @@ import { WIRE_VERSION, parseState } from "../src/wire";
 import spec from "../../wire-tokens.json";
 
 test("tokens.js mirrors wire-tokens.json (generated Swift-side, no drift)", () => {
-  // T (attributes) / B (behaviors) / S (swaps) all generated from this spec by the command plugin.
-  expect(T).toEqual(Object.fromEntries(spec.tokens));
-  expect(B).toEqual(Object.fromEntries(spec.behaviors));
-  expect(S).toEqual(Object.fromEntries(spec.swaps));
-  const all = [...Object.values(T), ...Object.values(B), ...Object.values(S)];
-  expect(all.every((t) => t.length === 1)).toBe(true); // single-char, maximal density
+  // The generator prefixes the attribute category (T) with `data-` (valid HTML5); values (B/S) stay bare.
+  const map = (pairs, prefix = "") => Object.fromEntries(pairs.map(([n, t]) => [n, prefix + t]));
+  expect(T).toEqual(map(spec.tokens, "data-"));
+  expect(B).toEqual(map(spec.behaviors));
+  expect(S).toEqual(map(spec.swaps));
+  expect(Object.values(T).every((t) => /^data-[a-z0-9]$/.test(t))).toBe(true); // data- + 1 char
+  expect([...Object.values(B), ...Object.values(S)].every((t) => t.length === 1)).toBe(true); // bare values
 });
 
 test("an effect re-runs when a signal it read changes", () => {
@@ -93,8 +94,23 @@ test("P5 highlight wraps the match in <mark> and escapes everything else (XSS-sa
 });
 
 test("the behavior-token set is closed and matches Swift Behavior.names (parity)", () => {
-  // 1-char tokens, generated from wire-tokens.json (increment=a, toggle=b, …).
-  expect([...BEHAVIOR_NAMES]).toEqual(["a", "b", "c", "d", "e", "f", "g"]);
+  // 1-char tokens, generated from wire-tokens.json (increment=a … commitValue=h).
+  expect([...BEHAVIOR_NAMES]).toEqual(["a", "b", "c", "d", "e", "f", "g", "h"]);
+});
+
+test("commitValue appends the triggering element's text and clears the query (click-to-commit)", () => {
+  const field = [new Signal(/** @type {string[]} */ ([])), new Signal("ap")]; // tokens, query
+  applyBehavior(parseInvocation("h#0#1"), field, /** @type {any} */ ({ textContent: " Apple " }));
+  expect(field[0].peek()).toEqual(["Apple"]); // trimmed
+  expect(field[1].peek()).toBe("");
+});
+
+test("removeLast is skipped while the input still has text (Backspace edits, not removes a chip)", () => {
+  const list = [new Signal(["a", "b"])];
+  applyBehavior(parseInvocation("g#0"), list, /** @type {any} */ ({ value: "typing" }));
+  expect(list[0].peek()).toEqual(["a", "b"]); // unchanged — still typing
+  applyBehavior(parseInvocation("g#0"), list, /** @type {any} */ ({ value: "" }));
+  expect(list[0].peek()).toEqual(["a"]); // empty input -> removes last chip
 });
 
 test("malformed invocations are rejected", () => {

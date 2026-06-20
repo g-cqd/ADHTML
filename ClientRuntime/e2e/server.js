@@ -5,10 +5,10 @@
 // `Bun.serve`; the runtime is read from the committed `adh-runtime.min.js`.
 
 const STATE = JSON.stringify({
-  v: 1,
+  data-v: 1,
   cells: [
-    { $: "sig", v: 0 },
-    { $: "sig", v: 0 },
+    { $: "sig", data-v: 0 },
+    { $: "sig", data-v: 0 },
   ],
   islands: [
     { id: "counter", on: "load", scope: [0] },
@@ -17,14 +17,14 @@ const STATE = JSON.stringify({
 });
 
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>adh e2e</title></head><body>
-  <div a b="counter" c="load">
-    <button id="inc" c:click="a#0#1">+</button>
-    <span id="count" e:text="0">0</span>
+  <div data-a data-b="counter" data-c="load">
+    <button id="inc" data-c:click="a#0#1">+</button>
+    <span id="count" data-e:text="0">0</span>
   </div>
   <div style="height:2000px">spacer (pushes the lazy island below the fold)</div>
-  <div a b="lazy" c="visible">
-    <button id="lazy-inc" c:click="a#1#1">+</button>
-    <span id="lazy-count" e:text="1">0</span>
+  <div data-a data-b="lazy" data-c="visible">
+    <button id="lazy-inc" data-c:click="a#1#1">+</button>
+    <span id="lazy-count" data-e:text="1">0</span>
   </div>
   <script type="application/adh-state+json" id="adh-state">${STATE}</script>
   <script type="module" src="/adh-runtime.min.js"></script>
@@ -42,9 +42,9 @@ const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf<
   const N = 500;
   let html = "";
   for (let i = 0; i < N; i++) {
-    html += '<div a b="c' + i + '" c="load">' +
-      '<button c:click="a#' + i + '#1"><span class="hit">+</span></button>' +
-      '<output e:text="' + i + '">0</output></div>';
+    html += '<div data-a data-b="c' + i + '" data-c="load">' +
+      '<button data-c:click="a#' + i + '#1"><span class="hit">+</span></button>' +
+      '<output data-e:text="' + i + '">0</output></div>';
   }
   const cells = Array.from({ length: N }, () => '{"$":"sig","v":0}').join(",");
   const islands = Array.from({ length: N }, (_, i) => '{"id":"c' + i + '","on":"load","scope":[' + i + ']}').join(",");
@@ -73,7 +73,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 // network + real EventSource paths the happy-dom unit tests can't. The islands are in the inline state so
 // the delegated listener treats them as wired.
 const ACTIONS_STATE = JSON.stringify({
-  v: 1,
+  data-v: 1,
   cells: [],
   islands: [
     { id: "search-isle", on: "load", scope: [] },
@@ -81,12 +81,12 @@ const ACTIONS_STATE = JSON.stringify({
   ],
 });
 const ACTIONS_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>actions</title></head><body>
-  <div a b="search-isle" c="load">
-    <input id="q" name="q" p="get" q="/rows"
-           r="input" s="30" u="rows">
+  <div data-a data-b="search-isle" data-c="load">
+    <input id="q" name="q" data-p="get" data-q="/rows"
+           data-r="input" data-s="30" data-u="rows">
   </div>
   <ul id="rows"><li id="r-initial">initial</li></ul>
-  <div a b="live" c="load" d="/stream">
+  <div data-a data-b="live" data-c="load" data-d="/stream">
     <span id="live-text">waiting</span>
   </div>
   <script type="application/adh-state+json" id="adh-state">${ACTIONS_STATE}</script>

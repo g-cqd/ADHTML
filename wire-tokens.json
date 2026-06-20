@@ -6,8 +6,9 @@
   "//5": "Run: `swift package --allow-writing-to-package-directory generate-wire-tokens`. Parity tests on both",
   "//6": "sides re-derive from this file, so a stale generated file fails CI. Generation lives on the Swift",
   "//7": "side, not in a JS script. Tokens are SINGLE base36 chars (the whole alphabet+numerals) — maximally",
-  "//8": "dense; bare (no prefix) since no standard HTML attribute is single-char, and class/id/style keep",
-  "//9": "their real names. Compound attrs append a suffix: on -> 'c:click', bind -> 'e:text'.",
+  "//8": "dense single base36 chars; the generator PREFIXES the attribute-name category (`tokens`) with",
+  "//9": "`data-` (valid HTML5 custom data attributes) — so the spec stays bare and the prefix lives in one",
+  "//10": "place. Behaviors/swaps below are attribute VALUES, not names, so they stay bare single chars.",
   "tokens": [
     ["island", "a"],
     ["id", "b"],
@@ -32,7 +33,8 @@
     ["target", "u"],
     ["swap", "v"],
     ["optimistic", "w"],
-    ["oob", "x"]
+    ["oob", "x"],
+    ["keymap", "y"]
   ],
   "//behaviors": "Closed client-behavior names — the value of an event binding (`c:click=\"a#0#1\"`).",
   "behaviors": [
@@ -42,7 +44,8 @@
     ["setFromValue", "d"],
     ["listMove", "e"],
     ["commit", "f"],
-    ["removeLast", "g"]
+    ["removeLast", "g"],
+    ["commitValue", "h"]
   ],
   "//swaps": "Closed Action swap modes — the value of the `v` (swap) attribute.",
   "swaps": [

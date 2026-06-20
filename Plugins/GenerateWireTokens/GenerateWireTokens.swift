@@ -13,11 +13,13 @@ import PackagePlugin
 // on the Swift side (this plugin), not in a JS script.
 @main
 struct GenerateWireTokens: CommandPlugin {
-    /// (spec key, Swift enum, JS const) for each closed category, in emit order.
+    /// (spec key, Swift enum, JS const, prefix) per closed category. The `tokens` (attribute NAME) category
+    /// gets the `data-` prefix here — the one place it is applied — so the spec stays bare and the wire is
+    /// valid HTML5 custom data attributes. Behaviors/swaps are attribute VALUES, so they stay bare.
     private static let categories = [
-        (key: "tokens", swiftEnum: "WireToken", jsConst: "T"),
-        (key: "behaviors", swiftEnum: "WireBehavior", jsConst: "B"),
-        (key: "swaps", swiftEnum: "WireSwap", jsConst: "S")
+        (key: "tokens", swiftEnum: "WireToken", jsConst: "T", prefix: "data-"),
+        (key: "behaviors", swiftEnum: "WireBehavior", jsConst: "B", prefix: ""),
+        (key: "swaps", swiftEnum: "WireSwap", jsConst: "S", prefix: "")
     ]
 
     func performCommand(context: PluginContext, arguments: [String]) async throws {
@@ -27,10 +29,10 @@ struct GenerateWireTokens: CommandPlugin {
             Diagnostics.error("wire-tokens.json: not a JSON object")
             return
         }
-        func pairs(_ key: String) -> [(name: String, token: String)] {
+        func pairs(_ key: String, prefix: String) -> [(name: String, token: String)] {
             (object[key] as? [[String]] ?? [])
                 .compactMap {
-                    $0.count == 2 ? (name: $0[0], token: $0[1]) : nil
+                    $0.count == 2 ? (name: $0[0], token: prefix + $0[1]) : nil
                 }
         }
 
@@ -38,7 +40,7 @@ struct GenerateWireTokens: CommandPlugin {
         var js = Self.banner("Sources/ADHTMLCore/Wire/WireTokens.swift")
         var total = 0
         for category in Self.categories {
-            let group = pairs(category.key)
+            let group = pairs(category.key, prefix: category.prefix)
             total += group.count
             swift += Self.swiftEnum(category.swiftEnum, group)
             js += Self.jsMap(category.jsConst, group)

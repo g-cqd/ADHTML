@@ -9,15 +9,15 @@ struct BindingsTests {
         let count = arena.signal(0)
         #expect(
             button { "+" }.on(.click, Behavior.increment(count)).render()
-                == #"<button c:click="a#0#1">+</button>"#
+                == #"<button data-c:click="a#0#1">+</button>"#
         )
         #expect(
             input().on(.focusIn, Behavior.set(count, to: 1)).render()
-                == #"<input c:focusin="c#0#1">"#
+                == #"<input data-c:focusin="c#0#1">"#
         )
         #expect(
             div { "x" }.on(.custom("dragend"), Behavior.toggle(arena.signal(false))).render()
-                == #"<div c:dragend="b#1">x</div>"#
+                == #"<div data-c:dragend="b#1">x</div>"#
         )
     }
 
@@ -27,12 +27,12 @@ struct BindingsTests {
         let count = arena.signal(7)
         #expect(
             span { "7" }.bind(.text, to: count).render()
-                == #"<span e:text="0">7</span>"#
+                == #"<span data-e:text="0">7</span>"#
         )
         let doubled = arena.computed(count.reactive * 2)
         #expect(
             span { "14" }.bind(.text, to: doubled).render()
-                == #"<span e:text="1">14</span>"#
+                == #"<span data-e:text="1">14</span>"#
         )
     }
 

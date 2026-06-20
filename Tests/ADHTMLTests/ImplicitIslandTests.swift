@@ -49,7 +49,7 @@ struct ImplicitIslandTests {
     @Test
     func `the hydration override makes the implicit island lazy`() throws {
         let html = String(decoding: try LazyCounter().renderHydratable(arena: CellArena()), as: UTF8.self)
-        #expect(html.contains(#"<div a b="c1" c="visible">"#))
+        #expect(html.contains(#"<div data-a data-b="c1" data-c="visible">"#))
     }
 
     @Test
@@ -58,7 +58,7 @@ struct ImplicitIslandTests {
         let html = String(decoding: try Sum().renderHydratable(arena: arena), as: UTF8.self)
 
         // a=cell0 (behavior), b=cell1 (in total), total=cell2 (the registered computed); value 2+3 = 5.
-        #expect(html.contains(#"<output e:text="2">5</output>"#))
+        #expect(html.contains(#"<output data-e:text="2">5</output>"#))
         #expect(arena.cells.count == 3)
         guard case .computed(_, let expr) = arena.cells[2].kind else {
             Issue.record("cell 2 should be a computed")

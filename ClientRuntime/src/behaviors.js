@@ -75,8 +75,18 @@ export function applyBehavior(inv, cells, node) {
       break;
     }
     case B.removeLast: {
+      // Skip while typing (the input still has text) so Backspace deletes a char, not a chip.
+      if (/** @type {HTMLInputElement | undefined} */ (node)?.value) break;
       const list = /** @type {unknown[]} */ (cell.peek());
       if (list.length) cell.set(list.slice(0, -1));
+      break;
+    }
+    case B.commitValue: {
+      const text = node?.textContent?.trim();  // a clicked suggestion's text
+      if (text) {
+        cell.set([.../** @type {unknown[]} */ (cell.peek()), text]);
+        cells[Number(inv.params[0])]?.set("");  // clear the query
+      }
       break;
     }
   }

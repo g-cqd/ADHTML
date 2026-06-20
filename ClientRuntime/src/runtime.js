@@ -155,6 +155,20 @@ function delegated(type, state, event, doc) {
     if (onNode.hasAttribute(T.prevent)) event.preventDefault();
     if (onNode.hasAttribute(T.stop)) event.stopPropagation();
   }
+  if (type === "keydown") {  // P9 keymap: dispatch the entry matching event.key on one element
+    const keymapNode = start.closest(`[${T.keymap}]`);
+    const key = /** @type {KeyboardEvent} */ (event).key + ":";
+    if (keymapNode && delivers(keymapNode)) {
+      for (const entry of (keymapNode.getAttribute(T.keymap) ?? "").split(";")) {
+        if (entry.startsWith(key)) {
+          const invocation = parseInvocation(entry.slice(key.length));
+          if (invocation) applyBehavior(invocation, state.cells, keymapNode);
+          if (key !== "Backspace:") event.preventDefault();  // nav keys prevent; Backspace keeps editing
+          break;
+        }
+      }
+    }
+  }
   const actionNode = start.closest(`[${T.action}]`);
   if (actionNode && delivers(actionNode) && actionTrigger(actionNode) === type) {
     runAction(actionNode, state, doc);

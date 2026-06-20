@@ -10,8 +10,8 @@ struct IslandConnectTests {
     func `Island(connect:) emits d on the island root`() {
         #expect(
             Island("parts-rows", connect: "/parts/stream") { span { "rows" } }.render()
-                == #"<div a b="parts-rows" c="load" "#
-                + #"d="/parts/stream"><span>rows</span></div>"#
+                == #"<div data-a data-b="parts-rows" data-c="load" "#
+                + #"data-d="/parts/stream"><span>rows</span></div>"#
         )
     }
 
@@ -19,7 +19,7 @@ struct IslandConnectTests {
     func `an island without connect is byte-identical to before`() {
         #expect(
             Island("isle", on: .visible) { span { "x" } }.render()
-                == #"<div a b="isle" c="visible"><span>x</span></div>"#
+                == #"<div data-a data-b="isle" data-c="visible"><span>x</span></div>"#
         )
     }
 
@@ -27,7 +27,7 @@ struct IslandConnectTests {
     func `connect is attribute-escaped`() {
         #expect(
             Island("i", connect: "/s?q=a&b") {}.render()
-                == #"<div a b="i" c="load" d="/s?q=a&amp;b"></div>"#
+                == #"<div data-a data-b="i" data-c="load" data-d="/s?q=a&amp;b"></div>"#
         )
     }
 }

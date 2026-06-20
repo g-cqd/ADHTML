@@ -15,10 +15,10 @@ struct DirectivesTests {
         let b = arena.signal(false)  // id 1
         #expect(
             div { "x" }.classToggle("active", when: a).render()
-                == #"<div f="active:0">x</div>"#)
+                == #"<div data-f="active:0">x</div>"#)
         #expect(
             div { "x" }.classToggle("a", when: a).classToggle("b", when: b).render()
-                == #"<div f="a:0;b:1">x</div>"#)
+                == #"<div data-f="a:0;b:1">x</div>"#)
     }
 
     @Test
@@ -27,16 +27,16 @@ struct DirectivesTests {
         let on = arena.signal(true)  // id 0
         #expect(
             div { "x" }.classToggle("active", when: on).render()
-                == #"<div f="active:0" class="active">x</div>"#)
+                == #"<div data-f="active:0" class="active">x</div>"#)
         // Merges into an existing static class rather than clobbering it.
         #expect(
             div { "x" }.class("card").classToggle("active", when: on).render()
-                == #"<div class="card active" f="active:0">x</div>"#)
+                == #"<div class="card active" data-f="active:0">x</div>"#)
     }
 
     @Test
     func `classToggle accepts a raw CellID (no initial-class knowledge)`() {
-        #expect(div {}.classToggle("x", when: CellID(3)).render() == #"<div f="x:3"></div>"#)
+        #expect(div {}.classToggle("x", when: CellID(3)).render() == #"<div data-f="x:3"></div>"#)
     }
 
     // MARK: P6 — `.show(when:)` (display toggle, node stays in the DOM)
@@ -45,7 +45,7 @@ struct DirectivesTests {
     func `show is visible with no inline style when the signal is initially on`() {
         let arena = CellArena()
         let visible = arena.signal(true)  // id 0
-        #expect(div { "x" }.show(when: visible).render() == #"<div g="0">x</div>"#)
+        #expect(div { "x" }.show(when: visible).render() == #"<div data-g="0">x</div>"#)
     }
 
     @Test
@@ -54,11 +54,11 @@ struct DirectivesTests {
         let visible = arena.signal(false)  // id 0
         #expect(
             div { "x" }.show(when: visible).render()
-                == #"<div g="0" style="display:none">x</div>"#)
+                == #"<div data-g="0" style="display:none">x</div>"#)
         // The display:none merges with an existing style.
         #expect(
             div { "x" }.attribute("style", "color:red").show(when: visible).render()
-                == #"<div style="color:red;display:none" g="0">x</div>"#)
+                == #"<div style="color:red;display:none" data-g="0">x</div>"#)
     }
 
     // MARK: P6 — `When` (mount/unmount via an inert template)
@@ -69,15 +69,15 @@ struct DirectivesTests {
         let open = arena.signal(true)  // id 0
         #expect(
             When(open) { span { "hi" } }.render()
-                == #"<template h="0"><span>hi</span></template>"#)
-        #expect(When(CellID(2)) { "x" }.render() == #"<template h="2">x</template>"#)
+                == #"<template data-h="0"><span>hi</span></template>"#)
+        #expect(When(CellID(2)) { "x" }.render() == #"<template data-h="2">x</template>"#)
     }
 
     @Test
     func `the When content is escaped inside the template (XSS-safe)`() {
         #expect(
             When(CellID(0)) { "<script>alert(1)</script>" }.render()
-                == #"<template h="0">&lt;script&gt;alert(1)&lt;/script&gt;</template>"#)
+                == #"<template data-h="0">&lt;script&gt;alert(1)&lt;/script&gt;</template>"#)
     }
 
     // MARK: Reactive overloads register a client-recomputable cell (inside a hydration context — the
@@ -95,7 +95,7 @@ struct DirectivesTests {
                 .render()
         }
         #expect(
-            html == #"<div f="empty:1" class="empty" g="2" "#
+            html == #"<div data-f="empty:1" class="empty" data-g="2" "#
                 + #"style="display:none">x</div>"#)
     }
 }

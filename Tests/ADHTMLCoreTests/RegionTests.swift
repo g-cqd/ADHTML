@@ -12,7 +12,7 @@ struct RegionTests {
     func `a region stamps its key as both a plain id and b`() {
         #expect(
             Region(.content) { span { "x" } }.render()
-                == #"<div a id="content" b="content" c="load">"#
+                == #"<div data-a id="content" data-b="content" data-c="load">"#
                 + #"<span>x</span></div>"#
         )
     }
@@ -21,8 +21,8 @@ struct RegionTests {
     func `a region carries its loading strategy and SSE connect like an island`() {
         #expect(
             Region("rows", on: .visible, connect: "/parts/stream") { span { "rows" } }.render()
-                == #"<div a id="rows" b="rows" c="visible" "#
-                + #"d="/parts/stream"><span>rows</span></div>"#
+                == #"<div data-a id="rows" data-b="rows" data-c="visible" "#
+                + #"data-d="/parts/stream"><span>rows</span></div>"#
         )
     }
 
@@ -30,7 +30,7 @@ struct RegionTests {
     func `a region's key is attribute-escaped in both id and b`() {
         #expect(
             Region("a&b") {}.render()
-                == #"<div a id="a&amp;b" b="a&amp;b" c="load"></div>"#
+                == #"<div data-a id="a&amp;b" data-b="a&amp;b" data-c="load"></div>"#
         )
     }
 
@@ -38,7 +38,7 @@ struct RegionTests {
     func `a plain Island stays byte-identical — no plain id (the change is additive)`() {
         #expect(
             Island("isle", on: .visible) { span { "x" } }.render()
-                == #"<div a b="isle" c="visible"><span>x</span></div>"#
+                == #"<div data-a data-b="isle" data-c="visible"><span>x</span></div>"#
         )
     }
 
@@ -52,7 +52,7 @@ struct RegionTests {
         let html = try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
 
         // Markup: the region root carries both ids; the binding is inside it.
-        #expect(html.hasPrefix(#"<div a id="content" b="content" c="load">"#))
+        #expect(html.hasPrefix(#"<div data-a id="content" data-b="content" data-c="load">"#))
         // Wire: the region is an island keyed by its stable id, scope [0]; the cell is reachable.
         #expect(html.contains(#""islands":[{"id":"content","on":"load","scope":[0]}]"#))
         #expect(html.contains(#"{"$":"sig","v":0}"#))
