@@ -88,7 +88,7 @@ async function perform(node, state, doc) {
   const optimistic = node.getAttribute("data-adh-optimistic");
   if (optimistic) {
     const invocation = parseInvocation(optimistic);
-    if (invocation) applyBehavior(invocation, state.cells);
+    if (invocation) applyBehavior(invocation, state.cells, node);
   }
 
   const params = collectParams(node, doc);

@@ -9,6 +9,11 @@
  * @property {string[]} params
  */
 
+/** The closed behavior-name set, mirrored by Swift `Behavior.names` (parity test). Not referenced by the
+ * interpreter (the switch lists them inline), so the bundler tree-shakes it out of the runtime — it exists
+ * for the parity test only. @type {readonly string[]} */
+export const BEHAVIOR_NAMES = ["increment", "toggle", "set", "setFromValue", "listMove", "commit", "removeLast"];
+
 /** Parse a `data-adh-on:<event>` value into an invocation, or `null` if malformed.
  * @param {string} value
  * @returns {Invocation | null} */
@@ -20,11 +25,13 @@ export function parseInvocation(value) {
   return { name: /** @type {string} */ (parts[0]), cell, params: parts.slice(2) };
 }
 
-/** Apply a behavior to its target cell. Unknown behaviors are ignored (forward-compatible).
+/** Apply a behavior to its target cell. Unknown behaviors are ignored (forward-compatible). `node` is the
+ * triggering element (for value-reading behaviors); optional, since most behaviors need only the cell.
  * @param {Invocation} inv
  * @param {Array<import("./signals").Signal<unknown>>} cells
+ * @param {Element} [node]
  * @returns {void} */
-export function applyBehavior(inv, cells) {
+export function applyBehavior(inv, cells, node) {
   const cell = cells[inv.cell];
   if (!cell) return;
   switch (inv.name) {
@@ -39,6 +46,37 @@ export function applyBehavior(inv, cells) {
     case "set":
       cell.set(coerce(inv.params[0] ?? "", cell.peek()));
       break;
+    // --- P4: the extended vocabulary (mirrors Swift `Behavior`; parity-tested) ---
+    case "setFromValue":
+      cell.set(/** @type {HTMLInputElement | undefined} */ (node)?.value ?? "");
+      break;
+    case "listMove": {
+      const delta = Number(inv.params[0]) || 0;
+      const count = Number(cells[Number(inv.params[1])]?.peek() ?? 0);
+      if (count > 0) {
+        let next = /** @type {number} */ (cell.peek()) + delta;
+        next =
+          inv.params[2] === "true"
+            ? ((next % count) + count) % count  // wrap
+            : Math.max(0, Math.min(count - 1, next));  // clamp
+        cell.set(next);
+      }
+      break;
+    }
+    case "commit": {
+      const query = cells[Number(inv.params[0])];
+      const value = String(query?.peek() ?? "");
+      if (value) {
+        cell.set([.../** @type {unknown[]} */ (cell.peek()), value]);
+        query?.set("");
+      }
+      break;
+    }
+    case "removeLast": {
+      const list = /** @type {unknown[]} */ (cell.peek());
+      if (list.length) cell.set(list.slice(0, -1));
+      break;
+    }
   }
 }
 

@@ -48,6 +48,34 @@ extension HTMLElement {
         on(event.name, invocation)
     }
 
+    // MARK: - P1: two-way binding — `.model(_:)` (ADR-0018)
+
+    /// Two-way bind a text input to a `Signal<String>` (`v-model`): emits `data-adh-model="cell"` and the
+    /// initial `value` (no FOUC). On the client an `input` event sets the cell, and an effect writes the
+    /// cell back to `element.value` — so typing updates the signal and a programmatic change updates the
+    /// field. Targets `<input>`/`<textarea>` (both expose `.value`); the initial `value` attribute is the
+    /// `<input>` form (a `<textarea>`/`<select>` author renders its own initial content, the runtime syncs).
+    public consuming func model(_ signal: Signal<String>) -> Self {
+        attribute("data-adh-model", "\(signal.id.raw)").attribute("value", signal.stored)
+    }
+    /// Two-way bind to a raw `CellID` (no initial-value knowledge — the author renders the initial `value`).
+    public consuming func model(_ cell: CellID) -> Self {
+        attribute("data-adh-model", "\(cell.raw)")
+    }
+
+    // MARK: - P4: event refinements — key filter + prevent/stop (ADR-0018)
+
+    /// Fire this element's keyboard behavior only for these `event.key`s (`data-adh-keys="Enter,Escape"`).
+    /// No filter ⇒ every key. The keyboard-vocabulary gate (T5): `.on(.keydown, …).keys("ArrowDown")`.
+    public consuming func keys(_ keys: String...) -> Self {
+        attribute("data-adh-keys", keys.joined(separator: ","))
+    }
+    /// `preventDefault()` the event when this element's behavior fires (`data-adh-prevent`) — e.g. stop the
+    /// browser's default Enter/Arrow handling in a combobox.
+    public consuming func preventDefault() -> Self { attribute("data-adh-prevent", "") }
+    /// `stopPropagation()` the event when this element's behavior fires (`data-adh-stop`).
+    public consuming func stopPropagation() -> Self { attribute("data-adh-stop", "") }
+
     // MARK: - P2: class-merge (ADR-0017)
 
     /// Toggle the presence of CSS class `name` on this element from a boolean cell, **merging** — it

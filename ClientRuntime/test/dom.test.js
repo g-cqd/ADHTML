@@ -137,6 +137,50 @@ test("a value binding writes to an input's value", () => {
   expect(input.value).toBe("hello");
 });
 
+test("P1 v-model: typing updates the cell, and a programmatic change writes the field back", () => {
+  document.body.innerHTML = `
+    <div data-adh-island data-adh-id="i" data-adh-on="load">
+      <input id="q" data-adh-model="0" value="hi">
+      <output data-adh-bind:text="0">hi</output>
+      <button data-adh-on:click="set#0#cleared">clear</button>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[{"$":"sig","v":"hi"}],"islands":[{"id":"i","on":"load","scope":[0]}]}
+    </script>`;
+  hydrate(document);
+  const input = /** @type {HTMLInputElement} */ (document.getElementById("q"));
+  const output = document.querySelector("output");
+  expect(input.value).toBe("hi");
+  // input -> cell -> bound output
+  input.value = "world";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  expect(output?.textContent).toBe("world");
+  // cell -> input (a behavior changes the cell; the effect writes the field back)
+  document.querySelector("button")?.click();
+  expect(input.value).toBe("cleared");
+  expect(output?.textContent).toBe("cleared");
+});
+
+test("P4 key filter: a keydown behavior fires only for listed keys, and prevents default", () => {
+  document.body.innerHTML = `
+    <div data-adh-island data-adh-id="i" data-adh-on="load">
+      <input id="q" data-adh-on:keydown="increment#0#1" data-adh-keys="Enter" data-adh-prevent="">
+      <output data-adh-bind:text="0">0</output>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[{"$":"sig","v":0}],"islands":[{"id":"i","on":"load","scope":[0]}]}
+    </script>`;
+  hydrate(document);
+  const input = document.getElementById("q");
+  const output = document.querySelector("output");
+  input?.dispatchEvent(new KeyboardEvent("keydown", { key: "a", bubbles: true }));
+  expect(output?.textContent).toBe("0");  // non-matching key -> inert
+  const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+  input?.dispatchEvent(enter);
+  expect(output?.textContent).toBe("1");  // Enter -> fires
+  expect(enter.defaultPrevented).toBe(true);  // data-adh-prevent
+});
+
 test("P2 class-merge: classList.toggle merges, never clobbering the static class", () => {
   document.body.innerHTML = `
     <div data-adh-island data-adh-id="i" data-adh-on="load">

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test";
 
-import { applyBehavior, parseInvocation } from "../src/behaviors";
+import { BEHAVIOR_NAMES, applyBehavior, parseInvocation } from "../src/behaviors";
 import { BINARY_OPS, evalExpr } from "../src/expr";
 import { Signal, effect } from "../src/signals";
 import { WIRE_VERSION, parseState } from "../src/wire";
@@ -41,6 +41,39 @@ test("behaviors mirror the Swift registry (increment/toggle/set)", () => {
   expect(cells[1].peek()).toBe(true);
   applyBehavior(parseInvocation("set#2#z"), cells);
   expect(cells[2].peek()).toBe("z");
+});
+
+test("the extended behaviors mirror the Swift registry (P4: setFromValue/listMove/commit/removeLast)", () => {
+  // setFromValue reads the triggering element's value.
+  const q = [new Signal("")];
+  applyBehavior(parseInvocation("setFromValue#0"), q, /** @type {any} */ ({ value: "typed" }));
+  expect(q[0].peek()).toBe("typed");
+
+  // listMove: index bounded by a live count cell — clamp, then wrap.
+  const nav = [new Signal(0), new Signal(3)]; // index=0, count=3
+  applyBehavior(parseInvocation("listMove#0#1#1#false"), nav);
+  expect(nav[0].peek()).toBe(1);
+  applyBehavior(parseInvocation("listMove#0#5#1#false"), nav); // clamps to count-1
+  expect(nav[0].peek()).toBe(2);
+  applyBehavior(parseInvocation("listMove#0#1#1#true"), nav); // wraps 2->0
+  expect(nav[0].peek()).toBe(0);
+
+  // commit: append the query cell's value to the array cell, then clear the query.
+  const field = [new Signal(/** @type {string[]} */ ([])), new Signal("apple")]; // tokens, query
+  applyBehavior(parseInvocation("commit#0#1"), field);
+  expect(field[0].peek()).toEqual(["apple"]);
+  expect(field[1].peek()).toBe("");
+
+  // removeLast: pop the last element (no-op on empty).
+  const list = [new Signal(["a", "b"])];
+  applyBehavior(parseInvocation("removeLast#0"), list);
+  expect(list[0].peek()).toEqual(["a"]);
+});
+
+test("the behavior-name set is closed and matches Swift Behavior.names (parity)", () => {
+  expect([...BEHAVIOR_NAMES]).toEqual([
+    "increment", "toggle", "set", "setFromValue", "listMove", "commit", "removeLast",
+  ]);
 });
 
 test("malformed invocations are rejected", () => {

@@ -81,6 +81,26 @@ function bindDirectives(root, cells) {
       }
     });
   }
+  // P1: two-way binding (`v-model`). The `input` event sets the cell; an effect writes the cell back to
+  // `element.value` (a programmatic change updates the field). The `!==` guard avoids a cursor jump on echo.
+  for (const element of root.querySelectorAll("[data-adh-model]")) {
+    const cell = cells[Number(element.getAttribute("data-adh-model"))];
+    if (!cell) continue;
+    const input = /** @type {HTMLInputElement} */ (element);
+    effect(() => {
+      const value = String(cell.get());
+      if (input.value !== value) input.value = value;
+    });
+    input.addEventListener("input", () => cell.set(input.value));
+  }
+}
+
+/** Whether `node`'s key filter (`data-adh-keys="Enter,Escape"`) admits this event — true when there is no
+ * filter (P4). A filter on a non-keyboard event never matches (its `key` is undefined).
+ * @param {Element} node @param {Event} event @returns {boolean} */
+function keyMatches(node, event) {
+  const keys = node.getAttribute("data-adh-keys");
+  return !keys || keys.split(",").includes(/** @type {KeyboardEvent} */ (event).key);
 }
 
 /** True when `node`'s enclosing island has wired (or it has none) — the lazy-island gate shared by
@@ -102,9 +122,11 @@ function delegated(type, state, event, doc) {
   const start = event.target;
   if (!(start instanceof Element)) return;
   const onNode = start.closest(`[data-adh-on\\:${type}]`);
-  if (onNode && delivers(onNode)) {  // lazy island not wired yet -> inert
+  if (onNode && delivers(onNode) && keyMatches(onNode, event)) {  // lazy island / key filter -> inert
     const invocation = parseInvocation(onNode.getAttribute(`data-adh-on:${type}`) ?? "");
-    if (invocation) applyBehavior(invocation, state.cells);
+    if (invocation) applyBehavior(invocation, state.cells, onNode);
+    if (onNode.hasAttribute("data-adh-prevent")) event.preventDefault();
+    if (onNode.hasAttribute("data-adh-stop")) event.stopPropagation();
   }
   const actionNode = start.closest("[data-adh-action]");
   if (actionNode && delivers(actionNode) && actionTrigger(actionNode) === type) {
