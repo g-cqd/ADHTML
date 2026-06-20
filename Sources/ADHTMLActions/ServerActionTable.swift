@@ -13,13 +13,15 @@ public import ADServeDSL  // POST, RouteNode, StorageContext, PathParameters
 public struct ServerAction: Sendable {
     public let id: ActionID
     /// The no-JS Post/Redirect/Get target — where a native form POST is 303-redirected after the mutation.
-    public let returnPath: String
+    /// `nil` falls back to `/` for now; the same-origin `Referer` default is folded into the security review
+    /// (it needs the same-origin validation that pass already scopes — CWE-601).
+    public let returnPath: String?
     /// Token lifetime in seconds (the replay/expiry window minted into each token).
     public let ttl: Int
     public let handler: @Sendable (StorageContext) throws -> ResponseContent
 
     public init(
-        slug: String, returnPath: String, ttl: Int = 3600,
+        slug: String, returnPath: String? = nil, ttl: Int = 3600,
         handler: @escaping @Sendable (StorageContext) throws -> ResponseContent
     ) {
         self.id = ActionID(slug: slug)
@@ -88,7 +90,7 @@ public struct ServerActionTable: Sendable {
                     let action = self.action(for: id.raw)!
                     let result = try action.handler(ctx)
                     // Runtime request → return the fragment to morph; native no-JS POST → 303 PRG.
-                    return ctx.isFragment ? result : .redirect(to: action.returnPath)
+                    return ctx.isFragment ? result : .redirect(to: action.returnPath ?? "/")
             }
         }
     }
