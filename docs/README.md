@@ -32,6 +32,13 @@ ADRs are immutable once accepted: supersede with a new ADR rather than editing a
 | [0011](adr/0011-adfcore-adjson-adserve-reuse.md) | `ADFCore`/`ADJSON`/`ADServeCore` reuse policy (no duplication) | Proposed |
 | [0012](adr/0012-adserve-integration.md) | ADServe integration & the streaming dependency | Proposed |
 | [0013](adr/0013-ownership-escaping-memory-safety-performance.md) | Ownership, escaping & memory-safety performance | Accepted |
+| [0014](adr/0014-typed-attribute-value-enums.md) | Typed attribute value enums (preset HTML value sets) | Accepted |
+| [0015](adr/0015-implicit-islands-and-component-reactive-state.md) | Implicit islands & component-level reactive state (`@State`/`@Bound`) | Accepted (phased) |
+| [0016](adr/0016-region-keyed-rerender-unit.md) | `Region`: the keyed, re-renderable unit | Accepted |
+| [0017](adr/0017-class-merge-and-conditional-wire.md) | Class-merge & conditional-render wire (P2 / P6) | Accepted |
+| [0018](adr/0018-event-and-behavior-vocabulary.md) | Extended event & behavior vocabulary (P1 / P4) | Accepted |
+| [0019](adr/0019-wire-token-vocabulary.md) | Single-source wire-token vocabulary (Swift-generated) | Accepted |
+| [0020](adr/0020-markdown-in-builder-with-embedded-components.md) | Markdown in a component body, with embedded live components | Accepted |
 
 ## Integration
 

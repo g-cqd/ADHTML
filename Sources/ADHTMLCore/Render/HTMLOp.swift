@@ -56,4 +56,14 @@ extension HTMLProgram: RenderTarget {
         append(.islandOpen(id: id, on: on, scope: scope, connect: connect, key: key))
     }
     @inlinable public mutating func islandClose() { append(.islandClose) }
+
+    /// Full island fidelity (overrides the buffered default): render the slot's ops STRAIGHT INTO this
+    /// program, so an embedded `Markdown` component's `islandOpen`/`islandClose` + its registered cells
+    /// land in the page program exactly as if placed directly in the body — the hydration scan finds them
+    /// unchanged. (The `direct` byte thunk is unused on this path.)
+    @inlinable public mutating func _embedMarkdownSlot(
+        program: (inout HTMLProgram) -> Void, direct: (inout DirectTarget<ArraySink>) -> Void
+    ) {
+        program(&self)
+    }
 }

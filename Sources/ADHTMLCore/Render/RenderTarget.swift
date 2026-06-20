@@ -23,6 +23,33 @@ public protocol RenderTarget {
     mutating func closeTag(_ name: StaticString)
     mutating func islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?, key: String?)
     mutating func islandClose()
+
+    /// Embed a `Markdown` component slot into this target (the gated `ADHTMLMarkdown` surface). A slot is
+    /// a `some HTML` captured as two TARGET-GENERIC render thunks — one per concrete target — so an
+    /// embedded component never has to become `any HTML` (`HTML._render` is generic over `Target`, not an
+    /// existential). Each conformer picks the thunk matching its representation:
+    ///   • `HTMLProgram` (the hydration/streaming path) renders the slot's ops STRAIGHT INTO the program,
+    ///     so an embedded `@State`/`@Component` island's `islandOpen`/`islandClose` land exactly where
+    ///     `renderHydratable`'s island scan finds them — full hydration fidelity, no wire-format change.
+    ///   • Any byte target (`DirectTarget`, the static `render()` path) buffers the slot's bytes via the
+    ///     `direct` thunk and emits them `raw` — the default below. Correct because the byte paths run no
+    ///     island scan, so an embedded component renders inline (matching static semantics).
+    /// Type-safe slot dispatch with no `any HTML` and no unsafe cast — the single ADHTMLCore seam.
+    mutating func _embedMarkdownSlot(
+        program: (inout HTMLProgram) -> Void,
+        direct: (inout DirectTarget<ArraySink>) -> Void)
+}
+
+extension RenderTarget {
+    /// Default: buffer the slot's bytes through the `direct` thunk and emit them verbatim. Correct for
+    /// every BYTE target (no island scan there); `HTMLProgram` overrides this for full island fidelity.
+    public mutating func _embedMarkdownSlot(
+        program: (inout HTMLProgram) -> Void, direct: (inout DirectTarget<ArraySink>) -> Void
+    ) {
+        var buffer = DirectTarget(sink: ArraySink())
+        direct(&buffer)
+        raw(buffer.sink.bytes)
+    }
 }
 
 /// The single source of HTML byte output, shared by `DirectTarget` and the opcode emit (`Renderer`).
