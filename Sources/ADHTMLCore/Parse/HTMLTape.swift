@@ -78,27 +78,39 @@ extension HTMLTape {
                 if unsafe (p[i] == lt) {
                     i = unsafe handleLT(p, i)
                 } else {
-                    // Text run to the next `<`, flagging `&` for lazy decode. Hybrid scan: scalar
-                    // first (node-dense markup has short runs where an 8-byte stride is pure overhead
-                    // — ADJSON measured that regression), then, once a run proves long (>= 16 bytes),
-                    // a SWAR stop-mask skips whole 8-byte words containing neither `<` nor `&`. So
-                    // short runs never pay for SWAR and long prose runs skip ~8 bytes per step.
                     let start = i
                     var decode = false
-                    while i < n {
-                        let c = unsafe p[i]
-                        if c == lt { break }
-                        if c == ampersand { decode = true }
-                        i &+= 1
-                        if i - start >= 16 {
-                            while i + 8 <= n {
-                                let w = unsafe UnsafeRawPointer(p + i).loadUnaligned(as: UInt64.self)
-                                if (SWAR.equals(w, lt) | SWAR.equals(w, ampersand)) != 0 { break }
-                                i &+= 8
-                            }
-                        }
-                    }
+                    unsafe scanText(p, &i, &decode)
                     emit(K.text, start, (UInt64(i - start) << 1) | (decode ? 1 : 0))
+                }
+            }
+        }
+
+        // Advance `i` to the next `<` (or EOF), flagging `decode` if a `&` is seen. Short runs stay
+        // pure scalar (no SWAR setup — node-dense/realistic markup, which a per-byte SWAR check
+        // regresses); a run that survives a 16-byte scalar probe switches to SWAR word-skipping, so
+        // only genuinely long text (prose) pays for — and benefits from — the 8-byte stride.
+        @inline(__always)
+        func scanText(_ p: UnsafePointer<UInt8>, _ i: inout Int, _ decode: inout Bool) {
+            let cap = min(n, i + 16)
+            while i < cap {
+                let c = unsafe p[i]
+                if c == lt { return }
+                if c == ampersand { decode = true }
+                i &+= 1
+            }
+            while i < n {
+                while i + 8 <= n {
+                    let w = unsafe UnsafeRawPointer(p + i).loadUnaligned(as: UInt64.self)
+                    if (SWAR.equals(w, lt) | SWAR.equals(w, ampersand)) != 0 { break }
+                    i &+= 8
+                }
+                let wordEnd = min(n, i + 8)
+                while i < wordEnd {
+                    let c = unsafe p[i]
+                    if c == lt { return }
+                    if c == ampersand { decode = true }
+                    i &+= 1
                 }
             }
         }
