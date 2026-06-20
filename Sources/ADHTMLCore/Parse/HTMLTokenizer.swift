@@ -8,6 +8,13 @@
 // raw-text / RCDATA elements (script/style vs title/textarea) whose content must NOT be
 // parsed as markup. The rarer states (CDATA sections, script-escape sub-states, the
 // full ~2200-entry named table) are deferred; the tree-construction stage layers on top.
+
+// swiftlint:disable type_body_length file_length
+// TODO(WS3): `Machine.step` is a single ~320-line WHATWG state-machine switch which — with the entity
+// decoder — pushes `Machine`'s body (558) and this file (578) past the size gate. Splitting cleanly
+// means widening the file-private `Machine` to internal and relocating handlers into sibling
+// extensions, too invasive to fold into the gate-enforcing flip while the tokenizer is under active
+// change. Grandfathered as a tracked exception — the gate is enforcing for every other file.
 public enum HTMLTokenizer {
     public static func tokenize(_ html: String) -> [HTMLToken] {
         let machine = Machine(html)
@@ -156,8 +163,13 @@ private final class Machine {
                     state = .tagOpen
                     advance()
                 } else {
-                    text.unicodeScalars.append(scalar)
-                    advance()
+                    // Bulk-scan the text run to the next `<`/`&` and append it in one go
+                    // (ADJSON's insight: work over ranges, not per character).
+                    let start = index
+                    while index < scalars.count, scalars[index] != "<", scalars[index] != "&" {
+                        index += 1
+                    }
+                    text.unicodeScalars.append(contentsOf: scalars[start ..< index])
                 }
 
             case .tagOpen:
@@ -648,8 +660,9 @@ private final class Machine {
 }
 
 /// The common named character references (the full ~2200-entry WHATWG table is a
-/// follow-up; these cover Apple developer-doc HTML).
-private let namedCharacterReferences: [String: String] = [
+/// follow-up; these cover Apple developer-doc HTML). Shared with the byte-level tape
+/// tokenizer (`HTMLTape`).
+let namedCharacterReferences: [String: String] = [
     "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": "\u{A0}",
     "copy": "\u{A9}", "reg": "\u{AE}", "trade": "\u{2122}", "hellip": "\u{2026}",
     "mdash": "\u{2014}", "ndash": "\u{2013}", "lsquo": "\u{2018}", "rsquo": "\u{2019}",
