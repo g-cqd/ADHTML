@@ -3,14 +3,17 @@ import { expect, test } from "bun:test";
 import { BEHAVIOR_NAMES, applyBehavior, parseInvocation } from "../src/behaviors";
 import { BINARY_OPS, UNARY_OPS, evalExpr, highlight } from "../src/expr";
 import { Signal, effect } from "../src/signals";
-import { T } from "../src/tokens";
+import { B, S, T } from "../src/tokens";
 import { WIRE_VERSION, parseState } from "../src/wire";
 import spec from "../../wire-tokens.json";
 
 test("tokens.js mirrors wire-tokens.json (generated Swift-side, no drift)", () => {
-  // Both tokens.js and Swift WireTokens.swift are generated from this spec by the command plugin.
+  // T (attributes) / B (behaviors) / S (swaps) all generated from this spec by the command plugin.
   expect(T).toEqual(Object.fromEntries(spec.tokens));
-  expect(Object.values(T).every((t) => t.length === 1)).toBe(true); // single-char, maximal density
+  expect(B).toEqual(Object.fromEntries(spec.behaviors));
+  expect(S).toEqual(Object.fromEntries(spec.swaps));
+  const all = [...Object.values(T), ...Object.values(B), ...Object.values(S)];
+  expect(all.every((t) => t.length === 1)).toBe(true); // single-char, maximal density
 });
 
 test("an effect re-runs when a signal it read changes", () => {
@@ -43,38 +46,38 @@ test("an effect drops dependencies it no longer reads (dynamic deps)", () => {
 
 test("behaviors mirror the Swift registry (increment/toggle/set)", () => {
   const cells = [new Signal(0), new Signal(false), new Signal("a")];
-  applyBehavior(parseInvocation("increment#0#2"), cells);
+  applyBehavior(parseInvocation("a#0#2"), cells);
   expect(cells[0].peek()).toBe(2);
-  applyBehavior(parseInvocation("toggle#1"), cells);
+  applyBehavior(parseInvocation("b#1"), cells);
   expect(cells[1].peek()).toBe(true);
-  applyBehavior(parseInvocation("set#2#z"), cells);
+  applyBehavior(parseInvocation("c#2#z"), cells);
   expect(cells[2].peek()).toBe("z");
 });
 
 test("the extended behaviors mirror the Swift registry (P4: setFromValue/listMove/commit/removeLast)", () => {
   // setFromValue reads the triggering element's value.
   const q = [new Signal("")];
-  applyBehavior(parseInvocation("setFromValue#0"), q, /** @type {any} */ ({ value: "typed" }));
+  applyBehavior(parseInvocation("d#0"), q, /** @type {any} */ ({ value: "typed" }));
   expect(q[0].peek()).toBe("typed");
 
   // listMove: index bounded by a live count cell — clamp, then wrap.
   const nav = [new Signal(0), new Signal(3)]; // index=0, count=3
-  applyBehavior(parseInvocation("listMove#0#1#1#false"), nav);
+  applyBehavior(parseInvocation("e#0#1#1#false"), nav);
   expect(nav[0].peek()).toBe(1);
-  applyBehavior(parseInvocation("listMove#0#5#1#false"), nav); // clamps to count-1
+  applyBehavior(parseInvocation("e#0#5#1#false"), nav); // clamps to count-1
   expect(nav[0].peek()).toBe(2);
-  applyBehavior(parseInvocation("listMove#0#1#1#true"), nav); // wraps 2->0
+  applyBehavior(parseInvocation("e#0#1#1#true"), nav); // wraps 2->0
   expect(nav[0].peek()).toBe(0);
 
   // commit: append the query cell's value to the array cell, then clear the query.
   const field = [new Signal(/** @type {string[]} */ ([])), new Signal("apple")]; // tokens, query
-  applyBehavior(parseInvocation("commit#0#1"), field);
+  applyBehavior(parseInvocation("f#0#1"), field);
   expect(field[0].peek()).toEqual(["apple"]);
   expect(field[1].peek()).toBe("");
 
   // removeLast: pop the last element (no-op on empty).
   const list = [new Signal(["a", "b"])];
-  applyBehavior(parseInvocation("removeLast#0"), list);
+  applyBehavior(parseInvocation("g#0"), list);
   expect(list[0].peek()).toEqual(["a"]);
 });
 
@@ -89,20 +92,19 @@ test("P5 highlight wraps the match in <mark> and escapes everything else (XSS-sa
   );
 });
 
-test("the behavior-name set is closed and matches Swift Behavior.names (parity)", () => {
-  expect([...BEHAVIOR_NAMES]).toEqual([
-    "increment", "toggle", "set", "setFromValue", "listMove", "commit", "removeLast",
-  ]);
+test("the behavior-token set is closed and matches Swift Behavior.names (parity)", () => {
+  // 1-char tokens, generated from wire-tokens.json (increment=a, toggle=b, …).
+  expect([...BEHAVIOR_NAMES]).toEqual(["a", "b", "c", "d", "e", "f", "g"]);
 });
 
 test("malformed invocations are rejected", () => {
   expect(parseInvocation("oops")).toBeNull();
-  expect(parseInvocation("increment#x")).toBeNull();
+  expect(parseInvocation("a#x")).toBeNull();
 });
 
 test("set on a number cell ignores a non-numeric param (failure-safe: no NaN)", () => {
   const cells = [new Signal(5)];
-  applyBehavior(parseInvocation("set#0#notanumber"), cells);
+  applyBehavior(parseInvocation("c#0#notanumber"), cells);
   expect(cells[0].peek()).toBe(5);  // unchanged, never NaN
 });
 

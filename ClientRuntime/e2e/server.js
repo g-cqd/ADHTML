@@ -18,12 +18,12 @@ const STATE = JSON.stringify({
 
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>adh e2e</title></head><body>
   <div a b="counter" c="load">
-    <button id="inc" c:click="increment#0#1">+</button>
+    <button id="inc" c:click="a#0#1">+</button>
     <span id="count" e:text="0">0</span>
   </div>
   <div style="height:2000px">spacer (pushes the lazy island below the fold)</div>
   <div a b="lazy" c="visible">
-    <button id="lazy-inc" c:click="increment#1#1">+</button>
+    <button id="lazy-inc" c:click="a#1#1">+</button>
     <span id="lazy-count" e:text="1">0</span>
   </div>
   <script type="application/adh-state+json" id="adh-state">${STATE}</script>
@@ -43,7 +43,7 @@ const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf<
   let html = "";
   for (let i = 0; i < N; i++) {
     html += '<div a b="c' + i + '" c="load">' +
-      '<button c:click="increment#' + i + '#1"><span class="hit">+</span></button>' +
+      '<button c:click="a#' + i + '#1"><span class="hit">+</span></button>' +
       '<output e:text="' + i + '">0</output></div>';
   }
   const cells = Array.from({ length: N }, () => '{"$":"sig","v":0}').join(",");

@@ -24,7 +24,7 @@ struct EventVocabTests {
         #expect(
             input().on(.keydown, Behavior.setFromValue(query)).keys("Enter", "Escape")
                 .preventDefault().render()
-                == #"<input c:keydown="setFromValue#0" j="Enter,Escape" "#
+                == #"<input c:keydown="d#0" j="Enter,Escape" "#
                 + #"k="">"#)
         #expect(div { "x" }.stopPropagation().render() == #"<div l="">x</div>"#)
     }
@@ -39,18 +39,16 @@ struct EventVocabTests {
         let count = arena.signal(5)  // id 2
         let tokens = arena.signal([String]())  // id 3
 
-        #expect(Behavior.setFromValue(query).attributeValue == "setFromValue#0")
-        #expect(Behavior.listMove(index, by: 1, within: count).attributeValue == "listMove#1#1#2#false")
-        #expect(Behavior.listMove(index, by: -1, within: count, wrap: true).attributeValue == "listMove#1#-1#2#true")
-        #expect(Behavior.commit(tokens, from: query).attributeValue == "commit#3#0")
-        #expect(Behavior.removeLast(tokens).attributeValue == "removeLast#3")
+        #expect(Behavior.setFromValue(query).attributeValue == "d#0")
+        #expect(Behavior.listMove(index, by: 1, within: count).attributeValue == "e#1#1#2#false")
+        #expect(Behavior.listMove(index, by: -1, within: count, wrap: true).attributeValue == "e#1#-1#2#true")
+        #expect(Behavior.commit(tokens, from: query).attributeValue == "f#3#0")
+        #expect(Behavior.removeLast(tokens).attributeValue == "g#3")
     }
 
     @Test
-    func `the behavior-name set is closed and matches the runtime (Swift<->JS parity)`() {
-        #expect(
-            Behavior.names == [
-                "increment", "toggle", "set", "setFromValue", "listMove", "commit", "removeLast"
-            ])
+    func `the behavior-token set is closed and matches the runtime (Swift<->JS parity)`() {
+        // 1-char tokens generated from wire-tokens.json (increment=a … removeLast=g).
+        #expect(Behavior.names == ["a", "b", "c", "d", "e", "f", "g"])
     }
 }

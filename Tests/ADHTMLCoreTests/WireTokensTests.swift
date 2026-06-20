@@ -23,13 +23,25 @@ struct WireTokensTests {
     }
 
     @Test
+    func `behavior + swap value tokens are generated single-char and used by the wire`() {
+        #expect(WireBehavior.all.map(\.token) == ["a", "b", "c", "d", "e", "f", "g"])
+        #expect(WireSwap.all.map(\.token) == ["a", "b", "c", "d"])
+        // The factories + the Swap emit use the tokens.
+        #expect(Behavior.increment(CellArena().signal(0)).attributeValue == "\(WireBehavior.increment)#0#1")
+        #expect(
+            div {}.action(.get("/x").swap(.append)).render()
+                == "<div \(WireToken.action)=\"get\" \(WireToken.url)=\"/x\" \(WireToken.swap)=\"\(WireSwap.append)\"></div>"
+        )
+    }
+
+    @Test
     func `the renderer emits the generated tokens (renderer <-> WireToken wiring)`() {
         let arena = CellArena()
         let count = arena.signal(0)
         // Each assertion interpolates the WireToken constant, so it tracks the spec and proves the emit path.
         #expect(
             button { "+" }.on(.click, Behavior.increment(count)).render()
-                == "<button \(WireToken.on):click=\"increment#0#1\">+</button>")
+                == "<button \(WireToken.on):click=\"a#0#1\">+</button>")
         #expect(
             span { "0" }.bind(.text, to: count).render()
                 == "<span \(WireToken.bind):text=\"0\">0</span>")

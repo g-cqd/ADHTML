@@ -17,7 +17,7 @@ struct ActionTests {
                 .render()
                 == #"<input name="search" p="get" q="/parts/rows" "#
                 + #"r="input" s="200" u="parts-rows" "#
-                + #"v="morph">"#
+                + #"v="a">"#
         )
     }
 
@@ -25,7 +25,7 @@ struct ActionTests {
     func `swap defaults to morph and is emitted explicitly`() {
         #expect(
             div { "x" }.action(.get("/x")).render()
-                == #"<div p="get" q="/x" v="morph">x</div>"#
+                == #"<div p="get" q="/x" v="a">x</div>"#
         )
     }
 
@@ -35,7 +35,7 @@ struct ActionTests {
             input().action(.get("/manufacturers/options").include("q", "kind").swap(.append).target("opts"))
                 .render()
                 == #"<input p="get" q="/manufacturers/options" "#
-                + #"t="q,kind" u="opts" v="append">"#
+                + #"t="q,kind" u="opts" v="c">"#
         )
     }
 
@@ -50,7 +50,7 @@ struct ActionTests {
                 )
                 .render()
                 == #"<button p="delete" q="/parts/1/manufacturers/2" "#
-                + #"u="mfr-chips" v="morph" w="toggle#0">remove</button>"#
+                + #"u="mfr-chips" v="a" w="b#0">remove</button>"#
         )
     }
 
@@ -59,7 +59,7 @@ struct ActionTests {
         #expect(
             input().action(.post("/parts/1").trigger(.change).swap(.outOfBand)).render()
                 == #"<input p="post" q="/parts/1" "#
-                + #"r="change" v="outOfBand">"#
+                + #"r="change" v="d">"#
         )
     }
 
@@ -67,7 +67,7 @@ struct ActionTests {
     func `debounce converts a Duration to whole milliseconds`() {
         #expect(
             input().action(.get("/x").debounce(.seconds(1))).render()
-                == #"<input p="get" q="/x" s="1000" v="morph">"#
+                == #"<input p="get" q="/x" s="1000" v="a">"#
         )
         #expect(Action.get("/x").debounce(.milliseconds(150)).debounceMilliseconds == 150)
         #expect(Action.get("/x").debounceMilliseconds == nil)
@@ -100,7 +100,7 @@ struct ActionTests {
         // The matrix is small and closed — assert each mode independently so a mis-mapped case (e.g.
         // outOfBand emitting "oob") fails, not just the default.
         let modes: [(Swap, String)] = [
-            (.morph, "morph"), (.innerHTML, "innerHTML"), (.append, "append"), (.outOfBand, "outOfBand")
+            (.morph, "a"), (.innerHTML, "b"), (.append, "c"), (.outOfBand, "d")
         ]
         for (mode, raw) in modes {
             #expect(div {}.action(.get("/p").swap(mode)).render().contains(##"v="\##(raw)""##))

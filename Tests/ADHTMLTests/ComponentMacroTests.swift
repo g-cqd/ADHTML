@@ -39,7 +39,7 @@ struct ComponentMacroTests {
 
         // No Island/scope/.id authored — the component became an island automatically (inferred scope).
         #expect(html.contains(#"<div a b="c1" c="load">"#))
-        #expect(html.contains(#"c:click="increment#0#1""#))
+        #expect(html.contains(#"c:click="a#0#1""#))
         #expect(html.contains(#"<span e:text="0">0</span>"#))
         #expect(html.contains(#"<script type="application/adh-state+json" id="adh-state">"#))
 
@@ -60,7 +60,7 @@ struct ComponentMacroTests {
     func `@State infers String and respects an explicit Bool type`() throws {
         let arena = CellArena()
         let html = String(decoding: try MacroToggle().renderHydratable(arena: arena), as: UTF8.self)
-        #expect(html.contains(#"c:click="toggle#0""#))
+        #expect(html.contains(#"c:click="b#0""#))
         #expect(html.contains(">off</button>"))
 
         #expect(arena.cells.count == 2)

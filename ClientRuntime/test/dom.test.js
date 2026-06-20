@@ -27,7 +27,7 @@ beforeEach(() => {
 function mountCounter(on = "load") {
   document.body.innerHTML = `
     <div a b="counter" c="${on}">
-      <button c:click="increment#0#1">+</button>
+      <button c:click="a#0#1">+</button>
       <span e:text="0">0</span>
     </div>
     <script type="application/adh-state+json" id="adh-state">
@@ -53,7 +53,7 @@ test("a delegated click reaches a deeply nested target via closest()", () => {
   // The clicked node is a child of the c element; closest() must still find the handler.
   document.body.innerHTML = `
     <div a b="i" c="load">
-      <button c:click="increment#0#1"><span class="inner">+</span></button>
+      <button c:click="a#0#1"><span class="inner">+</span></button>
       <output e:text="0">0</output>
     </div>
     <script type="application/adh-state+json" id="adh-state">
@@ -125,7 +125,7 @@ test("a value binding writes to an input's value", () => {
   document.body.innerHTML = `
     <div a b="i" c="load">
       <input e:value="0">
-      <button c:click="set#0#hello">x</button>
+      <button c:click="c#0#hello">x</button>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":"hi"}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -144,8 +144,8 @@ test("P3 client list reconciles rows from a signal array (commit appends, remove
     `<ul id="list"><template m="0"><li><span n></span></li></template>` +
     `<li><span n>a</span></li></ul>` +
     `<input id="q" i="1" value="">` +
-    `<button id="add" c:click="commit#0#1">add</button>` +
-    `<button id="pop" c:click="removeLast#0">pop</button>` +
+    `<button id="add" c:click="f#0#1">add</button>` +
+    `<button id="pop" c:click="g#0">pop</button>` +
     `</div>` +
     `<script type="application/adh-state+json" id="adh-state">` +
     `{"v":1,"cells":[{"$":"sig","v":["a"]},{"$":"sig","v":""}],"islands":[{"id":"i","on":"load","scope":[0,1]}]}` +
@@ -184,7 +184,7 @@ test("P1 v-model: typing updates the cell, and a programmatic change writes the 
     <div a b="i" c="load">
       <input id="q" i="0" value="hi">
       <output e:text="0">hi</output>
-      <button c:click="set#0#cleared">clear</button>
+      <button c:click="c#0#cleared">clear</button>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":"hi"}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -206,7 +206,7 @@ test("P1 v-model: typing updates the cell, and a programmatic change writes the 
 test("P4 key filter: a keydown behavior fires only for listed keys, and prevents default", () => {
   document.body.innerHTML = `
     <div a b="i" c="load">
-      <input id="q" c:keydown="increment#0#1" j="Enter" k="">
+      <input id="q" c:keydown="a#0#1" j="Enter" k="">
       <output e:text="0">0</output>
     </div>
     <script type="application/adh-state+json" id="adh-state">
@@ -226,7 +226,7 @@ test("P4 key filter: a keydown behavior fires only for listed keys, and prevents
 test("P2 class-merge: classList.toggle merges, never clobbering the static class", () => {
   document.body.innerHTML = `
     <div a b="i" c="load">
-      <button c:click="toggle#0">t</button>
+      <button c:click="b#0">t</button>
       <div id="box" class="card" f="active:0">box</div>
     </div>
     <script type="application/adh-state+json" id="adh-state">
@@ -258,7 +258,7 @@ test("P2 class-merge splits the cell off the LAST colon (Tailwind-variant class 
 test("P6 show toggles display, keeping the node in the DOM", () => {
   document.body.innerHTML = `
     <div a b="i" c="load">
-      <button c:click="toggle#0">t</button>
+      <button c:click="b#0">t</button>
       <p id="msg" g="0" style="display:none">hi</p>
     </div>
     <script type="application/adh-state+json" id="adh-state">
@@ -275,7 +275,7 @@ test("P6 show toggles display, keeping the node in the DOM", () => {
 test("P6 When mounts/unmounts the template content on the cell", () => {
   document.body.innerHTML = `
     <div a b="i" c="load">
-      <button c:click="toggle#0">t</button>
+      <button c:click="b#0">t</button>
       <template h="0"><p id="panel">panel</p></template>
     </div>
     <script type="application/adh-state+json" id="adh-state">

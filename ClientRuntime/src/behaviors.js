@@ -1,6 +1,8 @@
 // The closed client-behavior registry (ADR-0005/0009). It MUST mirror the Swift `Behavior` factory
 // (set/toggle/increment); a parity test keeps them in sync. Parsing + application are pure (DOM-free)
-// and unit-tested. The attribute form is `<name>#<cell>[#param…]`, e.g. `increment#0#1`.
+// and unit-tested. The attribute form is `<token>#<cell>[#param…]`, e.g. `a#0#1` (a = increment).
+
+import { B } from "./tokens";
 
 /**
  * @typedef {object} Invocation
@@ -12,7 +14,7 @@
 /** The closed behavior-name set, mirrored by Swift `Behavior.names` (parity test). Not referenced by the
  * interpreter (the switch lists them inline), so the bundler tree-shakes it out of the runtime — it exists
  * for the parity test only. @type {readonly string[]} */
-export const BEHAVIOR_NAMES = ["increment", "toggle", "set", "setFromValue", "listMove", "commit", "removeLast"];
+export const BEHAVIOR_NAMES = Object.values(B);
 
 /** Parse a `data-adh-on:<event>` value into an invocation, or `null` if malformed.
  * @param {string} value
@@ -35,22 +37,22 @@ export function applyBehavior(inv, cells, node) {
   const cell = cells[inv.cell];
   if (!cell) return;
   switch (inv.name) {
-    case "increment": {
+    case B.increment: {
       const step = Number(inv.params[0] ?? "1") || 1;
       cell.set(/** @type {number} */ (cell.peek()) + step);
       break;
     }
-    case "toggle":
+    case B.toggle:
       cell.set(!(/** @type {boolean} */ (cell.peek())));
       break;
-    case "set":
+    case B.set:
       cell.set(coerce(inv.params[0] ?? "", cell.peek()));
       break;
     // --- P4: the extended vocabulary (mirrors Swift `Behavior`; parity-tested) ---
-    case "setFromValue":
+    case B.setFromValue:
       cell.set(/** @type {HTMLInputElement | undefined} */ (node)?.value ?? "");
       break;
-    case "listMove": {
+    case B.listMove: {
       const delta = Number(inv.params[0]) || 0;
       const count = Number(cells[Number(inv.params[1])]?.peek() ?? 0);
       if (count > 0) {
@@ -63,7 +65,7 @@ export function applyBehavior(inv, cells, node) {
       }
       break;
     }
-    case "commit": {
+    case B.commit: {
       const query = cells[Number(inv.params[0])];
       const value = String(query?.peek() ?? "");
       if (value) {
@@ -72,7 +74,7 @@ export function applyBehavior(inv, cells, node) {
       }
       break;
     }
-    case "removeLast": {
+    case B.removeLast: {
       const list = /** @type {unknown[]} */ (cell.peek());
       if (list.length) cell.set(list.slice(0, -1));
       break;

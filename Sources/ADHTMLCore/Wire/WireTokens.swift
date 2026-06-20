@@ -1,7 +1,7 @@
 // GENERATED from wire-tokens.json by `swift package generate-wire-tokens` — DO NOT EDIT.
-// The closed wire-attribute vocabulary, shared with ClientRuntime/src/tokens.js (parity-tested). 1-char base36 tokens.
+// The closed wire vocabulary (attributes/behaviors/swaps), shared with ClientRuntime/src/tokens.js (parity-tested). 1-char base36 tokens.
 
-/// The closed set of ADHTML wire attribute tokens (RFC-0021 / ADR-0007), shared with the JS runtime.
+/// Generated wire tokens — shared with the JS runtime; do not edit by hand.
 public enum WireToken {
     public static let island = "a"
     public static let id = "b"
@@ -54,5 +54,43 @@ public enum WireToken {
         ("swap", "v"),
         ("optimistic", "w"),
         ("oob", "x")
+    ]
+}
+
+/// Generated wire tokens — shared with the JS runtime; do not edit by hand.
+public enum WireBehavior {
+    public static let increment = "a"
+    public static let toggle = "b"
+    public static let set = "c"
+    public static let setFromValue = "d"
+    public static let listMove = "e"
+    public static let commit = "f"
+    public static let removeLast = "g"
+
+    /// Every (name, token) pair — the input to the Swift↔JS parity test.
+    public static let all: [(name: String, token: String)] = [
+        ("increment", "a"),
+        ("toggle", "b"),
+        ("set", "c"),
+        ("setFromValue", "d"),
+        ("listMove", "e"),
+        ("commit", "f"),
+        ("removeLast", "g")
+    ]
+}
+
+/// Generated wire tokens — shared with the JS runtime; do not edit by hand.
+public enum WireSwap {
+    public static let morph = "a"
+    public static let innerHTML = "b"
+    public static let append = "c"
+    public static let outOfBand = "d"
+
+    /// Every (name, token) pair — the input to the Swift↔JS parity test.
+    public static let all: [(name: String, token: String)] = [
+        ("morph", "a"),
+        ("innerHTML", "b"),
+        ("append", "c"),
+        ("outOfBand", "d")
     ]
 }

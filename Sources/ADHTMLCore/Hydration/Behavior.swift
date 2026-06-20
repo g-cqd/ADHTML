@@ -28,27 +28,25 @@ public struct BehaviorInvocation: Sendable, Equatable {
 
 /// The closed set of client behaviors. Each factory is type-checked against the signal it targets.
 public enum Behavior {
-    /// The closed behavior-name set, mirrored by `BEHAVIOR_NAMES` in `behaviors.js` (parity test) — the
-    /// runtime interprets exactly these. Add a behavior → extend both sides (the test fails otherwise).
-    public static let names = [
-        "increment", "toggle", "set", "setFromValue", "listMove", "commit", "removeLast"
-    ]
+    /// The closed behavior-token set (the generated `WireBehavior` tokens, in order), mirrored by
+    /// `BEHAVIOR_NAMES` in `behaviors.js` (parity test) — the runtime interprets exactly these.
+    public static let names = WireBehavior.all.map(\.token)
 
     /// Set `signal` to a constant value.
     public static func set<Value: WireEncodable>(_ signal: Signal<Value>, to value: Value)
         -> BehaviorInvocation
     {
-        BehaviorInvocation(name: "set", cell: signal.id, params: [value.wireValue])
+        BehaviorInvocation(name: WireBehavior.set, cell: signal.id, params: [value.wireValue])
     }
 
     /// Toggle a boolean signal.
     public static func toggle(_ signal: Signal<Bool>) -> BehaviorInvocation {
-        BehaviorInvocation(name: "toggle", cell: signal.id)
+        BehaviorInvocation(name: WireBehavior.toggle, cell: signal.id)
     }
 
     /// Add `step` to an integer signal.
     public static func increment(_ signal: Signal<Int>, by step: Int = 1) -> BehaviorInvocation {
-        BehaviorInvocation(name: "increment", cell: signal.id, params: [.int(Int64(step))])
+        BehaviorInvocation(name: WireBehavior.increment, cell: signal.id, params: [.int(Int64(step))])
     }
 
     // MARK: - P4: the extended behavior vocabulary (ADR-0018). Still a CLOSED set, parity-tested.
@@ -56,7 +54,7 @@ public enum Behavior {
     /// Set a string signal from the **triggering element's** `value` — e.g. commit an input's text to a
     /// query signal on a key event. The client reads `event.target.value`.
     public static func setFromValue(_ signal: Signal<String>) -> BehaviorInvocation {
-        BehaviorInvocation(name: "setFromValue", cell: signal.id)
+        BehaviorInvocation(name: WireBehavior.setFromValue, cell: signal.id)
     }
 
     /// Move an index signal by `delta`, bounded by the live length in `count` (a `Signal`/`Computed<Int>`
@@ -66,7 +64,7 @@ public enum Behavior {
         _ index: Signal<Int>, by delta: Int, within count: CellID, wrap: Bool = false
     ) -> BehaviorInvocation {
         BehaviorInvocation(
-            name: "listMove", cell: index.id,
+            name: WireBehavior.listMove, cell: index.id,
             params: [.int(Int64(delta)), .int(Int64(count.raw)), .bool(wrap)])
     }
     /// `listMove` bounded by a `Signal<Int>` length.
@@ -85,12 +83,12 @@ public enum Behavior {
     /// Append the current text of `query` to the `tokens` array and clear `query` — the token-field
     /// commit (type text, press Enter → a new chip, input cleared). A no-op when `query` is empty.
     public static func commit(_ tokens: Signal<[String]>, from query: Signal<String>) -> BehaviorInvocation {
-        BehaviorInvocation(name: "commit", cell: tokens.id, params: [.int(Int64(query.id.raw))])
+        BehaviorInvocation(name: WireBehavior.commit, cell: tokens.id, params: [.int(Int64(query.id.raw))])
     }
 
     /// Remove the last element of a string array — backspace-on-empty removes the last chip.
     public static func removeLast(_ tokens: Signal<[String]>) -> BehaviorInvocation {
-        BehaviorInvocation(name: "removeLast", cell: tokens.id)
+        BehaviorInvocation(name: WireBehavior.removeLast, cell: tokens.id)
     }
 }
 

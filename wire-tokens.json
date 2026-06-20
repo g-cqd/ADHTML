@@ -33,5 +33,22 @@
     ["swap", "v"],
     ["optimistic", "w"],
     ["oob", "x"]
+  ],
+  "//behaviors": "Closed client-behavior names — the value of an event binding (`c:click=\"a#0#1\"`).",
+  "behaviors": [
+    ["increment", "a"],
+    ["toggle", "b"],
+    ["set", "c"],
+    ["setFromValue", "d"],
+    ["listMove", "e"],
+    ["commit", "f"],
+    ["removeLast", "g"]
+  ],
+  "//swaps": "Closed Action swap modes — the value of the `v` (swap) attribute.",
+  "swaps": [
+    ["morph", "a"],
+    ["innerHTML", "b"],
+    ["append", "c"],
+    ["outOfBand", "d"]
   ]
 }

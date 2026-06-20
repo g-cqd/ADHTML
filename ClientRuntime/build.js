@@ -11,14 +11,14 @@ const BUDGET_BYTES = 4 * 1024;
 // The mangling step: inline every `T.<name>` to its short literal across the source before bundling, so
 // the `T` object + its import tree-shake away and the bundle carries only the 1-char tokens. (Bun's
 // `define` only handles bare identifiers, not the `T.<name>` member expression, so we do it in an onLoad.)
-const { T } = await import("./src/tokens.js");
+const maps = await import("./src/tokens.js"); // { T: attributes, B: behaviors, S: swaps }
 const inlineTokens = {
   name: "adh-token-inline",
   setup(build) {
     build.onLoad({ filter: /\.js$/ }, async (args) => {
       const code = (await Bun.file(args.path).text()).replace(
-        /\bT\.([A-Za-z]+)\b/g,
-        (match, name) => (name in T ? JSON.stringify(T[name]) : match),
+        /\b([TBS])\.([A-Za-z]+)\b/g,
+        (match, map, name) => (name in maps[map] ? JSON.stringify(maps[map][name]) : match),
       );
       return { contents: code, loader: "js" };
     });

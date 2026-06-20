@@ -1,5 +1,5 @@
 // GENERATED from wire-tokens.json by `swift package generate-wire-tokens` — DO NOT EDIT.
-// The closed wire-attribute vocabulary, shared with Sources/ADHTMLCore/Wire/WireTokens.swift (parity-tested). 1-char base36 tokens.
+// The closed wire vocabulary (attributes/behaviors/swaps), shared with Sources/ADHTMLCore/Wire/WireTokens.swift (parity-tested). 1-char base36 tokens.
 
 export const T = {
   island: "a",
@@ -26,4 +26,21 @@ export const T = {
   swap: "v",
   optimistic: "w",
   oob: "x",
+};
+
+export const B = {
+  increment: "a",
+  toggle: "b",
+  set: "c",
+  setFromValue: "d",
+  listMove: "e",
+  commit: "f",
+  removeLast: "g",
+};
+
+export const S = {
+  morph: "a",
+  innerHTML: "b",
+  append: "c",
+  outOfBand: "d",
 };

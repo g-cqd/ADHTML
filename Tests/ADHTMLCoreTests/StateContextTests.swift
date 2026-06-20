@@ -27,7 +27,7 @@ struct StateContextTests {
         let html = String(decoding: try Counter().renderHydratable(arena: arena), as: UTF8.self)
 
         // The stored default reaches the markup; the binding + behavior both point at cell #0.
-        #expect(html.contains(#"c:click="increment#0#1""#))
+        #expect(html.contains(#"c:click="a#0#1""#))
         #expect(html.contains(#"<span e:text="0">0</span>"#))
 
         // `countSignal` is read three times (island scope, the behavior, the binding) yet dedups to one.

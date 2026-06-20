@@ -18,8 +18,18 @@ public enum Swap: String, Sendable, Equatable {
     case innerHTML
     /// Append the response to the end of the target.
     case append
-    /// The response carries its own `data-adh-oob`-tagged regions; the runtime morphs each by id.
+    /// The response carries its own `x`(oob)-tagged regions; the runtime morphs each by id.
     case outOfBand
+
+    /// The wire token for this swap mode (generated `WireSwap`; mirrored by `S` in `action.js`).
+    var token: String {
+        switch self {
+            case .morph: WireSwap.morph
+            case .innerHTML: WireSwap.innerHTML
+            case .append: WireSwap.append
+            case .outOfBand: WireSwap.outOfBand
+        }
+    }
 }
 
 /// A client-issued request bound to a DOM event, whose response updates a region. Built by a verb factory
@@ -129,7 +139,7 @@ extension HTMLElement {
         if let targetID = action.targetID {
             node = node.attribute(WireToken.target, targetID.raw)
         }
-        node = node.attribute(WireToken.swap, action.swap.rawValue)
+        node = node.attribute(WireToken.swap, action.swap.token)
         if let optimistic = action.optimistic {
             node = node.attribute(WireToken.optimistic, optimistic.attributeValue)
         }

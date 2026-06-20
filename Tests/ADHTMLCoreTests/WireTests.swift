@@ -117,7 +117,7 @@ struct WireTests {
         }
         let html = try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
 
-        #expect(html.contains(##"c:click="increment#0#1""##))
+        #expect(html.contains(##"c:click="a#0#1""##))
     }
 
     @Test

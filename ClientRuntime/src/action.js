@@ -7,7 +7,7 @@
 
 import { applyBehavior, parseInvocation } from "./behaviors";
 import { morph, oobSwap } from "./morph";
-import { T } from "./tokens";
+import { S, T } from "./tokens";
 
 /** The closed verb set, mirrored by Swift `Action.methods` (parity test). Unused by the interpreter
  * itself (it lowercases the attribute), so the bundler tree-shakes it out of the runtime — it exists for
@@ -66,10 +66,10 @@ function collectParams(node, doc) {
  * @param {string} swap @param {string} html @param {Element | null} target @param {Document} doc
  * @returns {void} */
 function applySwap(swap, html, target, doc) {
-  if (swap === "outOfBand") return oobSwap(html, doc);
+  if (swap === S.outOfBand) return oobSwap(html, doc);
   if (!target) return;
-  if (swap === "innerHTML") target.innerHTML = html;
-  else if (swap === "append") target.insertAdjacentHTML("beforeend", html);
+  if (swap === S.innerHTML) target.innerHTML = html;
+  else if (swap === S.append) target.insertAdjacentHTML("beforeend", html);
   else morph(target, html);
 }
 
@@ -79,7 +79,7 @@ function applySwap(swap, html, target, doc) {
 async function perform(node, state, doc) {
   const method = (node.getAttribute(T.action) || "get").toUpperCase();
   const url = node.getAttribute(T.url) || "";
-  const swap = node.getAttribute(T.swap) || "morph";
+  const swap = node.getAttribute(T.swap) || S.morph;
   const targetId =
     node.getAttribute(T.target) ||
     node.closest(`[${T.id}]`)?.getAttribute(T.id) ||

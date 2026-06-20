@@ -55,7 +55,7 @@ test("a GET action fetches with the ADH-Request header + query string, then morp
   const doc = mount(`
     <div a b="isle" c="load">
       <input name="q" value="ab" p="get" q="/rows"
-             r="input" u="rows" v="morph">
+             r="input" u="rows" v="a">
     </div>
     <ul id="rows"><li id="r0">old</li></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -96,7 +96,7 @@ test("optimistic applies a behavior to its cell instantly, before the response a
   const doc = mount(`
     <div a b="isle" c="load">
       <span id="flag" e:text="0">false</span>
-      <button p="delete" q="/x" w="toggle#0"
+      <button p="delete" q="/x" w="b#0"
               u="t">remove</button>
     </div>
     <div id="t"></div>
@@ -132,7 +132,7 @@ test("an out-of-band swap morphs each response region (attributes + children) by
   const doc = mount(`
     <div a b="isle" c="load">
       <input name="title" value="x" p="post" q="/save"
-             r="change" v="outOfBand">
+             r="change" v="d">
     </div>
     <span id="pill" class="idle">Idle</span>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
