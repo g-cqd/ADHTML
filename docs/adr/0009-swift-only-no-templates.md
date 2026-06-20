@@ -1,8 +1,12 @@
 # ADR 0009 — Swift-only views: no template files; whole-scope compile-time type-checking
 
-- **Status**: Proposed
+- **Status**: Accepted (implemented 2026-06-20)
 - **Date**: 2026-06-19
 - **Related**: RFC-0004; ADR-0002 (renderer), ADR-0004 (signals), ADR-0008 (macros)
+- **Implementation**: phantom-typed `Tags` + 14 attribute-trait protocols give compile-time element/
+  attribute legality. The full standard element set (112 elements) is generated from a single curated
+  spec by the committed-output `ADHTMLCodegen` CLI (run manually, not a build plugin); the hybrid model
+  holds — global attributes everywhere, traits gate high-value element-specific attributes.
 
 ## Context
 

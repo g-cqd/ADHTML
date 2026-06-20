@@ -3,6 +3,9 @@
 - **Status**: Proposed
 - **Date**: 2026-06-19
 - **Related**: RFC-0002, RFC-0003; ADR-0003 (escaping), ADR-0007 (wire), ADR-0012 (ADServe)
+- **Implementation note**: `ADHTMLSRI` is implemented (gated `ADHTML_SRI`) — SHA-256 via swift-crypto
+  confined to that one target; island/cache IDs still use `ADFCore.XXH64`. ADFCore ships no base64, so
+  SRI carries a small standard-alphabet encoder. ADServeCore reuse remains pending the ADServe work.
 
 ## Context
 

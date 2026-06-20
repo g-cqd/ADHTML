@@ -1,8 +1,15 @@
 # ADR 0012 — ADServe integration & the streaming dependency
 
-- **Status**: Proposed
+- **Status**: Proposed (in-repo streaming primitive landed; cross-repo bridge pending ADServe)
 - **Date**: 2026-06-19
 - **Related**: RFC-0001, RFC-0002, RFC-0003; spare-parts-app ADR-0046 (ADServe view support); ADR-0010 (gating), ADR-0011 (reuse)
+- **Implementation note**: the in-repo streaming primitive is implemented — `AsyncHTMLByteSink`
+  (reference-semantic, typed `Failure`) + `AsyncRenderer` (chunked emit, cooperative cancellation,
+  `Task.yield`) + `HTML.render(into:)` / `renderHydratable(into:arena:)`. The ADServe surface (the
+  ADR-0046 `text/html` MediaType, streaming response, SSE, static handler) and the gated `ADHTMLNIO`
+  bridge that consumes this sink are the remaining cross-repo work — see
+  `docs/integration/adserve-requirements.md`. Data-driven `AsyncForEach` is deferred (Sendable-opcode
+  constraint).
 
 ## Context
 

@@ -24,10 +24,10 @@ ADRs are immutable once accepted: supersede with a new ADR rather than editing a
 | [0003](adr/0003-escape-by-default-context-aware.md) | Escape-by-default + context-aware escaping | Proposed |
 | [0004](adr/0004-serializable-signals-not-observation.md) | Custom serializable signals (not Swift `Observation`) | Proposed |
 | [0005](adr/0005-islands-resumable-wiring.md) | Islands + resumable wiring (reject full & whole-page hydration) | Proposed |
-| [0006](adr/0006-tiny-js-runtime-not-wasm.md) | Tiny hand-written JS runtime (reject Swift→WASM baseline) | Proposed |
+| [0006](adr/0006-tiny-js-runtime-not-wasm.md) | Tiny hand-written JS runtime (reject Swift→WASM baseline) | Accepted |
 | [0007](adr/0007-wire-format-v1.md) | Wire format v1 (versioned, index-deduped, ADJSON-serialized) | Proposed |
-| [0008](adr/0008-lean-macro-surface.md) | Lean macro surface (`@Component`, `#html`, `#attr`) | Proposed |
-| [0009](adr/0009-swift-only-no-templates.md) | Swift-only views: no template files; whole-scope compile-time type-checking | Proposed |
+| [0008](adr/0008-lean-macro-surface.md) | Lean macro surface (`@Component`, `@State`, `#attr`) | Accepted |
+| [0009](adr/0009-swift-only-no-templates.md) | Swift-only views: no template files; whole-scope compile-time type-checking | Accepted |
 | [0010](adr/0010-package-layering-and-gating.md) | Package layering & dependency gating (mirror ADJSON) | Proposed |
 | [0011](adr/0011-adfcore-adjson-adserve-reuse.md) | `ADFCore`/`ADJSON`/`ADServeCore` reuse policy (no duplication) | Proposed |
 | [0012](adr/0012-adserve-integration.md) | ADServe integration & the streaming dependency | Proposed |

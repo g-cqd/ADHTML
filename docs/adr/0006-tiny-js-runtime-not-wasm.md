@@ -1,8 +1,12 @@
 # ADR 0006 — Tiny hand-written JS runtime (reject Swift→WASM baseline)
 
-- **Status**: Proposed
+- **Status**: Accepted (implemented 2026-06-20)
 - **Date**: 2026-06-19
 - **Related**: RFC-0003; ADR-0005 (islands), ADR-0007 (wire format), ADR-0011 (SRI via swift-crypto)
+- **Implementation**: hand-written TypeScript (signals, wire parse, closed behavior registry, DOM layer
+  with delegated events, bindings, Astro load directives incl. `IntersectionObserver`, SSE `patch` +
+  `morph`), built with bun → **1.64 KiB gzip** (≤ 6 KiB hard gate). 13 tests (DOM-free core + happy-dom
+  DOM layer); strict `tsc` typecheck. Full idiomorph-style reordering remains a follow-up.
 
 ## Context
 

@@ -1,8 +1,13 @@
 # ADR 0008 — Lean macro surface
 
-- **Status**: Proposed
+- **Status**: Accepted (implemented 2026-06-20)
 - **Date**: 2026-06-19
 - **Related**: RFC-0004; ADR-0009 (compile-time checking), ADR-0010 (packaging)
+- **Implementation**: `#attr` (compile-time attribute validation), `@State` (peer macro adding a
+  `<name>Signal` accessor backed by an ambient `ADHTMLRenderContext`), `@Component` (extension macro
+  adding `Component` conformance; per-instance render scoping is intrinsic to `Component._render`). The
+  surface stayed lean — no `#html` tokenizer macro yet (deferred). swift-syntax confined to the `.macro`
+  target; built with `--build-system native`.
 
 ## Context
 
