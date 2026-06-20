@@ -197,3 +197,44 @@ test("morph handles deep nesting iteratively and preserves a deep node by id", (
   expect(document.getElementById("leaf")).toBe(leaf);  // same node, preserved through 60 levels
   expect(leaf.textContent).toBe("new");
 });
+
+test("morph reorders keyed children, preserving node identity", () => {
+  document.body.innerHTML = `<ul id="list"><li id="a">A</li><li id="b">B</li><li id="c">C</li></ul>`;
+  const list = document.getElementById("list")!;
+  const a = document.getElementById("a")!;
+  const b = document.getElementById("b")!;
+  const c = document.getElementById("c")!;
+
+  morph(list, `<li id="c">C</li><li id="a">A</li><li id="b">B</li>`);
+
+  expect(document.getElementById("a")).toBe(a);  // same nodes, moved not recreated
+  expect(document.getElementById("b")).toBe(b);
+  expect(document.getElementById("c")).toBe(c);
+  expect([...list.children].map((el) => el.id)).toEqual(["c", "a", "b"]);
+});
+
+test("morph inserts/removes keyed children without disturbing the rest", () => {
+  document.body.innerHTML = `<ul id="list"><li id="a">A</li><li id="b">B</li></ul>`;
+  const list = document.getElementById("list")!;
+  const a = document.getElementById("a")!;
+
+  morph(list, `<li id="a">A</li><li id="x">X</li><li id="b">B</li>`);  // insert x
+  expect(document.getElementById("a")).toBe(a);
+  expect([...list.children].map((el) => el.id)).toEqual(["a", "x", "b"]);
+
+  morph(list, `<li id="a">A</li><li id="b">B</li>`);  // remove x
+  expect(document.getElementById("a")).toBe(a);
+  expect(document.getElementById("x")).toBeNull();
+  expect([...list.children].map((el) => el.id)).toEqual(["a", "b"]);
+});
+
+test("a reordered keyed input keeps its live value (state survives the move)", () => {
+  document.body.innerHTML = `<form id="f"><input id="i1"><input id="i2"></form>`;
+  const form = document.getElementById("f")!;
+  (document.getElementById("i1") as HTMLInputElement).value = "typed";  // live state, not in the HTML
+
+  morph(form, `<input id="i2"><input id="i1">`);  // reordered
+
+  expect((document.getElementById("i1") as HTMLInputElement).value).toBe("typed");
+  expect([...form.children].map((el) => el.id)).toEqual(["i2", "i1"]);
+});

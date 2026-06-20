@@ -17,31 +17,50 @@ export function morph(target: Element, html: string): void {
   }
 }
 
-/** Make `oldParent`'s children match `newParent`'s; queue matched element pairs for deeper morphing. */
+/** Make `oldParent`'s children match `newParent`'s; queue matched element pairs for deeper morphing.
+ * id-set aware (idiomorph heuristic): a new child whose id exists among the old siblings reuses that
+ * node — **moved** into place with `insertBefore` rather than replaced — so keyed nodes (and their
+ * focus/state) survive a reorder. Falls back to positional tag matching when there is no id. */
 function reconcileChildren(oldParent: Node, newParent: Node, work: Array<[Node, Node]>): void {
+  // Index old element children by id, so a reordered keyed node can be found wherever it now sits.
+  const oldById = new Map<string, Element>();
+  for (let node = oldParent.firstChild; node; node = node.nextSibling) {
+    if (node instanceof Element && node.id) oldById.set(node.id, node);
+  }
+
   let oldChild = oldParent.firstChild;
   let newChild = newParent.firstChild;
   while (newChild) {
     const nextNew = newChild.nextSibling;
-    if (!oldChild) {
-      oldParent.appendChild(newChild.cloneNode(true));
-    } else {
-      const nextOld = oldChild.nextSibling;
-      if (sameNode(oldChild, newChild)) {
-        if (oldChild instanceof Element && newChild instanceof Element) {
-          patchAttributes(oldChild, newChild);
-          work.push([oldChild, newChild]);  // reconcile its children later (iteratively)
-        } else if (oldChild.nodeValue !== newChild.nodeValue) {
-          oldChild.nodeValue = newChild.nodeValue;  // text / comment content
-        }
+
+    // Prefer a keyed match (anywhere among the old siblings); else the current positional node.
+    let match: ChildNode | null = null;
+    if (newChild instanceof Element && newChild.id && oldById.has(newChild.id)) {
+      match = oldById.get(newChild.id) ?? null;
+      oldById.delete(newChild.id);
+    } else if (oldChild && sameNode(oldChild, newChild)) {
+      match = oldChild;
+    }
+
+    if (match) {
+      if (match === oldChild) {
+        oldChild = oldChild.nextSibling;  // consumed in place
       } else {
-        oldParent.replaceChild(newChild.cloneNode(true), oldChild);
+        oldParent.insertBefore(match, oldChild);  // move the keyed node into position (cursor unchanged)
       }
-      oldChild = nextOld;
+      if (match instanceof Element && newChild instanceof Element) {
+        patchAttributes(match, newChild);
+        work.push([match, newChild]);  // reconcile its children later (iteratively)
+      } else if (match.nodeValue !== newChild.nodeValue) {
+        match.nodeValue = newChild.nodeValue;  // text / comment content
+      }
+    } else {
+      oldParent.insertBefore(newChild.cloneNode(true), oldChild);  // new node (before cursor, or at end)
     }
     newChild = nextNew;
   }
-  // Drop any old children the new HTML no longer has.
+
+  // Drop any old children the new HTML no longer has (matched/moved nodes are before the cursor).
   while (oldChild) {
     const nextOld = oldChild.nextSibling;
     oldParent.removeChild(oldChild);
