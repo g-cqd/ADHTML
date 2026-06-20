@@ -141,6 +141,11 @@ let package = Package(
         // its output is committed under DOM/Generated. Not a product, so consumers never build it; it
         // depends only on Foundation (a dev-time tool, never shipped in a library product).
         .executableTarget(name: "ADHTMLCodegen", swiftSettings: strictSettings),
+
+        // A lightweight, network-free release perf probe over ADHTMLCore (no swift-syntax / DEV deps).
+        // Run: `swift run -c release ADHTMLPerfProbe`. Complements the ordo-one suite (the CI gate with
+        // mallocCountTotal) for quick local before/after wall-clock measurement. Not a product.
+        .executableTarget(name: "ADHTMLPerfProbe", dependencies: ["ADHTMLCore"], swiftSettings: strictSettings),
     ]
 )
 

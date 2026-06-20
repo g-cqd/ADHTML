@@ -11,12 +11,12 @@ public enum BindTarget: String, Sendable, Equatable {
 
 extension HTMLElement {
     /// Wire a client behavior to a DOM event — emits `data-adh-on:<event>="<behavior>#<cell>[#param…]"`.
-    public func on(_ event: String, _ invocation: BehaviorInvocation) -> Self {
+    public consuming func on(_ event: String, _ invocation: BehaviorInvocation) -> Self {
         attribute("data-adh-on:\(event)", invocation.attributeValue)
     }
 
     /// Bind a reactive cell to this element's text/value/class — emits `data-adh-bind:<target>="<cell>"`.
-    public func bind(_ target: BindTarget, to cell: CellID) -> Self {
+    public consuming func bind(_ target: BindTarget, to cell: CellID) -> Self {
         attribute("data-adh-bind:\(target.rawValue)", "\(cell.raw)")
     }
 }

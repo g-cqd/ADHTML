@@ -29,17 +29,22 @@ public struct HTMLElement<Tag: HTMLTag, Content: HTML>: HTML {
 }
 
 extension HTMLElement {
-    /// A copy of this element with `name`=`value` set (or merged, for `class`/`style`). The value is
-    /// emitted in `context` (default attribute escaping); `.href` uses `.url`.
-    public func attribute(_ name: String, _ value: String, context: EscapeContext = .attribute) -> Self {
-        var copy = self
+    /// This element with `name`=`value` set (or merged, for `class`/`style`), emitted in `context`
+    /// (default attribute escaping; `.href` uses `.url`). `consuming`: a modifier chain on a dying
+    /// temporary *moves* `self`, so the attribute store is uniquely held and mutated in place — the
+    /// chain pays one allocation, not one deep copy per link (CoW-tax bypass). Storing then modifying
+    /// still copies, exactly as before.
+    public consuming func attribute(
+        _ name: String, _ value: String, context: EscapeContext = .attribute
+    ) -> Self {
+        var copy = consume self
         copy.attributes.set(name, value, context: context)
         return copy
     }
 
     /// Append to the element's `class` list (space-separated).
-    public func `class`(_ value: String) -> Self { attribute("class", value) }
+    public consuming func `class`(_ value: String) -> Self { attribute("class", value) }
 
     /// Set the element's `id`.
-    public func id(_ value: String) -> Self { attribute("id", value) }
+    public consuming func id(_ value: String) -> Self { attribute("id", value) }
 }

@@ -15,16 +15,19 @@ internal import OrderedCollections
 /// Serializes the reactive-cell graph + islands to the hydration wire format.
 public enum WireSerializer {
     /// Encode the wire payload to JSON bytes, escaped for safe embedding in the inline state script.
+    /// Reuses ADJSON's HTML-safe encoder (`escapeHTMLUnsafe`), which escapes `<`/`>`/`&` and
+    /// U+2028/U+2029 to `\uXXXX` *during* encoding — one SWAR-accelerated pass, no separate escape pass
+    /// and no duplicated escaper (ADR-0011 reuse). The result still parses as the same JSON value, so
+    /// the wire format is unchanged; `</script>` simply cannot appear literally.
     public static func scriptBytes(
         cells: [CellArena.Cell], islands: [WireIsland]
     ) throws(WireError) -> [UInt8] {
-        let bytes: [UInt8]
         do {
-            bytes = try payload(cells: cells, islands: islands).encodedBytes()
+            return try payload(cells: cells, islands: islands)
+                .encodedBytes(options: JSONEncodingOptions(escapeHTMLUnsafe: true))
         } catch {
             throw WireError.encoding("\(error)")
         }
-        return Escaper.escapeScriptJSON(bytes)
     }
 
     /// Build the wire payload as a `JSONValue` (internal; `scriptBytes` is the public entry).
