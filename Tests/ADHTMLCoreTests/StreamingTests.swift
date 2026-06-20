@@ -6,7 +6,6 @@ import Testing
 // The streaming render path must produce byte-for-byte the same output as the buffered renderer — it is
 // the same opcode emit, just flushed in chunks. These tests pin parity (plain + hydratable), that
 // chunking actually happens, and that an empty view streams nothing.
-@Suite("Streaming render")
 struct StreamingTests {
     /// A sink that also counts `write` calls, to prove the renderer flushed in multiple chunks.
     final class CountingSink: AsyncHTMLByteSink {
@@ -29,16 +28,16 @@ struct StreamingTests {
         }
     }
 
-    @Test("streamed bytes equal the buffered render")
-    func parity() async {
+    @Test
+    func `streamed bytes equal the buffered render`() async {
         let buffered = bigList().renderBytes()
         let sink = AsyncByteCollector()
         await bigList().render(into: sink, chunkBytes: 64)
         #expect(sink.bytes == buffered)
     }
 
-    @Test("a small chunk size produces many writes; a large one a single write")
-    func chunking() async {
+    @Test
+    func `a small chunk size produces many writes; a large one a single write`() async {
         let many = CountingSink()
         await bigList().render(into: many, chunkBytes: 64)
         #expect(many.writes > 1)
@@ -48,16 +47,16 @@ struct StreamingTests {
         #expect(few.writes == 1)
     }
 
-    @Test("an empty view streams nothing")
-    func empty() async {
+    @Test
+    func `an empty view streams nothing`() async {
         let sink = CountingSink()
         await EmptyHTML().render(into: sink)
         #expect(sink.bytes.isEmpty)
         #expect(sink.writes == 0)
     }
 
-    @Test("streamed hydratable output equals the buffered hydratable output")
-    func hydratableParity() async throws {
+    @Test
+    func `streamed hydratable output equals the buffered hydratable output`() async throws {
         let syncArena = CellArena()
         let buffered = try StreamCounter(count: 5).renderHydratable(arena: syncArena)
 
