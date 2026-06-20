@@ -4,6 +4,7 @@
 // signal -> bound node update. The pure logic (signals/behaviors/wire) is unit-tested; this DOM glue
 // is browser-validated (Playwright e2e — see e2e/).
 
+import { actionTrigger, runAction } from "./action";
 import { applyBehavior, parseInvocation } from "./behaviors";
 import { morph } from "./morph";
 import { effect } from "./signals";
@@ -42,21 +43,46 @@ function bindElements(root, cells) {
   }
 }
 
+/** True when `node`'s enclosing island has wired (or it has none) — the lazy-island gate shared by
+ * behaviors and actions: a `visible`/`idle` island stays inert until it actually loads.
+ * @param {Element} node @returns {boolean} */
+function delivers(node) {
+  const island = node.closest("[data-adh-id]");
+  return !island || wired.has(island);
+}
+
 /** The document-level delegated handler for one event type. From the event target, `closest()` walks up
- * to the nearest `data-adh-on:<type>` element in a single native call — no `composedPath()` array
- * allocation, no JS loop (we render light DOM, so shadow-piercing isn't needed). If that element's island
- * has wired, run its behavior. ONE listener per event type for the whole page (qwikloader-style).
- * @param {string} type @param {Array<import("./signals").Signal<unknown>>} cells @param {Event} event
+ * to the nearest `data-adh-on:<type>` element (a behavior) and the nearest `data-adh-action` element (an
+ * action) in single native calls — no `composedPath()` array allocation, no JS loop. ONE listener per
+ * event type for the whole page (qwikloader-style); a click both runs a behavior and, if the action's
+ * trigger is `click`, issues the action.
+ * @param {string} type @param {import("./wire").WireState} state @param {Event} event @param {Document} doc
  * @returns {void} */
-function delegated(type, cells, event) {
+function delegated(type, state, event, doc) {
   const start = event.target;
   if (!(start instanceof Element)) return;
-  const node = start.closest(`[data-adh-on\\:${type}]`);
-  if (!node) return;
-  const island = node.closest("[data-adh-id]");
-  if (island && !wired.has(island)) return;  // lazy island not wired yet -> inert
-  const invocation = parseInvocation(node.getAttribute(`data-adh-on:${type}`) ?? "");
-  if (invocation) applyBehavior(invocation, cells);
+  const onNode = start.closest(`[data-adh-on\\:${type}]`);
+  if (onNode && delivers(onNode)) {  // lazy island not wired yet -> inert
+    const invocation = parseInvocation(onNode.getAttribute(`data-adh-on:${type}`) ?? "");
+    if (invocation) applyBehavior(invocation, state.cells);
+  }
+  const actionNode = start.closest("[data-adh-action]");
+  if (actionNode && delivers(actionNode) && actionTrigger(actionNode) === type) {
+    runAction(actionNode, state, doc);
+  }
+}
+
+/** Form `submit` is not in the delegated set (it has a native default action), so it gets its own
+ * listener: an action whose trigger resolves to `submit` runs here, and we `preventDefault()` the native
+ * navigation. The zero-JS fallback is exactly this prevented navigation (a normal form post).
+ * @param {import("./wire").WireState} state @param {Event} event @param {Document} doc @returns {void} */
+function onSubmit(state, event, doc) {
+  const start = event.target;
+  if (!(start instanceof Element)) return;
+  const node = start.closest("[data-adh-action]");
+  if (!node || !delivers(node) || actionTrigger(node) !== "submit") return;
+  event.preventDefault();
+  runAction(node, state, doc);
 }
 
 /** @param {Element} root @param {Array<import("./signals").Signal<unknown>>} cells @returns {void} */
@@ -102,9 +128,12 @@ export function hydrate(doc = document) {
   const state = readState(doc);
   if (!state) return;
   // One delegated listener per event type for the WHOLE page (not one per island) — O(1) listeners.
+  // They carry both the behavior path (`data-adh-on`) and the action path (`data-adh-action`); `submit`
+  // gets a dedicated listener (it is not delegated — it has a native default action we must prevent).
   for (const type of DELEGATED_EVENTS) {
-    doc.addEventListener(type, (event) => delegated(type, state.cells, event));
+    doc.addEventListener(type, (event) => delegated(type, state, event, doc));
   }
+  doc.addEventListener("submit", (event) => onSubmit(state, event, doc));
   // One DOM query for all island roots, mapped by id (vs a full-document search per island).
   /** @type {Map<string, Element>} */
   const roots = new Map();
@@ -114,15 +143,18 @@ export function hydrate(doc = document) {
   }
   for (const island of state.islands) {
     const root = roots.get(island.id);
-    if (root) {
-      schedule(island.on, root, () => {
-        try {
-          wireIsland(root, state.cells);
-        } catch {
-          // isolate per-island failures — the rest of the page stays interactive
-        }
-      });
-    }
+    if (!root) continue;
+    schedule(island.on, root, () => {
+      try {
+        wireIsland(root, state.cells);
+      } catch {
+        // isolate per-island failures — the rest of the page stays interactive
+      }
+    });
+    // Declarative SSE (RFC-0019 §6.3-H, contract C5): an island carrying `data-adh-connect` subscribes to
+    // a server morph/patch stream, so live cross-client updates flow in (pushed, not polled).
+    const stream = root.getAttribute("data-adh-connect");
+    if (stream) connect(stream, state, doc);
   }
 }
 

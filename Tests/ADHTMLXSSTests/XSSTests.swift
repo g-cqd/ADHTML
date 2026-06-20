@@ -53,4 +53,30 @@ struct XSSTests {
         #expect(a { "x" }.href("mailto:a@b.co").render() == #"<a href="mailto:a@b.co">x</a>"#)
         #expect(a { "x" }.href("#frag").render() == ##"<a href="#frag">x</a>"##)
     }
+
+    // RFC-0019 §6.3-J: a reactive-hypermedia fragment is built from server data and morphed into the page
+    // by the client runtime. The bytes it morphs MUST be escape-by-default — a hostile value cannot smuggle
+    // live markup through the morph-apply path (no `RawHTML` on server data). This exercises the fragment
+    // byte path (`renderBytes`, what `ADHTMLNIO.adhtmlFragment` emits) with the same adversarial vectors.
+    @Test(arguments: vectors)
+    func `fragment bytes morphed by the runtime are inert`(_ vector: String) {
+        let fragment = ul {
+            li { vector }.attribute("data-label", vector)
+            li { "ok" }
+        }
+        let out = String(decoding: fragment.renderBytes(), as: UTF8.self)
+        #expect(!out.contains("<script"))
+        #expect(!out.contains("<img"))
+        #expect(!out.contains("<svg"))
+        #expect(out.contains("&lt;"))
+    }
+
+    // The out-of-band marker is server-controlled, but an attacker-influenced id must still be escaped in
+    // the attribute it lands in (the runtime resolves it via getElementById, never by parsing it as markup).
+    @Test
+    func `out-of-band id is attribute-escaped`() {
+        let out = div {}.attribute("data-adh-oob", #""><script>alert(1)</script>"#).render()
+        #expect(!out.contains("<script"))
+        #expect(out.contains("&quot;") && out.contains("&lt;"))
+    }
 }

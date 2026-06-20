@@ -16,12 +16,46 @@ export function morph(target, html) {
   // (never moves them out), so reuse is safe.
   const template = (parseTemplate ??= document.createElement("template"));
   template.innerHTML = html;
-  /** @type {Array<[Node, Node]>} */
-  const work = [[target, template.content]];
+  drain([[target, template.content]]);
+}
+
+/** Morph an existing element to match `source` (a parsed element): sync its attributes, then reconcile its
+ * children — preserving the target's identity, focus, selection, and bound effects rather than replacing
+ * it. The element-level counterpart of `morph` (which only reconciles children); used by `oobSwap`.
+ * @param {Element} target @param {Element} source @returns {void} */
+export function morphElement(target, source) {
+  patchAttributes(target, source);
+  drain([[target, source]]);
+}
+
+/** Drain a worklist of (oldParent, newParent) pairs — reconcile each pair's children, which pushes their
+ * matched element children back on for deeper morphing. Iterative (no recursion), stack-safe.
+ * @param {Array<[Node, Node]>} work @returns {void} */
+function drain(work) {
   /** @type {[Node, Node] | undefined} */
   let pair;
   while ((pair = work.pop())) {
     reconcileChildren(pair[0], pair[1], work);
+  }
+}
+
+/** Apply an out-of-band response (RFC-0019 §6.3-J, contract C3): each top-level element of `html` names
+ * the page region it updates — via `data-adh-oob="<id>"` or its own `id` — and is morphed into that
+ * region. Parsed inertly through a `<template>` (nothing in `html` runs on parse), and only id-resolved
+ * regions are touched; an element naming no live region is ignored. Used by the action `outOfBand` swap.
+ * @param {string} html @param {Document} [doc] @returns {void} */
+export function oobSwap(html, doc = document) {
+  const template = doc.createElement("template");
+  template.innerHTML = html;
+  for (const element of template.content.children) {
+    const id = element.getAttribute("data-adh-oob") || element.id;
+    const target = id ? doc.getElementById(id) : null;
+    if (!target) continue;
+    // Normalize the marker to the target's own id so the attribute sync preserves identity rather than
+    // replacing `id` with `data-adh-oob` (which would orphan the region for any later swap).
+    element.removeAttribute("data-adh-oob");
+    element.id = id;
+    morphElement(target, element);
   }
 }
 

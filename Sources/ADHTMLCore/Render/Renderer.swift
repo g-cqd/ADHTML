@@ -21,7 +21,7 @@ public enum Renderer {
     /// exceeds `maxDepth`. The failure-safe path for dynamically-built programs.
     public static func render(
         _ program: borrowing HTMLProgram, into sink: inout some HTMLByteSink, maxDepth: Int
-    ) throws {
+    ) throws(RenderError) {
         var depth = 0
         for op in program.ops {
             switch op {
@@ -49,7 +49,8 @@ public enum Renderer {
             case .text(let value): HTMLBytes.text(value, into: &sink)
             case .raw(let bytes): HTMLBytes.raw(bytes, into: &sink)
             case .closeTag(let name): HTMLBytes.closeTag(name, into: &sink)
-            case .islandOpen(let id, let on, _): HTMLBytes.islandOpen(id: id, on: on, into: &sink)
+            case .islandOpen(let id, let on, _, let connect):
+                HTMLBytes.islandOpen(id: id, on: on, connect: connect, into: &sink)
             case .islandClose: HTMLBytes.islandClose(into: &sink)
         }
     }
@@ -74,7 +75,7 @@ extension HTML {
 
     /// Render to bytes with an open-tag-depth ceiling; throws on adversarial nesting (failure-safe). Uses
     /// the materialized opcode path (`HTMLProgram`) so the ceiling is enforced during the iterative emit.
-    public consuming func renderBytes(maxDepth: Int) throws -> [UInt8] {
+    public consuming func renderBytes(maxDepth: Int) throws(RenderError) -> [UInt8] {
         var program = HTMLProgram()
         Self._render(self, into: &program)
         var sink = ArraySink(reservingCapacity: program.ops.count * 16)

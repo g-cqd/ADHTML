@@ -18,9 +18,10 @@ public enum HTMLOp: Sendable {
     case raw([UInt8])
     /// `</name>` — a closing tag.
     case closeTag(StaticString)
-    /// Opens a hydration island root: `<div data-adh-island data-adh-id="…" data-adh-on="…">`. The
-    /// `scope` (cells reachable for this island) is read by the wire serializer, not the byte emit.
-    case islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID])
+    /// Opens a hydration island root: `<div data-adh-island data-adh-id="…" data-adh-on="…">`, plus an
+    /// optional `data-adh-connect="…"` when the island subscribes to a live SSE stream (RFC-0019 §6.3-H).
+    /// The `scope` (cells reachable for this island) is read by the wire serializer, not the byte emit.
+    case islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?)
     /// Closes a hydration island root (`</div>`).
     case islandClose
 }
@@ -46,8 +47,10 @@ extension HTMLProgram: RenderTarget {
     @inlinable public mutating func text(_ value: String) { append(.text(value)) }
     @inlinable public mutating func raw(_ bytes: [UInt8]) { append(.raw(bytes)) }
     @inlinable public mutating func closeTag(_ name: StaticString) { append(.closeTag(name)) }
-    @inlinable public mutating func islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID]) {
-        append(.islandOpen(id: id, on: on, scope: scope))
+    @inlinable public mutating func islandOpen(
+        id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?
+    ) {
+        append(.islandOpen(id: id, on: on, scope: scope, connect: connect))
     }
     @inlinable public mutating func islandClose() { append(.islandClose) }
 }

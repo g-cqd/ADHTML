@@ -21,7 +21,7 @@ public protocol RenderTarget {
     mutating func text(_ value: String)
     mutating func raw(_ bytes: [UInt8])
     mutating func closeTag(_ name: StaticString)
-    mutating func islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID])
+    mutating func islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?)
     mutating func islandClose()
 }
 
@@ -56,11 +56,17 @@ enum HTMLBytes {
         sink.writeStatic(markup)  // "</tag>" (precomputed)
     }
     @inlinable @inline(__always)
-    static func islandOpen(id: IslandID, on: LoadStrategy, into sink: inout some HTMLByteSink) {
+    static func islandOpen(
+        id: IslandID, on: LoadStrategy, connect: String?, into sink: inout some HTMLByteSink
+    ) {
         sink.writeStatic("<div data-adh-island data-adh-id=\"")
         Escaper.write(id.raw, context: .attribute, into: &sink)
         sink.writeStatic("\" data-adh-on=\"")
         Escaper.write(on.attributeValue, context: .attribute, into: &sink)
+        if let connect {  // declarative SSE subscription (RFC-0019 §6.3-H); absent ⇒ byte-identical to before
+            sink.writeStatic("\" data-adh-connect=\"")
+            Escaper.write(connect, context: .attribute, into: &sink)
+        }
         sink.writeStatic("\">")
     }
     @inlinable @inline(__always)
@@ -88,8 +94,10 @@ public struct DirectTarget<Sink: HTMLByteSink>: RenderTarget {
     @inlinable public mutating func closeTag(_ name: StaticString) {
         HTMLBytes.closeTag(name, into: &sink)
     }
-    @inlinable public mutating func islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID]) {
-        HTMLBytes.islandOpen(id: id, on: on, into: &sink)
+    @inlinable public mutating func islandOpen(
+        id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?
+    ) {
+        HTMLBytes.islandOpen(id: id, on: on, connect: connect, into: &sink)
     }
     @inlinable public mutating func islandClose() { HTMLBytes.islandClose(into: &sink) }
 }

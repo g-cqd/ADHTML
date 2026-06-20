@@ -47,6 +47,19 @@ struct BridgeTests {
     }
 
     @Test
+    func `adhtmlFragment yields a partial text/html response (no doctype, no state script)`() {
+        let response = ResponseContent.adhtmlFragment(ul { li { "row" } })
+        guard case .raw(let body, let contentType, _) = response else {
+            Issue.record("expected .raw, got \(response)")
+            return
+        }
+        let html = String(decoding: body, as: UTF8.self)
+        #expect(contentType == "text/html; charset=utf-8")
+        #expect(html == "<ul><li>row</li></ul>")  // a partial: no <!doctype>/<html>, no inline adh-state
+        #expect(!html.contains("adh-state"))
+    }
+
+    @Test
     func `adhtmlStaticStream chunks a large view and the bytes equal the buffered render`() async throws {
         func bigList() -> some HTML { ul { for index in 0 ..< 50 { li { "item \(index)" } } } }
         let expected = bigList().renderBytes()

@@ -29,6 +29,16 @@ extension ResponseContent {
         .html(try view.renderHydratable(arena: arena))
     }
 
+    /// Render an ADHTML view as a `text/html` **fragment** (RFC-0019 contract C2): the partial bytes — no
+    /// doctype, no inline hydration-state script — that a handler returns to an action fetch
+    /// (`ctx.isFragment`). The runtime morphs these into the target region; the cells already exist
+    /// client-side, so a fragment carries no state of its own. Escape-by-default like every render path.
+    /// 200 by default; for a non-OK fragment (e.g. a 422 validation partial) call `.html(_:status:)` with
+    /// `renderBytes()` directly, or ADServe's `.fragment(_:status:)` once that lands (RFC-0019 §6.2-B).
+    public static func adhtmlFragment(_ view: consuming some HTML) -> ResponseContent {
+        .html(view.renderBytes())
+    }
+
     /// Render an ADHTML view as a **streamed** `text/html` response: `<head>` flushes before the body
     /// finishes (TTFB), the body streams in ~`chunkBytes` chunks with channel back-pressure, and the
     /// inline hydration state script is the final chunk. The state is serialized up front, so a wire
