@@ -1,7 +1,17 @@
-# Lint -> build -> test in one gated job, then fan out (Linux, platform matrix, benchmarks, fuzz, docs)
-# only after the gate passes. Mirrors the AD* family CI (e.g. ADJSON). AD* sibling dependencies resolve
-# from github.com/g-cqd (the manifest default when <DEP>_PATH is unset), exactly like the rest of the
-# family's CI.
+# The COMMON Swift legs (lint/gate + build & test on macOS + Linux) route through the shared
+# reusable workflow. Everything package-UNIQUE fans out alongside it: the Foundation-free-core Linux
+# portability build, the cross-platform compile matrix, the ordo-one benchmark suite, the libFuzzer
+# pass, the gated swift-crypto SRI target, the DocC link check, and the hand-written JS client
+# runtime (bun unit tests + Playwright e2e). AD* sibling dependencies resolve from github.com/g-cqd
+# (the manifest default when <DEP>_PATH is unset), so the resolution-dependent legs gate on
+# AD_SWIFT_SIBLINGS_PUBLISHED.
+#
+# HUMAN REVIEW (see report): ADHTML's macro target needs `swift build/test --build-system native`
+# (the classic build system) to avoid the swiftbuild macro/test-link bug (ADR-0008). The reusable
+# workflow runs plain `swift build`/`swift test` (no `--build-system` input), so its macOS/Linux test
+# legs may hit that bug on the current toolchain. The package-unique jobs below keep `--build-system
+# native`. If the reusable legs fail on the macro link, either add a `build-system` input upstream or
+# fall back to a bespoke native build-test job for ADHTML.
 name: CI
 
 on:
@@ -20,44 +30,29 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  build-test:
-    name: Lint, build & test (macOS)
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v6
-      - name: Select latest Xcode
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
-      - name: Show toolchain
-        run: swift --version
-      - name: Cache SwiftPM
-        uses: actions/cache@v5
-        with:
-          path: |
-            .build
-            ~/Library/Caches/org.swift.swiftpm
-          key: spm-${{ runner.os }}-${{ hashFiles('Package.swift') }}-${{ hashFiles('Sources/**', 'Tests/**') }}
-          restore-keys: |
-            spm-${{ runner.os }}-${{ hashFiles('Package.swift') }}-
-            spm-${{ runner.os }}-
-      - name: Lint (toolchain swift-format, strict)
-        run: swift format lint --strict --recursive --configuration .swift-format Sources Tests Benchmarks
-      # The package has a `.macro` target. The newer `swiftbuild` engine on the current toolchain
-      # mislinks the macro module into dependent test bundles, so we use `native` (the classic build
-      # system), which handles macros correctly. Revisit once the swiftbuild macro/test-link bug is
-      # fixed (see CONTRIBUTING / ADR-0008).
-      - name: Build
-        run: swift build --build-system native
-      - name: Test (with coverage)
-        run: swift test --build-system native --enable-code-coverage
+  quality:
+    # Full-adopt of the reusable workflow for the COMMON gate + build/test (macOS + Linux). ADHTML
+    # depends on the first-party siblings ADFoundation and ADJSON (resolved from branch: main —
+    # Package.swift lines 45–46, in the always-on dependency array, NOT dev-gated), so the
+    # resolution-dependent jobs stay gated on AD_SWIFT_SIBLINGS_PUBLISHED; the file-based gates
+    # (format/metrics/drift) always run. Sanitizers/docs are NOT enabled: ADHTML had no sanitizer
+    # job, and its DocC leg is a stricter `--warnings-as-errors` link check (the `docs-check` job
+    # below) with no Pages deploy.
+    uses: g-cqd/ADBuildTools/.github/workflows/swift-quality.yml@v1
+    with:
+      dev-env-var: ADHTML_DEV
+      requires-published-siblings: true
 
   linux:
-    name: Build & test (Linux)
-    needs: build-test
-    # ADHTMLCore is Foundation-free; building it on Linux guards portability. Advisory while the
-    # tools-version tracks a toolchain only the nightly container ships.
+    name: Build & test (Linux, Foundation-free core)
+    needs: quality
+    # ADHTMLCore is Foundation-free; building it in isolation on Linux guards portability — a check
+    # the reusable's whole-package Linux leg doesn't make. Advisory while the tools-version tracks a
+    # toolchain only the nightly container ships. Uses `--build-system native` (ADR-0008 macro bug).
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    container: swiftlang/swift:nightly-main-jammy
+    # Dated nightly pins the toolchain for reproducible CI; bump deliberately like a dependency (#14).
+    container: swiftlang/swift:nightly-6.4-2026-06-18-jammy
     continue-on-error: true
     steps:
       - uses: actions/checkout@v6
@@ -70,7 +65,7 @@ jobs:
 
   platforms:
     name: Build (${{ matrix.platform }})
-    needs: build-test
+    needs: quality
     if: github.event_name != 'pull_request'
     runs-on: macos-26
     strategy:
@@ -91,7 +86,7 @@ jobs:
 
   benchmarks:
     name: Benchmark (macOS, release)
-    needs: build-test
+    needs: quality
     # ordo-one suite, on main / dispatch only (noisy on shared runners); advisory.
     if: github.event_name != 'pull_request'
     runs-on: macos-26
@@ -109,18 +104,34 @@ jobs:
         run: |
           set -o pipefail
           swift package --build-system native --allow-writing-to-package-directory benchmark --format markdown | tee bench.md
+      - name: Regression check vs committed baseline
+        # Advisory (the job is continue-on-error) and guarded: a no-op until a baseline is captured on this
+        # runner class (hosted timings miscalibrate against a dev machine — capture via
+        # `swift package benchmark baseline update main` on macos-26, then commit .benchmarkBaselines/main/).
+        # Once a baseline exists, `baseline check` flags a regression past the suite's thresholds; promote to
+        # a hard gate (drop continue-on-error) when the runner proves stable — mirrors the ADJSON gate.
+        if: always()
+        env:
+          ADHTML_DEV: "1"
+        run: |
+          if ls -d .benchmarkBaselines/*/main >/dev/null 2>&1; then
+            swift package --build-system native --allow-writing-to-package-directory benchmark baseline check main
+          else
+            echo "No committed baseline yet — capture one on this runner class, then commit .benchmarkBaselines/main/."
+          fi
       - name: Publish results to the job summary
         if: always()
         run: cat bench.md >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
 
   fuzz:
     name: Fuzz (libFuzzer, Linux)
-    needs: build-test
+    needs: quality
     # `-sanitize=fuzzer` is a Linux capability of the toolchain (the Darwin SDK rejects it). Time-boxed,
     # advisory (nightly container). A crash uploads its reproducer; commit it as a regression test.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    container: swiftlang/swift:nightly-main-jammy
+    # Dated nightly pins the toolchain for reproducible CI; bump deliberately like a dependency (#14).
+    container: swiftlang/swift:nightly-6.4-2026-06-18-jammy
     continue-on-error: true
     timeout-minutes: 20
     steps:
@@ -147,7 +158,7 @@ jobs:
 
   sri:
     name: SRI (gated, swift-crypto)
-    needs: build-test
+    needs: quality
     # The `ADHTML_SRI` target pulls swift-crypto, so it is gated out of the default build; this job
     # builds + runs its tests (canonical SHA-256 vectors) so the gated code never rots.
     runs-on: macos-26
@@ -162,7 +173,7 @@ jobs:
 
   docs-check:
     name: Build docs (link check)
-    needs: build-test
+    needs: quality
     runs-on: macos-26
     env:
       ADHTML_DEV: "1"
@@ -183,7 +194,7 @@ jobs:
     name: Client runtime (bun)
     # The hand-written JS hydration runtime: strict typecheck, unit-test the DOM-free core + the DOM
     # layer (delegated events, bindings, visible, morph) under happy-dom, build + gate its gzip size
-    # (<= 6 KiB, ADR-0006), and verify the committed minified artifact is in sync with source.
+    # (<= 4 KiB, ADR-0006 — build.js enforces 4 * 1024), and verify the committed artifact is in sync.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -200,7 +211,7 @@ jobs:
         run: bun run test
         working-directory: ClientRuntime
       - name: Build + gzip size gate
-        run: bun run build.ts
+        run: bun run build.js
         working-directory: ClientRuntime
       - name: Verify committed runtime artifact is in sync
         run: git diff --exit-code -- adh-runtime.min.js
@@ -224,7 +235,7 @@ jobs:
         run: bunx playwright install --with-deps chromium
         working-directory: ClientRuntime
       - name: Build the runtime (fixture serves it)
-        run: bun run build.ts
+        run: bun run build.js
         working-directory: ClientRuntime
       - name: Run Playwright e2e
         run: bun run e2e
