@@ -11,12 +11,19 @@ import { type WireState, readState } from "./wire";
 
 const BIND_TARGETS = ["text", "value", "class"] as const;
 const DELEGATED_EVENTS = ["click", "input", "change"] as const;
+const BIND_SELECTOR = "[data-adh-bind\\:text],[data-adh-bind\\:value],[data-adh-bind\\:class]";
+
+// Islands that have wired. The document-level delegated listener checks this so a lazy island
+// (`visible`/`idle`/`media`) stays inert until it actually loads.
+const wired = new WeakSet<Element>();
 
 function bindElements(root: Element, cells: Array<Signal<unknown>>): void {
-  for (const target of BIND_TARGETS) {
-    for (const element of root.querySelectorAll<HTMLElement>(`[data-adh-bind\\:${target}]`)) {
+  // One combined query for all bind targets (vs one querySelectorAll per target).
+  for (const element of root.querySelectorAll<HTMLElement>(BIND_SELECTOR)) {
+    for (const target of BIND_TARGETS) {
       const ref = element.getAttribute(`data-adh-bind:${target}`);
-      const cell = ref === null ? undefined : cells[Number(ref)];
+      if (ref === null) continue;
+      const cell = cells[Number(ref)];
       if (!cell) continue;
       effect(() => {
         const value = String(cell.get());
@@ -28,22 +35,25 @@ function bindElements(root: Element, cells: Array<Signal<unknown>>): void {
   }
 }
 
-function delegate(root: Element, type: string, cells: Array<Signal<unknown>>): void {
-  root.addEventListener(type, (event) => {
-    const attribute = `data-adh-on:${type}`;
-    for (const node of event.composedPath()) {
-      if (node instanceof Element && node.hasAttribute(attribute)) {
-        const invocation = parseInvocation(node.getAttribute(attribute) ?? "");
-        if (invocation) applyBehavior(invocation, cells);
-        return;
-      }
+/** The document-level delegated handler for one event type: find the nearest `data-adh-on:<type>`
+ * element on the event path and, if its island has wired, run its behavior. ONE listener per event type
+ * for the whole page (qwikloader-style) — not one per island. */
+function delegated(type: string, cells: Array<Signal<unknown>>, event: Event): void {
+  const attribute = `data-adh-on:${type}`;
+  for (const node of event.composedPath()) {
+    if (node instanceof Element && node.hasAttribute(attribute)) {
+      const island = node.closest("[data-adh-id]");
+      if (island && !wired.has(island)) return;  // lazy island not wired yet -> inert
+      const invocation = parseInvocation(node.getAttribute(attribute) ?? "");
+      if (invocation) applyBehavior(invocation, cells);
+      return;
     }
-  });
+  }
 }
 
 function wireIsland(root: Element, cells: Array<Signal<unknown>>): void {
   bindElements(root, cells);
-  for (const type of DELEGATED_EVENTS) delegate(root, type, cells);
+  wired.add(root);  // the document-level listener now delivers this island's events
 }
 
 /** Wire when `root` first scrolls into view (`IntersectionObserver`); falls back to immediate if the API
@@ -79,8 +89,18 @@ function schedule(on: string, root: Element, wire: () => void): void {
 export function hydrate(doc: Document = document): void {
   const state = readState(doc);
   if (!state) return;
+  // One delegated listener per event type for the WHOLE page (not one per island) — O(1) listeners.
+  for (const type of DELEGATED_EVENTS) {
+    doc.addEventListener(type, (event) => delegated(type, state.cells, event));
+  }
+  // One DOM query for all island roots, mapped by id (vs a full-document search per island).
+  const roots = new Map<string, Element>();
+  for (const element of doc.querySelectorAll("[data-adh-id]")) {
+    const id = element.getAttribute("data-adh-id");
+    if (id !== null) roots.set(id, element);
+  }
   for (const island of state.islands) {
-    const root = doc.querySelector(`[data-adh-id="${CSS.escape(island.id)}"]`);
+    const root = roots.get(island.id);
     if (root) {
       schedule(island.on, root, () => {
         try {

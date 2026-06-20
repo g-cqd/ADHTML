@@ -2,8 +2,9 @@
 // (ADR-0006/0011). SHA-256 via swift-crypto is required *only* here; island/cache IDs use the
 // non-cryptographic `ADFCore.XXH64`. The output is a standard SRI token, `sha256-<base64>`, ready for
 // `<script integrity="…">`. Foundation-free: bytes feed swift-crypto via an unsafe buffer pointer, and
-// the digest is base64-encoded by the small standard-alphabet encoder below (ADFCore ships Hex/percent
-// coding but not base64, and SRI mandates standard base64).
+// the digest is base64-encoded through the shared `ADFCore.Base64` codec (standard alphabet, padded —
+// the exact form SRI mandates), so the family has one base64 implementation rather than a local copy.
+internal import ADFCore
 internal import Crypto
 
 /// Subresource-Integrity hashing of the client runtime (ADR-0006/0011).
@@ -22,43 +23,6 @@ public enum ADHTMLSRI {
     public static func sha256Base64(_ bytes: [UInt8]) -> String {
         var hasher = SHA256()
         bytes.withUnsafeBytes { buffer in hasher.update(bufferPointer: buffer) }
-        return base64(Array(hasher.finalize()))
+        return Base64.encodedString(Array(hasher.finalize()))
     }
-}
-
-/// Standard base64 (RFC 4648, `+`/`/`, `=` padding). Small + Foundation-free; SRI requires this exact
-/// alphabet. Used only on a 32-byte digest, so it is not a hot path.
-private func base64(_ input: [UInt8]) -> String {
-    let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".utf8)
-    let pad: UInt8 = 0x3D  // '='
-    var out: [UInt8] = []
-    out.reserveCapacity((input.count + 2) / 3 * 4)
-
-    var index = 0
-    while index + 3 <= input.count {
-        let chunk = (UInt32(input[index]) << 16) | (UInt32(input[index + 1]) << 8) | UInt32(input[index + 2])
-        out.append(alphabet[Int((chunk >> 18) & 0x3F)])
-        out.append(alphabet[Int((chunk >> 12) & 0x3F)])
-        out.append(alphabet[Int((chunk >> 6) & 0x3F)])
-        out.append(alphabet[Int(chunk & 0x3F)])
-        index += 3
-    }
-
-    switch input.count - index {
-        case 1:
-            let chunk = UInt32(input[index]) << 16
-            out.append(alphabet[Int((chunk >> 18) & 0x3F)])
-            out.append(alphabet[Int((chunk >> 12) & 0x3F)])
-            out.append(pad)
-            out.append(pad)
-        case 2:
-            let chunk = (UInt32(input[index]) << 16) | (UInt32(input[index + 1]) << 8)
-            out.append(alphabet[Int((chunk >> 18) & 0x3F)])
-            out.append(alphabet[Int((chunk >> 12) & 0x3F)])
-            out.append(alphabet[Int((chunk >> 6) & 0x3F)])
-            out.append(pad)
-        default:
-            break
-    }
-    return String(decoding: out, as: UTF8.self)
 }

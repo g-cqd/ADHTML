@@ -178,7 +178,7 @@ if isSRI {
     package.targets.append(
         .target(
             name: "ADHTMLSRI",
-            dependencies: ["ADHTMLCore", .product(name: "Crypto", package: "swift-crypto")],
+            dependencies: ["ADHTMLCore", adfCore, .product(name: "Crypto", package: "swift-crypto")],
             swiftSettings: strictSettings))
     package.targets.append(
         .testTarget(name: "ADHTMLSRITests", dependencies: ["ADHTMLSRI"], swiftSettings: testSettings))

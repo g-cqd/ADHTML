@@ -30,6 +30,32 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>adh e2e</t
   <script type="module" src="/adh-runtime.min.js"></script>
 </body></html>`;
 
+// A perf page: builds N islands client-side then times a single hydrate() in the REAL browser (native
+// DOM), exposing the result on window.__hydrateMs. The auto-hydrate on module import is a no-op (the
+// state block doesn't exist yet), so the measured call is the only one.
+const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf</title></head><body>
+<div id="container"></div>
+<script type="module">
+  import { hydrate } from "/adh-runtime.min.js";
+  const N = 500;
+  let html = "";
+  for (let i = 0; i < N; i++) {
+    html += '<div data-adh-island data-adh-id="c' + i + '" data-adh-on="load">' +
+      '<button data-adh-on:click="increment#' + i + '#1">+</button>' +
+      '<span data-adh-bind:text="' + i + '">0</span></div>';
+  }
+  const cells = Array.from({ length: N }, () => '{"$":"sig","v":0}').join(",");
+  const islands = Array.from({ length: N }, (_, i) => '{"id":"c' + i + '","on":"load","scope":[' + i + ']}').join(",");
+  html += '<script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[' + cells + '],"islands":[' + islands + ']}<\\/script>';
+  document.getElementById("container").innerHTML = html;
+  const t0 = performance.now();
+  hydrate(document);
+  const ms = performance.now() - t0;
+  window.__hydrateMs = ms;
+  document.title = "hydrated " + N + " islands in " + ms.toFixed(3) + "ms";
+</script>
+</body></html>`;
+
 const PORT = Number(process.env.PORT ?? 3000);
 
 Bun.serve({
@@ -38,6 +64,9 @@ Bun.serve({
     const path = new URL(req.url).pathname;
     if (path === "/") {
       return new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    if (path === "/perf") {
+      return new Response(PERF_PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
     }
     if (path === "/adh-runtime.min.js") {
       return new Response(Bun.file("adh-runtime.min.js"), { headers: { "content-type": "text/javascript" } });
