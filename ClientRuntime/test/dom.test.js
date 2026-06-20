@@ -239,6 +239,32 @@ test("morph inserts/removes keyed children without disturbing the rest", () => {
   expect([...list.children].map((el) => el.id)).toEqual(["a", "b"]);
 });
 
+test("an action inside a Region defaults its morph target to the Region (RFC-0020 §1.6)", async () => {
+  // A Region renders as an island whose stable key is BOTH `id` and `data-adh-id`. An inner action with
+  // no explicit target resolves the closest `data-adh-id` (the Region) and morphs it via getElementById —
+  // the plain `id` is what makes that resolution land. No runtime change: this is the unchanged transport.
+  document.body.innerHTML = `
+    <div data-adh-island id="content" data-adh-id="content" data-adh-on="load">
+      <button data-adh-action="get" data-adh-url="/rows">reload</button>
+      <ul id="rows"><li>initial</li></ul>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[],"islands":[{"id":"content","on":"load","scope":[]}]}
+    </script>`;
+  const fragment =
+    `<button data-adh-action="get" data-adh-url="/rows">reload</button><ul id="rows"><li>reloaded</li></ul>`;
+  const original = globalThis.fetch;
+  globalThis.fetch = /** @type {any} */ (async () => ({ ok: true, text: async () => fragment }));
+  try {
+    hydrate(document);
+    document.querySelector("button").click();
+    await new Promise((resolve) => setTimeout(resolve, 0));  // let the async action settle
+    expect(document.querySelector("#content #rows").textContent).toBe("reloaded");
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
 test("a reordered keyed input keeps its live value (state survives the move)", () => {
   document.body.innerHTML = `<form id="f"><input id="i1"><input id="i2"></form>`;
   const form = document.getElementById("f");

@@ -55,8 +55,8 @@ public enum Renderer {
             case .text(let value): HTMLBytes.text(value, into: &sink)
             case .raw(let bytes): HTMLBytes.raw(bytes, into: &sink)
             case .closeTag(let name): HTMLBytes.closeTag(name, into: &sink)
-            case .islandOpen(let id, let on, _, let connect):
-                HTMLBytes.islandOpen(id: id, on: on, connect: connect, into: &sink)
+            case .islandOpen(let id, let on, _, let connect, let key):
+                HTMLBytes.islandOpen(id: id, on: on, connect: connect, key: key, into: &sink)
             case .islandClose: HTMLBytes.islandClose(into: &sink)
         }
     }

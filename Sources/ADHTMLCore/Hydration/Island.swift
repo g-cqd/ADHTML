@@ -25,7 +25,7 @@ public struct Island<Content: HTML>: HTML {
 
     @inlinable
     public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
-        target.islandOpen(id: html.id, on: html.on, scope: html.scope, connect: html.connect)
+        target.islandOpen(id: html.id, on: html.on, scope: html.scope, connect: html.connect, key: nil)
         Content._render(html.content, into: &target)
         target.islandClose()
     }

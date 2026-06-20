@@ -50,7 +50,7 @@ extension Component {
         // from the cells this instance created (the data-leak boundary, computed by the engine — not a
         // hand-written `scope:` allowlist). The cells are known after body-eval, before lowering.
         let scope = context.arena.cells(inScope: context.scope)
-        target.islandOpen(id: IslandID("c\(context.scope)"), on: hydration, scope: scope, connect: nil)
+        target.islandOpen(id: IslandID("c\(context.scope)"), on: hydration, scope: scope, connect: nil, key: nil)
         Body._render(built, into: &target)
         target.islandClose()
     }

@@ -67,7 +67,7 @@ extension HTML {
 
         var islands: [WireIsland] = []
         for op in program.ops {
-            if case .islandOpen(let id, let on, let scope, _) = op {
+            if case .islandOpen(let id, let on, let scope, _, _) = op {
                 islands.append(WireIsland(id: id, on: on, scope: scope))
             }
         }

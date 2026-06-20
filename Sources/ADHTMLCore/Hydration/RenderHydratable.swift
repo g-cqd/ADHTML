@@ -31,7 +31,7 @@ extension HTML {
             switch op {
                 case .openTagStart:
                     depth += 1
-                case .islandOpen(let id, let on, let scope, _):
+                case .islandOpen(let id, let on, let scope, _, _):
                     depth += 1
                     islands.append(WireIsland(id: id, on: on, scope: scope))
                 case .voidTagEnd, .closeTag, .islandClose:

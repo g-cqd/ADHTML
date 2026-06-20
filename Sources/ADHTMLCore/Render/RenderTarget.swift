@@ -21,7 +21,7 @@ public protocol RenderTarget {
     mutating func text(_ value: String)
     mutating func raw(_ bytes: [UInt8])
     mutating func closeTag(_ name: StaticString)
-    mutating func islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?)
+    mutating func islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?, key: String?)
     mutating func islandClose()
 }
 
@@ -57,9 +57,15 @@ enum HTMLBytes {
     }
     @inlinable @inline(__always)
     static func islandOpen(
-        id: IslandID, on: LoadStrategy, connect: String?, into sink: inout some HTMLByteSink
+        id: IslandID, on: LoadStrategy, connect: String?, key: String?, into sink: inout some HTMLByteSink
     ) {
-        sink.writeStatic("<div data-adh-island data-adh-id=\"")
+        sink.writeStatic("<div data-adh-island")
+        if let key {  // a Region's stable plain `id` — a getElementById morph target; absent ⇒ unchanged bytes
+            sink.writeStatic(" id=\"")
+            Escaper.write(key, context: .attribute, into: &sink)
+            sink.writeStatic("\"")
+        }
+        sink.writeStatic(" data-adh-id=\"")
         Escaper.write(id.raw, context: .attribute, into: &sink)
         sink.writeStatic("\" data-adh-on=\"")
         Escaper.write(on.attributeValue, context: .attribute, into: &sink)
@@ -95,9 +101,9 @@ public struct DirectTarget<Sink: HTMLByteSink>: RenderTarget {
         HTMLBytes.closeTag(name, into: &sink)
     }
     @inlinable public mutating func islandOpen(
-        id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?
+        id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?, key: String?
     ) {
-        HTMLBytes.islandOpen(id: id, on: on, connect: connect, into: &sink)
+        HTMLBytes.islandOpen(id: id, on: on, connect: connect, key: key, into: &sink)
     }
     @inlinable public mutating func islandClose() { HTMLBytes.islandClose(into: &sink) }
 }

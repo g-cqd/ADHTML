@@ -21,7 +21,10 @@ public enum HTMLOp: Sendable {
     /// Opens a hydration island root: `<div data-adh-island data-adh-id="…" data-adh-on="…">`, plus an
     /// optional `data-adh-connect="…"` when the island subscribes to a live SSE stream (RFC-0019 §6.3-H).
     /// The `scope` (cells reachable for this island) is read by the wire serializer, not the byte emit.
-    case islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?)
+    /// `key` (non-`nil` for a ``Region``) additionally stamps a plain `id="…"` so the island is a
+    /// `getElementById` morph target — what the RFC-0019 action interpreter resolves a target by. `nil`
+    /// for an implicit/explicit ``Island`` (byte-identical to before — no plain `id`).
+    case islandOpen(id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?, key: String?)
     /// Closes a hydration island root (`</div>`).
     case islandClose
 }
@@ -48,9 +51,9 @@ extension HTMLProgram: RenderTarget {
     @inlinable public mutating func raw(_ bytes: [UInt8]) { append(.raw(bytes)) }
     @inlinable public mutating func closeTag(_ name: StaticString) { append(.closeTag(name)) }
     @inlinable public mutating func islandOpen(
-        id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?
+        id: IslandID, on: LoadStrategy, scope: [CellID], connect: String?, key: String?
     ) {
-        append(.islandOpen(id: id, on: on, scope: scope, connect: connect))
+        append(.islandOpen(id: id, on: on, scope: scope, connect: connect, key: key))
     }
     @inlinable public mutating func islandClose() { append(.islandClose) }
 }
