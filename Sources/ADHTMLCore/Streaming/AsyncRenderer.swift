@@ -82,8 +82,10 @@ extension HTML {
 
         do {
             try await AsyncRenderer.render(program, into: sink, chunkBytes: chunkBytes)
-            // Component-scoped CSS (Track 4): the deduped `<style>` precedes the state script in the tail.
+            // Component-scoped assets (Track 4): the deduped `<style>` + inline `<script>`s precede the
+            // state script in the tail.
             var tail = assets.styleTag()
+            tail.append(contentsOf: assets.scriptTag())
             tail.append(contentsOf: Self.scriptOpen)
             tail.append(contentsOf: stateBytes)
             tail.append(contentsOf: Self.scriptClose)

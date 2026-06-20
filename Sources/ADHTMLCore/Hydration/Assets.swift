@@ -33,14 +33,39 @@ public struct ScopedStyle: Sendable {
     }
 }
 
+/// A component's co-located JavaScript (Track 4). `.inline` is emitted as a CSP-nonced `<script>` in the
+/// page; `.module(name:)` names a content-hashed, SRI-served ES module the gated bridge loads. Both are
+/// `StaticString` (trusted, never user-interpolated). The script ENHANCES — it registers `ADH.mount(name,
+/// fn)` whose only network primitive is `ctx.action` (the signed RFC-0019 endpoint), so it never
+/// re-implements the model; the component `body` stays the no-JS fallback.
+public enum Script: Sendable {
+    /// Inline JavaScript, emitted as a nonced `<script>` (no SRI — it is part of the HTML, covered by CSP).
+    case inline(StaticString)
+    /// A named ES module (bundled + content-hashed + SRI-served by the gated `ADHTMLAssets` bridge).
+    case module(name: StaticString)
+
+    /// The bytes that distinguish this script in the per-type asset hash (so a script-only component, or
+    /// two same-CSS components with different scripts, still scope distinctly).
+    var identityBytes: [UInt8] {
+        switch self {
+            case .inline(let js): return js.withUTF8Buffer { unsafe Array($0) }
+            case .module(let name): return name.withUTF8Buffer { unsafe Array($0) }
+        }
+    }
+}
+
 /// Accumulates a render's component-scoped assets, DEDUPED by scope hash (two instances of one component
 /// type contribute one `<style>`). `Mutex`-guarded so a streaming/async render is data-race-free; `nil` on
 /// the static `render()` path (no injection point), mirroring how ``CellArena`` is absent there.
 public final class AssetSink: Sendable {
-    /// One deduped asset entry: the scope hash (its `data-scope` value) + the rendered CSS bytes.
+    /// One deduped asset entry for a component type: the scope hash (its `data-scope` value), the rendered
+    /// CSS bytes (empty when none), the inline-script bytes (empty when none), and the module name (the
+    /// gated bridge loads it as a content-hashed, SRI-served `<script type=module>`).
     public struct Entry: Sendable, Equatable {
         public let scope: String
         public let css: [UInt8]
+        public let inlineScript: [UInt8]
+        public let module: String?
     }
 
     private struct State {
@@ -72,34 +97,59 @@ public final class AssetSink: Sendable {
     /// The deduped `<style>…</style>` block for all recorded CSS, or empty when none — injected verbatim
     /// (already scoped + escape-free; CSS is trusted `StaticString`). The gated bridge re-emits with a nonce.
     public func styleTag() -> [UInt8] {
-        let all = entries
-        guard !all.isEmpty else { return [] }
+        let css = entries.flatMap(\.css)
+        guard !css.isEmpty else { return [] }
         var out = Array("<style>".utf8)
-        for entry in all { out.append(contentsOf: entry.css) }
+        out.append(contentsOf: css)
         out.append(contentsOf: Array("</style>".utf8))
+        return out
+    }
+
+    /// The deduped inline `<script>…</script>` blocks for all recorded `.inline` scripts (one per type), or
+    /// empty when none. Trusted `StaticString` (escape-free). The gated bridge re-emits each with a nonce;
+    /// `.module` scripts are served separately (this covers only inline JS).
+    public func scriptTag() -> [UInt8] {
+        var out: [UInt8] = []
+        for entry in entries where !entry.inlineScript.isEmpty {
+            out.append(contentsOf: Array("<script>".utf8))
+            out.append(contentsOf: entry.inlineScript)
+            out.append(contentsOf: Array("</script>".utf8))
+        }
         return out
     }
 }
 
-/// Records a component type's style into the ambient ``AssetSink`` and computes its `data-scope` hash.
+/// Records a component type's style + script into the ambient ``AssetSink`` and computes its `data-scope`
+/// hash (the `data-component`/`data-scope` mount-root values).
 enum ComponentAssets {
-    /// Hash the type name + CSS (so two types with identical CSS still scope distinctly), dedup-record the
-    /// scoped/global CSS into `sink`, and return the base36 scope hash (the `data-scope` value).
-    static func record(style: ScopedStyle, typeName: String, into sink: AssetSink) -> String {
-        let cssBytes = style.css.withUTF8Buffer { unsafe Array($0) }
+    /// Hash the type name + CSS + script identity (so a script-only component, or two same-CSS components
+    /// with different scripts, still scope distinctly), dedup-record the scoped CSS + inline script into
+    /// `sink`, and return the base36 scope hash.
+    static func record(style: ScopedStyle?, script: Script?, typeName: String, into sink: AssetSink) -> String {
+        let cssBytes = style.map { $0.css.withUTF8Buffer { unsafe Array($0) } } ?? []
         var keyBytes = Array(typeName.utf8)
         keyBytes.append(contentsOf: cssBytes)
+        if let script { keyBytes.append(contentsOf: script.identityBytes) }
         let scope = base36(XXH64.hash(keyBytes))
 
         // Dedup BEFORE scoping: a repeated instance of the same type skips the (otherwise wasted) scope pass.
         guard !sink.contains(scope) else { return scope }
 
-        let rendered: [UInt8]
-        switch style.mode {
-            case .scoped, .shadow: rendered = CSSScoper.scope(cssBytes, scope: scope)
-            case .global: rendered = cssBytes
+        let renderedCSS: [UInt8]
+        switch style?.mode {
+            case .scoped, .shadow: renderedCSS = CSSScoper.scope(cssBytes, scope: scope)
+            case .global: renderedCSS = cssBytes
+            case .none: renderedCSS = []
         }
-        sink.record(AssetSink.Entry(scope: scope, css: rendered))
+
+        var inlineScript: [UInt8] = []
+        var module: String?
+        switch script {
+            case .inline(let js): inlineScript = js.withUTF8Buffer { unsafe Array($0) }
+            case .module(let name): module = name.withUTF8Buffer { String(decoding: unsafe Array($0), as: UTF8.self) }
+            case .none: break
+        }
+        sink.record(AssetSink.Entry(scope: scope, css: renderedCSS, inlineScript: inlineScript, module: module))
         return scope
     }
 }

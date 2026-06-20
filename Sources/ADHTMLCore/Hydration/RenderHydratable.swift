@@ -50,9 +50,11 @@ extension HTML {
 
         let state = try WireSerializer.scriptBytes(cells: arena.cells, islands: islands)
         var out = sink.bytes
-        // Component-scoped CSS (Track 4): inject the deduped `<style>` BEFORE the state script — present in
-        // the initial response (no async load), so no-JS clients get the scoped styling and there is no FOUC.
+        // Component-scoped assets (Track 4): inject the deduped `<style>` + inline `<script>`s BEFORE the
+        // state script — present in the initial response (no async load), so no-JS clients get the scoped
+        // styling (no FOUC) and the mount scripts register before the runtime drives the bridge.
         out.append(contentsOf: assets.styleTag())
+        out.append(contentsOf: assets.scriptTag())
         out.append(contentsOf: Self.scriptOpen)
         out.append(contentsOf: state)
         out.append(contentsOf: Self.scriptClose)

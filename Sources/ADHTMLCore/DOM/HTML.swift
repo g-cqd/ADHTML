@@ -30,12 +30,18 @@ public protocol Component: HTML {
     /// `nil` (no asset). When set, the engine scopes + dedups the CSS, stamps a `data-component`/`data-scope`
     /// mount root, and `renderHydratable` injects one deduped `<style>` before the inline state script.
     static var style: ScopedStyle? { get }
+    /// Co-located component-scoped JavaScript (Track 4) — `.inline`/`.module`. Default `nil`. When set, the
+    /// engine stamps the `data-component` mount root (so the client `mount` bridge dispatches to the widget's
+    /// `ADH.mount(name, fn)`) and injects/serves the script. The widget's only network primitive is the
+    /// signed RFC-0019 endpoint; the `body` stays the no-JS fallback.
+    static var script: Script? { get }
 }
 
 extension Component {
     public static var isIsland: Bool { false }
     public static var hydration: LoadStrategy { .load }
     public static var style: ScopedStyle? { nil }
+    public static var script: Script? { nil }
 
     public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
         // Pure static render (no hydration): render the body directly — zero reactive bookkeeping.
@@ -54,9 +60,10 @@ extension Component {
         // (the body is the no-JS/SSR fallback). The wrapper's `data-scope` is the CSS ancestor; mount.js
         // (gated) dispatches over `data-component`.
         var mountRoot: (name: String, scope: String)?
-        if let style = Self.style, let sink = context.assets {
+        if Self.style != nil || Self.script != nil, let sink = context.assets {
             let name = String(describing: Self.self)
-            mountRoot = (name, ComponentAssets.record(style: style, typeName: name, into: sink))
+            let scope = ComponentAssets.record(style: Self.style, script: Self.script, typeName: name, into: sink)
+            mountRoot = (name, scope)
         }
         if let mountRoot {
             target.openTagStart("<div")

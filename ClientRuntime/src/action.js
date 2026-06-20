@@ -73,35 +73,23 @@ function applySwap(swap, html, target, doc) {
   else morph(target, html);
 }
 
-/** Perform one action: optimistic pre-apply, fetch with the `ADH-Request` header, then swap the response.
- * @param {Element} node @param {import("./wire").WireState} state @param {Document} doc
- * @returns {Promise<void>} */
-async function perform(node, state, doc) {
-  const method = (node.getAttribute(T.action) || "get").toUpperCase();
-  const url = node.getAttribute(T.url) || "";
-  const swap = node.getAttribute(T.swap) || S.morph;
-  const targetId =
-    node.getAttribute(T.target) ||
-    node.closest(`[${T.id}]`)?.getAttribute(T.id) ||
-    "";
-
-  // Optimistic: apply a client behavior to its cell immediately, before the network round-trip.
-  const optimistic = node.getAttribute(T.optimistic);
-  if (optimistic) {
-    const invocation = parseInvocation(optimistic);
-    if (invocation) applyBehavior(invocation, state.cells, node);
-  }
-
-  const params = collectParams(node, doc);
+/** The fetch + swap CORE, shared by the declarative action interpreter (`perform`) and the programmatic
+ * component-mount bridge (`ctx.action`, mount.js) — so a widget can ONLY reach the network through the
+ * signed RFC-0019 endpoint, with the `ADH-Request: 1` header (C1). Never throws (guarded by the callers).
+ * @param {{method?: string, url: string, params?: URLSearchParams, swap?: string, target?: Element | null}} req
+ * @param {Document} doc @returns {Promise<void>} */
+export async function request(req, doc) {
+  const method = (req.method || "get").toUpperCase();
+  const params = req.params ?? new URLSearchParams();
   const headers = { "ADH-Request": "1" };
   let response;
   try {
     if (method === "GET" || method === "DELETE") {
       const query = params.toString();
-      const full = query ? url + (url.includes("?") ? "&" : "?") + query : url;
+      const full = query ? req.url + (req.url.includes("?") ? "&" : "?") + query : req.url;
       response = await fetch(full, { method, headers, redirect: "follow" });
     } else {
-      response = await fetch(url, { method, headers, body: params, redirect: "follow" });
+      response = await fetch(req.url, { method, headers, body: params, redirect: "follow" });
     }
   } catch {
     return; // network error -> keep the optimistic state; a later action / SSE frame reconciles
@@ -109,5 +97,27 @@ async function perform(node, state, doc) {
   if (!response.ok) return;
   const html = await response.text();
   if (html.length > MAX_RESPONSE_CHARS) return;  // failure-safe: drop an oversized fragment, keep the page live
-  applySwap(swap, html, targetId ? doc.getElementById(targetId) : null, doc);
+  applySwap(req.swap || S.morph, html, req.target ?? null, doc);
+}
+
+/** Perform one declarative action: optimistic pre-apply, then the shared `request` core (fetch + swap).
+ * @param {Element} node @param {import("./wire").WireState} state @param {Document} doc
+ * @returns {Promise<void>} */
+function perform(node, state, doc) {
+  // Optimistic: apply a client behavior to its cell immediately, before the network round-trip.
+  const optimistic = node.getAttribute(T.optimistic);
+  if (optimistic) {
+    const invocation = parseInvocation(optimistic);
+    if (invocation) applyBehavior(invocation, state.cells, node);
+  }
+  const targetId = node.getAttribute(T.target) || node.closest(`[${T.id}]`)?.getAttribute(T.id) || "";
+  return request(
+    {
+      method: node.getAttribute(T.action) || "get",
+      url: node.getAttribute(T.url) || "",
+      swap: node.getAttribute(T.swap) || S.morph,
+      params: collectParams(node, doc),
+      target: targetId ? doc.getElementById(targetId) : null,
+    },
+    doc);
 }

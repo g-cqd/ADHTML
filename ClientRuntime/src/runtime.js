@@ -7,6 +7,7 @@
 import { actionTrigger, runAction } from "./action";
 import { applyBehavior, parseInvocation } from "./behaviors";
 import { boostClick, boostPopstate } from "./boost";
+import { mount, mountAll } from "./mount";
 import { morph } from "./morph";
 import { effect } from "./signals";
 import { T } from "./tokens";
@@ -263,7 +264,14 @@ export function hydrate(doc = document) {
     const stream = root.getAttribute(T.connect);
     if (stream) connect(stream, state, doc);
   }
+  // Track 4: after islands wire, run the programmatic mount bridge over `[data-component]` roots (a bespoke
+  // widget's enhancement). Lazy — one no-op `querySelectorAll` on a page that declares no components.
+  mountAll(doc);
 }
+
+// Expose the mount registry so a component's (CSP-nonced) inline/module script can `ADH.mount(name, fn)`.
+// Late registration (after hydrate) mounts immediately, so script-vs-runtime order does not matter.
+/** @type {{ ADH?: object }} */ (globalThis).ADH = { mount };
 
 /**
  * Subscribe to a Server-Sent Events endpoint and apply live updates. Two event types:

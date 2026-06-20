@@ -5,6 +5,7 @@
 // each pair reconciles its direct children, pushing matched element children for deeper reconciliation.
 // v1 reconciles positionally with id preference, which still yields a DOM that matches the new HTML.
 
+import { runCleanups } from "./mount";
 import { T } from "./tokens";
 
 /** @type {HTMLTemplateElement | undefined} */
@@ -110,6 +111,7 @@ function reconcileChildren(oldParent, newParent, work) {
   // Drop any old children the new HTML no longer has (matched/moved nodes are before the cursor).
   while (oldChild) {
     const nextOld = oldChild.nextSibling;
+    runCleanups(oldChild);  // Track 4: tear down a removed widget's mount (listeners/timers/observers)
     oldParent.removeChild(oldChild);
     oldChild = nextOld;
   }

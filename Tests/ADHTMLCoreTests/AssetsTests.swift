@@ -89,6 +89,19 @@ private struct StyledIsland: Component {
     var body: some HTML { div { "hi" }.class("w") }
 }
 
+// A component carrying both scoped CSS and an inline mount script (Track 4 A2).
+private struct ScriptedWidget: Component {
+    static var style: ScopedStyle? { ScopedStyle(".cnt { color: green }") }
+    static var script: Script? { .inline("ADH.mount('ScriptedWidget',(root,ctx)=>{})") }
+    var body: some HTML { div { "0" }.class("cnt") }
+}
+
+// A component carrying ONLY a script — a `data-component` mount root, no CSS, no wire cells.
+private struct ScriptOnlyWidget: Component {
+    static var script: Script? { .inline("ADH.mount('ScriptOnlyWidget',()=>{})") }
+    var body: some HTML { div { "x" } }
+}
+
 extension AssetsTests {
     private func render(_ html: some HTML, arena: CellArena = CellArena()) throws -> String {
         String(decoding: try html.renderHydratable(arena: arena), as: UTF8.self)
@@ -158,5 +171,28 @@ extension AssetsTests {
         #expect(!html.contains("data-0="))  // no mount root
         #expect(!html.contains("<style>"))  // no injected CSS
         #expect(html.contains(#"<article class="card"><h3>Hi</h3></article>"#))  // body is the fallback
+    }
+
+    @Test
+    func `a scripted component injects its inline script after the style, before the state`() throws {
+        let html = try render(ScriptedWidget())
+        let hash = try scopeHash(in: html)
+        #expect(html.contains(#"<div data-0="ScriptedWidget" data-1="\#(hash)">"#))
+        #expect(html.contains(#"<style>[data-1="\#(hash)"] .cnt { color: green }</style>"#))
+        #expect(html.contains("<script>ADH.mount('ScriptedWidget',(root,ctx)=>{})</script>"))
+        // Order: style, then the mount script, then the inline state — so the mount fn registers first.
+        let styleAt = try #require(html.firstRange(of: "<style>"))
+        let scriptAt = try #require(html.firstRange(of: "<script>ADH.mount"))
+        let stateAt = try #require(html.firstRange(of: #"id="adh-state""#))
+        #expect(styleAt.lowerBound < scriptAt.lowerBound)
+        #expect(scriptAt.lowerBound < stateAt.lowerBound)
+    }
+
+    @Test
+    func `a script-only component stamps a mount root and injects the script with no style`() throws {
+        let html = try render(ScriptOnlyWidget())
+        #expect(html.contains(#"data-0="ScriptOnlyWidget""#))  // the mount root (so the bridge dispatches)
+        #expect(html.contains("<script>ADH.mount('ScriptOnlyWidget',()=>{})</script>"))
+        #expect(!html.contains("<style>"))  // no CSS → no <style>
     }
 }
