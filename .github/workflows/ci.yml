@@ -7,9 +7,9 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore: ["**/*.md", "LICENSE", ".gitignore", "docs/**", "ClientRuntime/**"]
+    paths-ignore: ["**/*.md", "LICENSE", ".gitignore", "docs/**"]
   pull_request:
-    paths-ignore: ["**/*.md", "LICENSE", ".gitignore", "docs/**", "ClientRuntime/**"]
+    paths-ignore: ["**/*.md", "LICENSE", ".gitignore", "docs/**"]
   workflow_dispatch:
 
 permissions:
@@ -181,7 +181,8 @@ jobs:
 
   runtime:
     name: Client runtime (bun)
-    # The hand-written JS hydration runtime: unit-test the DOM-free core, build + gate its gzip size
+    # The hand-written JS hydration runtime: strict typecheck, unit-test the DOM-free core + the DOM
+    # layer (delegated events, bindings, visible, morph) under happy-dom, build + gate its gzip size
     # (<= 6 KiB, ADR-0006), and verify the committed minified artifact is in sync with source.
     runs-on: ubuntu-latest
     steps:
@@ -189,7 +190,13 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: "1.3.14"
-      - name: Test (DOM-free core)
+      - name: Install (frozen lockfile)
+        run: bun install --frozen-lockfile
+        working-directory: ClientRuntime
+      - name: Typecheck (tsc, strict)
+        run: bun run typecheck
+        working-directory: ClientRuntime
+      - name: Test (DOM-free core + happy-dom DOM layer)
         run: bun test
         working-directory: ClientRuntime
       - name: Build + gzip size gate

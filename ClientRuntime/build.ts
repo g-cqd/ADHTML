@@ -26,3 +26,5 @@ if (gzipped.length > BUDGET_BYTES) {
   process.exit(1);
 }
 console.log(`OK: within the ${BUDGET_BYTES / 1024} KiB gzip budget`);
+
+export {}  // make this a module (top-level await + isolated build script)

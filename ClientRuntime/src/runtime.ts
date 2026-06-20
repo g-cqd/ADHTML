@@ -5,6 +5,7 @@
 // is browser-validated (smoke tests are the one remaining gap — see README).
 
 import { applyBehavior, parseInvocation } from "./behaviors";
+import { morph } from "./morph";
 import { type Signal, effect } from "./signals";
 import { type WireState, readState } from "./wire";
 
@@ -45,11 +46,30 @@ function wireIsland(root: Element, cells: Array<Signal<unknown>>): void {
   for (const type of DELEGATED_EVENTS) delegate(root, type, cells);
 }
 
+/** Wire when `root` first scrolls into view (`IntersectionObserver`); falls back to immediate if the API
+ * is missing (old/headless environments) — correct, just not lazy. */
+function observeVisible(root: Element, wire: () => void): void {
+  if (typeof IntersectionObserver === "undefined") {
+    wire();
+    return;
+  }
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        observer.disconnect();
+        wire();
+        return;
+      }
+    }
+  });
+  observer.observe(root);
+}
+
 /** Run `wire` per the island's `data-adh-on` loading contract (Astro-style directive). */
-function schedule(on: string, wire: () => void): void {
+function schedule(on: string, root: Element, wire: () => void): void {
   const idle = (globalThis as { requestIdleCallback?: (cb: () => void) => void }).requestIdleCallback;
   if (on === "idle") idle ? idle(wire) : setTimeout(wire, 1);
-  else if (on === "visible") wire()  // TODO: IntersectionObserver (deferred — immediate is correct, not lazy)
+  else if (on === "visible") observeVisible(root, wire);
   else if (on.startsWith("media:")) { if (matchMedia(on.slice(6)).matches) wire() }
   else wire()  // "load"
 }
@@ -60,21 +80,30 @@ export function hydrate(doc: Document = document): void {
   if (!state) return;
   for (const island of state.islands) {
     const root = doc.querySelector(`[data-adh-id="${CSS.escape(island.id)}"]`);
-    if (root) schedule(island.on, () => wireIsland(root, state.cells));
+    if (root) schedule(island.on, root, () => wireIsland(root, state.cells));
   }
 }
 
 /**
- * Subscribe to a Server-Sent Events endpoint: a `patch` event carries `{ cells: { <index>: { v } } }`
- * applied to the matching signals. (A `morph` HTML-swap handler is a follow-up.) Requires ADServe SSE
- * support — see docs/integration/adserve-requirements.md.
+ * Subscribe to a Server-Sent Events endpoint and apply live updates. Two event types:
+ * - `patch`: `{ cells: { <index>: { v } } }` — sets the matching signals (fine-grained cell update).
+ * - `morph`: `{ id, html }` — reconciles the island `[data-adh-id="<id>"]`'s subtree to `html`
+ *   (out-of-band HTML swap, preserving focus/state by id; see morph.ts).
+ * Requires ADServe SSE support — see docs/integration/adserve-requirements.md.
  */
-export function connect(url: string, state: WireState): EventSource {
+export function connect(url: string, state: WireState, doc: Document = document): EventSource {
   const source = new EventSource(url);
   source.addEventListener("patch", (event) => {
     const data = JSON.parse((event as MessageEvent).data) as { cells?: Record<string, { v: unknown }> };
     for (const [index, change] of Object.entries(data.cells ?? {})) {
       state.cells[Number(index)]?.set(change.v);
+    }
+  });
+  source.addEventListener("morph", (event) => {
+    const data = JSON.parse((event as MessageEvent).data) as { id?: string; html?: string };
+    if (data.id && typeof data.html === "string") {
+      const target = doc.querySelector(`[data-adh-id="${CSS.escape(data.id)}"]`);
+      if (target) morph(target, data.html);
     }
   });
   return source;
