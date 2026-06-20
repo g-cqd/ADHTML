@@ -8,6 +8,7 @@ import { actionTrigger, runAction } from "./action";
 import { applyBehavior, parseInvocation } from "./behaviors";
 import { morph } from "./morph";
 import { effect } from "./signals";
+import { T } from "./tokens";
 import { readState } from "./wire";
 
 const BIND_TARGETS = ["text", "value", "class"];
@@ -17,7 +18,7 @@ const DELEGATED_EVENTS = [
   "click", "dblclick", "input", "change", "keydown", "keyup", "keypress", "focusin", "focusout",
   "pointerdown", "pointerup", "mousedown", "mouseup", "mouseover", "mouseout", "contextmenu",
 ];
-const BIND_SELECTOR = "[data-adh-bind\\:text],[data-adh-bind\\:value],[data-adh-bind\\:class]";
+const BIND_SELECTOR = `[${T.bind}\\:text],[${T.bind}\\:value],[${T.bind}\\:class]`;
 
 // Islands that have wired. The document-level delegated listener checks this so a lazy island
 // (`visible`/`idle`/`media`) stays inert until it actually loads.
@@ -29,7 +30,7 @@ function bindElements(root, cells) {
   // One combined query for all bind targets (vs one querySelectorAll per target).
   for (const element of root.querySelectorAll(BIND_SELECTOR)) {
     for (const target of BIND_TARGETS) {
-      const ref = element.getAttribute(`data-adh-bind:${target}`);
+      const ref = element.getAttribute(`${T.bind}:${target}`);
       if (ref === null) continue;
       const cell = cells[Number(ref)];
       if (!cell) continue;
@@ -51,8 +52,8 @@ function bindElements(root, cells) {
  *    remove it when falsy (the content is absent without JS — the on-demand-reveal fallback).
  * @param {Element} root @param {Array<import("./signals").Signal<unknown>>} cells @returns {void} */
 function bindDirectives(root, cells) {
-  for (const element of root.querySelectorAll("[data-adh-class]")) {
-    for (const pair of (element.getAttribute("data-adh-class") ?? "").split(";")) {
+  for (const element of root.querySelectorAll(`[${T.classToggle}]`)) {
+    for (const pair of (element.getAttribute(T.classToggle) ?? "").split(";")) {
       const at = pair.lastIndexOf(":");
       if (at < 1) continue;
       const name = pair.slice(0, at);
@@ -60,12 +61,12 @@ function bindDirectives(root, cells) {
       if (cell) effect(() => element.classList.toggle(name, !!cell.get()));
     }
   }
-  for (const element of root.querySelectorAll("[data-adh-show]")) {
-    const cell = cells[Number(element.getAttribute("data-adh-show"))];
+  for (const element of root.querySelectorAll(`[${T.show}]`)) {
+    const cell = cells[Number(element.getAttribute(T.show))];
     if (cell) effect(() => void (/** @type {HTMLElement} */ (element).style.display = cell.get() ? "" : "none"));
   }
-  for (const template of root.querySelectorAll("template[data-adh-if]")) {
-    const cell = cells[Number(template.getAttribute("data-adh-if"))];
+  for (const template of root.querySelectorAll(`template[${T.if}]`)) {
+    const cell = cells[Number(template.getAttribute(T.if))];
     if (!cell) continue;
     /** @type {ChildNode[]} */
     let mounted = [];
@@ -83,8 +84,8 @@ function bindDirectives(root, cells) {
   }
   // P1: two-way binding (`v-model`). The `input` event sets the cell; an effect writes the cell back to
   // `element.value` (a programmatic change updates the field). The `!==` guard avoids a cursor jump on echo.
-  for (const element of root.querySelectorAll("[data-adh-model]")) {
-    const cell = cells[Number(element.getAttribute("data-adh-model"))];
+  for (const element of root.querySelectorAll(`[${T.model}]`)) {
+    const cell = cells[Number(element.getAttribute(T.model))];
     if (!cell) continue;
     const input = /** @type {HTMLInputElement} */ (element);
     effect(() => {
@@ -98,12 +99,12 @@ function bindDirectives(root, cells) {
   // reconciles them via morph — the template stays the first child (matched positionally), rows match by
   // key/position, so identity + focus survive a re-filter. Each row's `[data-adh-each-text]` slots take
   // the element's (escaped) text.
-  for (const template of root.querySelectorAll("template[data-adh-each]")) {
-    const cell = cells[Number(template.getAttribute("data-adh-each"))];
+  for (const template of root.querySelectorAll(`template[${T.each}]`)) {
+    const cell = cells[Number(template.getAttribute(T.each))];
     const parent = template.parentElement;
     const rowEl = /** @type {HTMLTemplateElement} */ (template).content.firstElementChild;
     if (!cell || !parent || !rowEl) continue;
-    const filterRef = template.getAttribute("data-adh-filter");
+    const filterRef = template.getAttribute(T.filter);
     const filterCell = filterRef ? cells[Number(filterRef)] : null;
     effect(() => {
       const items = /** @type {unknown[]} */ (cell.get());
@@ -113,7 +114,7 @@ function bindDirectives(root, cells) {
         const item = String(raw);
         if (query !== null && !item.toLowerCase().includes(query)) continue;
         const row = /** @type {Element} */ (rowEl.cloneNode(true));
-        for (const slot of row.querySelectorAll("[data-adh-each-text]")) slot.textContent = item;
+        for (const slot of row.querySelectorAll(`[${T.eachText}]`)) slot.textContent = item;
         html += row.outerHTML;
       }
       morph(parent, html);
@@ -125,7 +126,7 @@ function bindDirectives(root, cells) {
  * filter (P4). A filter on a non-keyboard event never matches (its `key` is undefined).
  * @param {Element} node @param {Event} event @returns {boolean} */
 function keyMatches(node, event) {
-  const keys = node.getAttribute("data-adh-keys");
+  const keys = node.getAttribute(T.keys);
   return !keys || keys.split(",").includes(/** @type {KeyboardEvent} */ (event).key);
 }
 
@@ -133,7 +134,7 @@ function keyMatches(node, event) {
  * behaviors and actions: a `visible`/`idle` island stays inert until it actually loads.
  * @param {Element} node @returns {boolean} */
 function delivers(node) {
-  const island = node.closest("[data-adh-id]");
+  const island = node.closest(`[${T.id}]`);
   return !island || wired.has(island);
 }
 
@@ -147,14 +148,14 @@ function delivers(node) {
 function delegated(type, state, event, doc) {
   const start = event.target;
   if (!(start instanceof Element)) return;
-  const onNode = start.closest(`[data-adh-on\\:${type}]`);
+  const onNode = start.closest(`[${T.on}\\:${type}]`);
   if (onNode && delivers(onNode) && keyMatches(onNode, event)) {  // lazy island / key filter -> inert
-    const invocation = parseInvocation(onNode.getAttribute(`data-adh-on:${type}`) ?? "");
+    const invocation = parseInvocation(onNode.getAttribute(`${T.on}:${type}`) ?? "");
     if (invocation) applyBehavior(invocation, state.cells, onNode);
-    if (onNode.hasAttribute("data-adh-prevent")) event.preventDefault();
-    if (onNode.hasAttribute("data-adh-stop")) event.stopPropagation();
+    if (onNode.hasAttribute(T.prevent)) event.preventDefault();
+    if (onNode.hasAttribute(T.stop)) event.stopPropagation();
   }
-  const actionNode = start.closest("[data-adh-action]");
+  const actionNode = start.closest(`[${T.action}]`);
   if (actionNode && delivers(actionNode) && actionTrigger(actionNode) === type) {
     runAction(actionNode, state, doc);
   }
@@ -167,7 +168,7 @@ function delegated(type, state, event, doc) {
 function onSubmit(state, event, doc) {
   const start = event.target;
   if (!(start instanceof Element)) return;
-  const node = start.closest("[data-adh-action]");
+  const node = start.closest(`[${T.action}]`);
   if (!node || !delivers(node) || actionTrigger(node) !== "submit") return;
   event.preventDefault();
   runAction(node, state, doc);
@@ -226,8 +227,8 @@ export function hydrate(doc = document) {
   // One DOM query for all island roots, mapped by id (vs a full-document search per island).
   /** @type {Map<string, Element>} */
   const roots = new Map();
-  for (const element of doc.querySelectorAll("[data-adh-id]")) {
-    const id = element.getAttribute("data-adh-id");
+  for (const element of doc.querySelectorAll(`[${T.id}]`)) {
+    const id = element.getAttribute(T.id);
     if (id !== null) roots.set(id, element);
   }
   for (const island of state.islands) {
@@ -242,7 +243,7 @@ export function hydrate(doc = document) {
     });
     // Declarative SSE (RFC-0019 §6.3-H, contract C5): an island carrying `data-adh-connect` subscribes to
     // a server morph/patch stream, so live cross-client updates flow in (pushed, not polled).
-    const stream = root.getAttribute("data-adh-connect");
+    const stream = root.getAttribute(T.connect);
     if (stream) connect(stream, state, doc);
   }
 }
@@ -271,7 +272,7 @@ export function connect(url, state, doc = document) {
   source.addEventListener("morph", (event) => {
     const data = /** @type {{id?: string, html?: string} | null} */ (parseEventData(event));
     if (data && data.id && typeof data.html === "string") {
-      const target = doc.querySelector(`[data-adh-id="${CSS.escape(data.id)}"]`);
+      const target = doc.querySelector(`[${T.id}="${CSS.escape(data.id)}"]`);
       if (target) morph(target, data.html);
     }
   });

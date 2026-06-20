@@ -170,6 +170,23 @@ let package = Package(
         // depends only on Foundation (a dev-time tool, never shipped in a library product).
         .executableTarget(name: "ADHTMLCodegen", swiftSettings: strictSettings),
 
+        // The Swift-side generator for the shared wire-attribute vocabulary (RFC-0021 / ADR-0007). Reads
+        // `wire-tokens.json` and regenerates BOTH `WireTokens.swift` (the renderer's constants) and
+        // `ClientRuntime/src/tokens.js` (the runtime's constants) from one source — generation lives on
+        // the Swift side, not in a JS script. A command plugin (not a build plugin) so it never runs
+        // during a normal `swift build`: invoke `swift package --allow-writing-to-package-directory
+        // generate-wire-tokens`. The committed outputs are guarded by parity tests on both sides.
+        .plugin(
+            name: "GenerateWireTokens",
+            capability: .command(
+                intent: .custom(
+                    verb: "generate-wire-tokens",
+                    description: "Regenerate the shared wire-token constants (Swift + JS) from wire-tokens.json"),
+                permissions: [
+                    .writeToPackageDirectory(
+                        reason: "Regenerate WireTokens.swift and ClientRuntime/src/tokens.js from wire-tokens.json")
+                ])),
+
         // A lightweight, network-free release perf probe over ADHTMLCore (no swift-syntax / DEV deps).
         // Run: `swift run -c release ADHTMLPerfProbe`. Complements the ordo-one suite (the CI gate with
         // mallocCountTotal) for quick local before/after wall-clock measurement. Not a product.

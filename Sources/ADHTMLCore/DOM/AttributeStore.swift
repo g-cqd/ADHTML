@@ -28,7 +28,7 @@ public struct AttributeStore: Sendable {
                 case "class": storage[index].value += " " + value
                 // `style` and the class-merge directive both accumulate `;`-separated (the P2 wire is
                 // `name:cell;name2:cell2`, so repeated `.classToggle` coalesces into one attribute).
-                case "style", "data-adh-class": storage[index].value += ";" + value
+                case "style", WireToken.classToggle: storage[index].value += ";" + value
                 default: storage[index] = Entry(name: name, value: value, context: context)
             }
             return

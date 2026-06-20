@@ -4,20 +4,20 @@ import Testing
 
 struct BindingsTests {
     @Test
-    func `typed DOM events render data-adh-on with the event name`() {
+    func `typed DOM events render c with the event name`() {
         let arena = CellArena()
         let count = arena.signal(0)
         #expect(
             button { "+" }.on(.click, Behavior.increment(count)).render()
-                == #"<button data-adh-on:click="increment#0#1">+</button>"#
+                == #"<button c:click="increment#0#1">+</button>"#
         )
         #expect(
             input().on(.focusIn, Behavior.set(count, to: 1)).render()
-                == #"<input data-adh-on:focusin="set#0#1">"#
+                == #"<input c:focusin="set#0#1">"#
         )
         #expect(
             div { "x" }.on(.custom("dragend"), Behavior.toggle(arena.signal(false))).render()
-                == #"<div data-adh-on:dragend="toggle#1">x</div>"#
+                == #"<div c:dragend="toggle#1">x</div>"#
         )
     }
 
@@ -27,12 +27,12 @@ struct BindingsTests {
         let count = arena.signal(7)
         #expect(
             span { "7" }.bind(.text, to: count).render()
-                == #"<span data-adh-bind:text="0">7</span>"#
+                == #"<span e:text="0">7</span>"#
         )
         let doubled = arena.computed(count.reactive * 2)
         #expect(
             span { "14" }.bind(.text, to: doubled).render()
-                == #"<span data-adh-bind:text="1">14</span>"#
+                == #"<span e:text="1">14</span>"#
         )
     }
 

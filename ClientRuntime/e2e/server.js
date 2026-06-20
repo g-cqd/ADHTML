@@ -17,14 +17,14 @@ const STATE = JSON.stringify({
 });
 
 const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>adh e2e</title></head><body>
-  <div data-adh-island data-adh-id="counter" data-adh-on="load">
-    <button id="inc" data-adh-on:click="increment#0#1">+</button>
-    <span id="count" data-adh-bind:text="0">0</span>
+  <div a b="counter" c="load">
+    <button id="inc" c:click="increment#0#1">+</button>
+    <span id="count" e:text="0">0</span>
   </div>
   <div style="height:2000px">spacer (pushes the lazy island below the fold)</div>
-  <div data-adh-island data-adh-id="lazy" data-adh-on="visible">
-    <button id="lazy-inc" data-adh-on:click="increment#1#1">+</button>
-    <span id="lazy-count" data-adh-bind:text="1">0</span>
+  <div a b="lazy" c="visible">
+    <button id="lazy-inc" c:click="increment#1#1">+</button>
+    <span id="lazy-count" e:text="1">0</span>
   </div>
   <script type="application/adh-state+json" id="adh-state">${STATE}</script>
   <script type="module" src="/adh-runtime.min.js"></script>
@@ -42,9 +42,9 @@ const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf<
   const N = 500;
   let html = "";
   for (let i = 0; i < N; i++) {
-    html += '<div data-adh-island data-adh-id="c' + i + '" data-adh-on="load">' +
-      '<button data-adh-on:click="increment#' + i + '#1"><span class="hit">+</span></button>' +
-      '<output data-adh-bind:text="' + i + '">0</output></div>';
+    html += '<div a b="c' + i + '" c="load">' +
+      '<button c:click="increment#' + i + '#1"><span class="hit">+</span></button>' +
+      '<output e:text="' + i + '">0</output></div>';
   }
   const cells = Array.from({ length: N }, () => '{"$":"sig","v":0}').join(",");
   const islands = Array.from({ length: N }, (_, i) => '{"id":"c' + i + '","on":"load","scope":[' + i + ']}').join(",");
@@ -56,7 +56,7 @@ const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf<
   window.__hydrateMs = performance.now() - t0;
 
   // Interaction latency: dispatch CLICKS clicks at a nested element inside c0's button.
-  const hit = document.querySelector('[data-adh-id="c0"] .hit');
+  const hit = document.querySelector('[b="c0"] .hit');
   const CLICKS = 2000;
   const t1 = performance.now();
   for (let i = 0; i < CLICKS; i++) hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -81,12 +81,12 @@ const ACTIONS_STATE = JSON.stringify({
   ],
 });
 const ACTIONS_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>actions</title></head><body>
-  <div data-adh-island data-adh-id="search-isle" data-adh-on="load">
-    <input id="q" name="q" data-adh-action="get" data-adh-url="/rows"
-           data-adh-trigger="input" data-adh-debounce="30" data-adh-target="rows">
+  <div a b="search-isle" c="load">
+    <input id="q" name="q" p="get" q="/rows"
+           r="input" s="30" u="rows">
   </div>
   <ul id="rows"><li id="r-initial">initial</li></ul>
-  <div data-adh-island data-adh-id="live" data-adh-on="load" data-adh-connect="/stream">
+  <div a b="live" c="load" d="/stream">
     <span id="live-text">waiting</span>
   </div>
   <script type="application/adh-state+json" id="adh-state">${ACTIONS_STATE}</script>

@@ -15,9 +15,9 @@ struct ActionTests {
                     .get("/parts/rows").trigger(.input).debounce(.milliseconds(200)).target("parts-rows")
                 )
                 .render()
-                == #"<input name="search" data-adh-action="get" data-adh-url="/parts/rows" "#
-                + #"data-adh-trigger="input" data-adh-debounce="200" data-adh-target="parts-rows" "#
-                + #"data-adh-swap="morph">"#
+                == #"<input name="search" p="get" q="/parts/rows" "#
+                + #"r="input" s="200" u="parts-rows" "#
+                + #"v="morph">"#
         )
     }
 
@@ -25,7 +25,7 @@ struct ActionTests {
     func `swap defaults to morph and is emitted explicitly`() {
         #expect(
             div { "x" }.action(.get("/x")).render()
-                == #"<div data-adh-action="get" data-adh-url="/x" data-adh-swap="morph">x</div>"#
+                == #"<div p="get" q="/x" v="morph">x</div>"#
         )
     }
 
@@ -34,8 +34,8 @@ struct ActionTests {
         #expect(
             input().action(.get("/manufacturers/options").include("q", "kind").swap(.append).target("opts"))
                 .render()
-                == #"<input data-adh-action="get" data-adh-url="/manufacturers/options" "#
-                + #"data-adh-include="q,kind" data-adh-target="opts" data-adh-swap="append">"#
+                == #"<input p="get" q="/manufacturers/options" "#
+                + #"t="q,kind" u="opts" v="append">"#
         )
     }
 
@@ -49,8 +49,8 @@ struct ActionTests {
                     .delete("/parts/1/manufacturers/2").target("mfr-chips").optimistic(Behavior.toggle(pending))
                 )
                 .render()
-                == #"<button data-adh-action="delete" data-adh-url="/parts/1/manufacturers/2" "#
-                + #"data-adh-target="mfr-chips" data-adh-swap="morph" data-adh-optimistic="toggle#0">remove</button>"#
+                == #"<button p="delete" q="/parts/1/manufacturers/2" "#
+                + #"u="mfr-chips" v="morph" w="toggle#0">remove</button>"#
         )
     }
 
@@ -58,8 +58,8 @@ struct ActionTests {
     func `inline auto-save uses change + out-of-band swap (example D)`() {
         #expect(
             input().action(.post("/parts/1").trigger(.change).swap(.outOfBand)).render()
-                == #"<input data-adh-action="post" data-adh-url="/parts/1" "#
-                + #"data-adh-trigger="change" data-adh-swap="outOfBand">"#
+                == #"<input p="post" q="/parts/1" "#
+                + #"r="change" v="outOfBand">"#
         )
     }
 
@@ -67,7 +67,7 @@ struct ActionTests {
     func `debounce converts a Duration to whole milliseconds`() {
         #expect(
             input().action(.get("/x").debounce(.seconds(1))).render()
-                == #"<input data-adh-action="get" data-adh-url="/x" data-adh-debounce="1000" data-adh-swap="morph">"#
+                == #"<input p="get" q="/x" s="1000" v="morph">"#
         )
         #expect(Action.get("/x").debounce(.milliseconds(150)).debounceMilliseconds == 150)
         #expect(Action.get("/x").debounceMilliseconds == nil)
@@ -85,13 +85,13 @@ struct ActionTests {
     }
 
     @Test
-    func `every verb lowers to its data-adh-action token (exhaustive)`() {
+    func `every verb lowers to its p token (exhaustive)`() {
         let cases: [(Action, String)] = [
             (.get("/p"), "get"), (.post("/p"), "post"), (.put("/p"), "put"),
             (.patch("/p"), "patch"), (.delete("/p"), "delete")
         ]
         for (action, verb) in cases {
-            #expect(div {}.action(action).render().contains(##"data-adh-action="\##(verb)""##))
+            #expect(div {}.action(action).render().contains(##"p="\##(verb)""##))
         }
     }
 
@@ -103,7 +103,7 @@ struct ActionTests {
             (.morph, "morph"), (.innerHTML, "innerHTML"), (.append, "append"), (.outOfBand, "outOfBand")
         ]
         for (mode, raw) in modes {
-            #expect(div {}.action(.get("/p").swap(mode)).render().contains(##"data-adh-swap="\##(raw)""##))
+            #expect(div {}.action(.get("/p").swap(mode)).render().contains(##"v="\##(raw)""##))
         }
     }
 }

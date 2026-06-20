@@ -38,9 +38,9 @@ struct ComponentMacroTests {
         let html = String(decoding: try MacroCounter().renderHydratable(arena: arena), as: UTF8.self)
 
         // No Island/scope/.id authored — the component became an island automatically (inferred scope).
-        #expect(html.contains(#"<div data-adh-island data-adh-id="c1" data-adh-on="load">"#))
-        #expect(html.contains(#"data-adh-on:click="increment#0#1""#))
-        #expect(html.contains(#"<span data-adh-bind:text="0">0</span>"#))
+        #expect(html.contains(#"<div a b="c1" c="load">"#))
+        #expect(html.contains(#"c:click="increment#0#1""#))
+        #expect(html.contains(#"<span e:text="0">0</span>"#))
         #expect(html.contains(#"<script type="application/adh-state+json" id="adh-state">"#))
 
         // The three `countSignal` reads dedup to one cell, registered in the passed arena.
@@ -52,7 +52,7 @@ struct ComponentMacroTests {
     func `@State carries a non-default initial value`() throws {
         let arena = CellArena()
         let html = String(decoding: try MacroCounter(count: 42).renderHydratable(arena: arena), as: UTF8.self)
-        #expect(html.contains(#"<span data-adh-bind:text="0">42</span>"#))
+        #expect(html.contains(#"<span e:text="0">42</span>"#))
         #expect(arena.cells[0].value == .int(42))
     }
 
@@ -60,7 +60,7 @@ struct ComponentMacroTests {
     func `@State infers String and respects an explicit Bool type`() throws {
         let arena = CellArena()
         let html = String(decoding: try MacroToggle().renderHydratable(arena: arena), as: UTF8.self)
-        #expect(html.contains(#"data-adh-on:click="toggle#0""#))
+        #expect(html.contains(#"c:click="toggle#0""#))
         #expect(html.contains(">off</button>"))
 
         #expect(arena.cells.count == 2)
@@ -79,8 +79,8 @@ struct ComponentMacroTests {
             .renderHydratable(arena: arena),
             as: UTF8.self)
         // Each instance is its own island (distinct ids), each with its own cell.
-        #expect(html.contains(#"data-adh-id="c1""#))
-        #expect(html.contains(#"data-adh-id="c2""#))
+        #expect(html.contains(#"b="c1""#))
+        #expect(html.contains(#"b="c2""#))
         #expect(arena.cells.count == 2)
         #expect(arena.cells[0].value == .int(1))
         #expect(arena.cells[1].value == .int(2))

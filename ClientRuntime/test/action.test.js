@@ -1,7 +1,7 @@
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 
-// Browser-in-the-loop tests for the action interpreter (RFC-0019 §6.3-G): the `data-adh-action` branch of
+// Browser-in-the-loop tests for the action interpreter (RFC-0019 §6.3-G): the `p` branch of
 // the delegated listener, fetch with the `ADH-Request` header (C1), and the swap apply (C2/C3). `fetch` is
 // stubbed so we assert the exact request shape and that the response is morphed into the target — the glue
 // the Swift render test can't reach. Real-network + real-layout coverage is the Playwright e2e suite.
@@ -53,9 +53,9 @@ function mount(html) {
 test("a GET action fetches with the ADH-Request header + query string, then morphs the target", async () => {
   stubFetch(`<li id="r1">A</li><li id="r2">B</li>`);
   const doc = mount(`
-    <div data-adh-island data-adh-id="isle" data-adh-on="load">
-      <input name="q" value="ab" data-adh-action="get" data-adh-url="/rows"
-             data-adh-trigger="input" data-adh-target="rows" data-adh-swap="morph">
+    <div a b="isle" c="load">
+      <input name="q" value="ab" p="get" q="/rows"
+             r="input" u="rows" v="morph">
     </div>
     <ul id="rows"><li id="r0">old</li></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -75,9 +75,9 @@ test("a GET action fetches with the ADH-Request header + query string, then morp
 test("debounce coalesces a burst of triggers into a single request", async () => {
   stubFetch(`<li>x</li>`);
   const doc = mount(`
-    <div data-adh-island data-adh-id="isle" data-adh-on="load">
-      <input name="q" value="z" data-adh-action="get" data-adh-url="/rows"
-             data-adh-trigger="input" data-adh-debounce="20" data-adh-target="rows">
+    <div a b="isle" c="load">
+      <input name="q" value="z" p="get" q="/rows"
+             r="input" s="20" u="rows">
     </div>
     <ul id="rows"></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -94,10 +94,10 @@ test("debounce coalesces a burst of triggers into a single request", async () =>
 test("optimistic applies a behavior to its cell instantly, before the response arrives", async () => {
   stubFetch(`<span>ignored</span>`);
   const doc = mount(`
-    <div data-adh-island data-adh-id="isle" data-adh-on="load">
-      <span id="flag" data-adh-bind:text="0">false</span>
-      <button data-adh-action="delete" data-adh-url="/x" data-adh-optimistic="toggle#0"
-              data-adh-target="t">remove</button>
+    <div a b="isle" c="load">
+      <span id="flag" e:text="0">false</span>
+      <button p="delete" q="/x" w="toggle#0"
+              u="t">remove</button>
     </div>
     <div id="t"></div>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"isle","on":"load","scope":[0]}]}</script>`);
@@ -113,8 +113,8 @@ test("optimistic applies a behavior to its cell instantly, before the response a
 test("a failed response is isolated — the target is untouched and nothing throws", async () => {
   stubFetch(`<li id="new">nope</li>`, false); // 500
   const doc = mount(`
-    <div data-adh-island data-adh-id="isle" data-adh-on="load">
-      <button data-adh-action="get" data-adh-url="/rows" data-adh-target="rows">go</button>
+    <div a b="isle" c="load">
+      <button p="get" q="/rows" u="rows">go</button>
     </div>
     <ul id="rows"><li id="keep">keep</li></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -128,11 +128,11 @@ test("a failed response is isolated — the target is untouched and nothing thro
 });
 
 test("an out-of-band swap morphs each response region (attributes + children) by id", async () => {
-  stubFetch(`<span data-adh-oob="pill" class="saved">Saved</span>`);
+  stubFetch(`<span x="pill" class="saved">Saved</span>`);
   const doc = mount(`
-    <div data-adh-island data-adh-id="isle" data-adh-on="load">
-      <input name="title" value="x" data-adh-action="post" data-adh-url="/save"
-             data-adh-trigger="change" data-adh-swap="outOfBand">
+    <div a b="isle" c="load">
+      <input name="title" value="x" p="post" q="/save"
+             r="change" v="outOfBand">
     </div>
     <span id="pill" class="idle">Idle</span>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);
@@ -147,14 +147,14 @@ test("an out-of-band swap morphs each response region (attributes + children) by
 
 test("actionTrigger defaults: a <form> triggers on submit, anything else on click; explicit wins", () => {
   const form = document.createElement("form");
-  form.setAttribute("data-adh-action", "post");
+  form.setAttribute("p", "post");
   expect(actionTrigger(form)).toBe("submit");
 
   const button = document.createElement("button");
-  button.setAttribute("data-adh-action", "delete");
+  button.setAttribute("p", "delete");
   expect(actionTrigger(button)).toBe("click");
 
-  button.setAttribute("data-adh-trigger", "change");
+  button.setAttribute("r", "change");
   expect(actionTrigger(button)).toBe("change");
 });
 
@@ -166,8 +166,8 @@ test("ACTION_METHODS mirrors the Swift Action.methods verb set (parity)", () => 
 test("an oversized action response is dropped before the DOM is touched (failure-safe size cap)", async () => {
   stubFetch("x".repeat(2 * 1024 * 1024 + 1));  // just over the 2 MiB cap
   const doc = mount(`
-    <div data-adh-island data-adh-id="isle" data-adh-on="load">
-      <button data-adh-action="get" data-adh-url="/big" data-adh-target="rows">go</button>
+    <div a b="isle" c="load">
+      <button p="get" q="/big" u="rows">go</button>
     </div>
     <ul id="rows"><li id="keep">keep</li></ul>
     <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[{"id":"isle","on":"load","scope":[]}]}</script>`);

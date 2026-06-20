@@ -42,14 +42,14 @@ struct ImplicitIslandTests {
     @Test
     func `a static component renders inline — no island, no JS`() throws {
         let html = String(decoding: try StaticCard(title: "Hi").renderHydratable(arena: CellArena()), as: UTF8.self)
-        #expect(!html.contains("data-adh-island"))
+        #expect(!html.contains("<div a"))  // no island root (the bare `a` marker) — renders inline
         #expect(html.contains("<article><h3>Hi</h3></article>"))
     }
 
     @Test
     func `the hydration override makes the implicit island lazy`() throws {
         let html = String(decoding: try LazyCounter().renderHydratable(arena: CellArena()), as: UTF8.self)
-        #expect(html.contains(#"<div data-adh-island data-adh-id="c1" data-adh-on="visible">"#))
+        #expect(html.contains(#"<div a b="c1" c="visible">"#))
     }
 
     @Test
@@ -58,7 +58,7 @@ struct ImplicitIslandTests {
         let html = String(decoding: try Sum().renderHydratable(arena: arena), as: UTF8.self)
 
         // a=cell0 (behavior), b=cell1 (in total), total=cell2 (the registered computed); value 2+3 = 5.
-        #expect(html.contains(#"<output data-adh-bind:text="2">5</output>"#))
+        #expect(html.contains(#"<output e:text="2">5</output>"#))
         #expect(arena.cells.count == 3)
         guard case .computed(_, let expr) = arena.cells[2].kind else {
             Issue.record("cell 2 should be a computed")

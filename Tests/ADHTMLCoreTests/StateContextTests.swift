@@ -27,8 +27,8 @@ struct StateContextTests {
         let html = String(decoding: try Counter().renderHydratable(arena: arena), as: UTF8.self)
 
         // The stored default reaches the markup; the binding + behavior both point at cell #0.
-        #expect(html.contains(#"data-adh-on:click="increment#0#1""#))
-        #expect(html.contains(#"<span data-adh-bind:text="0">0</span>"#))
+        #expect(html.contains(#"c:click="increment#0#1""#))
+        #expect(html.contains(#"<span e:text="0">0</span>"#))
 
         // `countSignal` is read three times (island scope, the behavior, the binding) yet dedups to one.
         #expect(arena.cells.count == 1)
@@ -40,7 +40,7 @@ struct StateContextTests {
     func `a non-default initial value flows into the cell and the markup`() throws {
         let arena = CellArena()
         let html = String(decoding: try Counter(count: 7).renderHydratable(arena: arena), as: UTF8.self)
-        #expect(html.contains(#"<span data-adh-bind:text="0">7</span>"#))
+        #expect(html.contains(#"<span e:text="0">7</span>"#))
         #expect(arena.cells[0].value == .int(7))
     }
 

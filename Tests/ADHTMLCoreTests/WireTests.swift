@@ -19,7 +19,7 @@ struct WireTests {
         let html = try renderedCounter()
         #expect(
             html.hasPrefix(
-                #"<div data-adh-island data-adh-id="counter" data-adh-on="visible"><span data-adh-bind:text="0">0</span></div>"#
+                #"<div a b="counter" c="visible"><span e:text="0">0</span></div>"#
             ))
         #expect(html.hasSuffix("</script>"))
     }
@@ -109,7 +109,7 @@ struct WireTests {
     }
 
     @Test
-    func `an event binding emits data-adh-on with behavior#cell#param`() throws {
+    func `an event binding emits c with behavior#cell#param`() throws {
         let arena = CellArena()
         let count = arena.signal(0)
         let view = Island("c", scope: [count.id]) {
@@ -117,7 +117,7 @@ struct WireTests {
         }
         let html = try String(decoding: view.renderHydratable(arena: arena), as: UTF8.self)
 
-        #expect(html.contains(##"data-adh-on:click="increment#0#1""##))
+        #expect(html.contains(##"c:click="increment#0#1""##))
     }
 
     @Test

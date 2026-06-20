@@ -7,6 +7,7 @@
 
 import { applyBehavior, parseInvocation } from "./behaviors";
 import { morph, oobSwap } from "./morph";
+import { T } from "./tokens";
 
 /** The closed verb set, mirrored by Swift `Action.methods` (parity test). Unused by the interpreter
  * itself (it lowercases the attribute), so the bundler tree-shakes it out of the runtime — it exists for
@@ -21,14 +22,14 @@ const MAX_RESPONSE_CHARS = 2 * 1024 * 1024;
 /** The event type that fires an action: explicit `data-adh-trigger`, else submit for a `<form>`, else click.
  * @param {Element} node @returns {string} */
 export function actionTrigger(node) {
-  return node.getAttribute("data-adh-trigger") || (node.tagName === "FORM" ? "submit" : "click");
+  return node.getAttribute(T.trigger) || (node.tagName === "FORM" ? "submit" : "click");
 }
 
 /** Run an action element: debounce, then perform it. The timer is keyed per element so a fast typist
  * coalesces to a single request. Never throws (perform is guarded).
  * @param {Element} node @param {import("./wire").WireState} state @param {Document} doc @returns {void} */
 export function runAction(node, state, doc) {
-  const ms = Number(node.getAttribute("data-adh-debounce")) || 0;
+  const ms = Number(node.getAttribute(T.debounce)) || 0;
   const go = () => void perform(node, state, doc);
   if (ms <= 0) return go();
   const timed = /** @type {{ _adhT?: ReturnType<typeof setTimeout> }} */ (/** @type {unknown} */ (node));
@@ -50,7 +51,7 @@ function collectParams(node, doc) {
   } else if (input.name) {
     params.append(input.name, input.value ?? "");
   }
-  const include = node.getAttribute("data-adh-include");
+  const include = node.getAttribute(T.include);
   if (include) {
     for (const name of include.split(",")) {
       const field = /** @type {HTMLInputElement | null} */ (doc.querySelector(`[name="${CSS.escape(name)}"]`));
@@ -76,16 +77,16 @@ function applySwap(swap, html, target, doc) {
  * @param {Element} node @param {import("./wire").WireState} state @param {Document} doc
  * @returns {Promise<void>} */
 async function perform(node, state, doc) {
-  const method = (node.getAttribute("data-adh-action") || "get").toUpperCase();
-  const url = node.getAttribute("data-adh-url") || "";
-  const swap = node.getAttribute("data-adh-swap") || "morph";
+  const method = (node.getAttribute(T.action) || "get").toUpperCase();
+  const url = node.getAttribute(T.url) || "";
+  const swap = node.getAttribute(T.swap) || "morph";
   const targetId =
-    node.getAttribute("data-adh-target") ||
-    node.closest("[data-adh-id]")?.getAttribute("data-adh-id") ||
+    node.getAttribute(T.target) ||
+    node.closest(`[${T.id}]`)?.getAttribute(T.id) ||
     "";
 
   // Optimistic: apply a client behavior to its cell immediately, before the network round-trip.
-  const optimistic = node.getAttribute("data-adh-optimistic");
+  const optimistic = node.getAttribute(T.optimistic);
   if (optimistic) {
     const invocation = parseInvocation(optimistic);
     if (invocation) applyBehavior(invocation, state.cells, node);

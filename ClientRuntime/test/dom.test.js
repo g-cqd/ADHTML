@@ -26,9 +26,9 @@ beforeEach(() => {
 /** A counter island + its inline state, exactly as the Swift renderer emits them. */
 function mountCounter(on = "load") {
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="counter" data-adh-on="${on}">
-      <button data-adh-on:click="increment#0#1">+</button>
-      <span data-adh-bind:text="0">0</span>
+    <div a b="counter" c="${on}">
+      <button c:click="increment#0#1">+</button>
+      <span e:text="0">0</span>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":0}],"islands":[{"id":"counter","on":"${on}","scope":[0]}]}
@@ -50,11 +50,11 @@ test("hydrate wires a delegated click -> behavior -> bound node update", () => {
 });
 
 test("a delegated click reaches a deeply nested target via closest()", () => {
-  // The clicked node is a child of the data-adh-on element; closest() must still find the handler.
+  // The clicked node is a child of the c element; closest() must still find the handler.
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="i" data-adh-on="load">
-      <button data-adh-on:click="increment#0#1"><span class="inner">+</span></button>
-      <output data-adh-bind:text="0">0</output>
+    <div a b="i" c="load">
+      <button c:click="increment#0#1"><span class="inner">+</span></button>
+      <output e:text="0">0</output>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":0}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -123,9 +123,9 @@ test("the visible directive falls back to immediate when IntersectionObserver is
 
 test("a value binding writes to an input's value", () => {
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="i" data-adh-on="load">
-      <input data-adh-bind:value="0">
-      <button data-adh-on:click="set#0#hello">x</button>
+    <div a b="i" c="load">
+      <input e:value="0">
+      <button c:click="set#0#hello">x</button>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":"hi"}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -140,19 +140,19 @@ test("a value binding writes to an input's value", () => {
 test("P3 client list reconciles rows from a signal array (commit appends, removeLast pops)", () => {
   // Markup is whitespace-free between the template and rows, exactly as the Swift renderer emits it.
   document.body.innerHTML =
-    `<div data-adh-island data-adh-id="i" data-adh-on="load">` +
-    `<ul id="list"><template data-adh-each="0"><li><span data-adh-each-text></span></li></template>` +
-    `<li><span data-adh-each-text>a</span></li></ul>` +
-    `<input id="q" data-adh-model="1" value="">` +
-    `<button id="add" data-adh-on:click="commit#0#1">add</button>` +
-    `<button id="pop" data-adh-on:click="removeLast#0">pop</button>` +
+    `<div a b="i" c="load">` +
+    `<ul id="list"><template m="0"><li><span n></span></li></template>` +
+    `<li><span n>a</span></li></ul>` +
+    `<input id="q" i="1" value="">` +
+    `<button id="add" c:click="commit#0#1">add</button>` +
+    `<button id="pop" c:click="removeLast#0">pop</button>` +
     `</div>` +
     `<script type="application/adh-state+json" id="adh-state">` +
     `{"v":1,"cells":[{"$":"sig","v":["a"]},{"$":"sig","v":""}],"islands":[{"id":"i","on":"load","scope":[0,1]}]}` +
     `</script>`;
   hydrate(document);
   const list = /** @type {Element} */ (document.getElementById("list"));
-  const texts = () => [...list.querySelectorAll("li [data-adh-each-text]")].map((s) => s.textContent);
+  const texts = () => [...list.querySelectorAll("li [n]")].map((s) => s.textContent);
   expect(texts()).toEqual(["a"]); // initial SSR row, reconciled in place
 
   const input = /** @type {HTMLInputElement} */ (document.getElementById("q"));
@@ -165,26 +165,26 @@ test("P3 client list reconciles rows from a signal array (commit appends, remove
   expect(texts()).toEqual(["a"]);
 });
 
-test("P3 client list filters rows by a query cell (data-adh-filter)", () => {
+test("P3 client list filters rows by a query cell (o)", () => {
   document.body.innerHTML =
-    `<div data-adh-island data-adh-id="i" data-adh-on="load">` +
-    `<ul id="list"><template data-adh-each="0" data-adh-filter="1"><li><span data-adh-each-text></span></li></template></ul>` +
+    `<div a b="i" c="load">` +
+    `<ul id="list"><template m="0" o="1"><li><span n></span></li></template></ul>` +
     `</div>` +
     `<script type="application/adh-state+json" id="adh-state">` +
     `{"v":1,"cells":[{"$":"sig","v":["apple","banana","grape"]},{"$":"sig","v":"an"}],` +
     `"islands":[{"id":"i","on":"load","scope":[0,1]}]}</script>`;
   hydrate(document);
   const list = /** @type {Element} */ (document.getElementById("list"));
-  const texts = () => [...list.querySelectorAll("li [data-adh-each-text]")].map((s) => s.textContent);
+  const texts = () => [...list.querySelectorAll("li [n]")].map((s) => s.textContent);
   expect(texts()).toEqual(["banana"]); // only "banana" contains "an"
 });
 
 test("P1 v-model: typing updates the cell, and a programmatic change writes the field back", () => {
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="i" data-adh-on="load">
-      <input id="q" data-adh-model="0" value="hi">
-      <output data-adh-bind:text="0">hi</output>
-      <button data-adh-on:click="set#0#cleared">clear</button>
+    <div a b="i" c="load">
+      <input id="q" i="0" value="hi">
+      <output e:text="0">hi</output>
+      <button c:click="set#0#cleared">clear</button>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":"hi"}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -205,9 +205,9 @@ test("P1 v-model: typing updates the cell, and a programmatic change writes the 
 
 test("P4 key filter: a keydown behavior fires only for listed keys, and prevents default", () => {
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="i" data-adh-on="load">
-      <input id="q" data-adh-on:keydown="increment#0#1" data-adh-keys="Enter" data-adh-prevent="">
-      <output data-adh-bind:text="0">0</output>
+    <div a b="i" c="load">
+      <input id="q" c:keydown="increment#0#1" j="Enter" k="">
+      <output e:text="0">0</output>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":0}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -220,14 +220,14 @@ test("P4 key filter: a keydown behavior fires only for listed keys, and prevents
   const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
   input?.dispatchEvent(enter);
   expect(output?.textContent).toBe("1");  // Enter -> fires
-  expect(enter.defaultPrevented).toBe(true);  // data-adh-prevent
+  expect(enter.defaultPrevented).toBe(true);  // k
 });
 
 test("P2 class-merge: classList.toggle merges, never clobbering the static class", () => {
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="i" data-adh-on="load">
-      <button data-adh-on:click="toggle#0">t</button>
-      <div id="box" class="card" data-adh-class="active:0">box</div>
+    <div a b="i" c="load">
+      <button c:click="toggle#0">t</button>
+      <div id="box" class="card" f="active:0">box</div>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -245,8 +245,8 @@ test("P2 class-merge: classList.toggle merges, never clobbering the static class
 
 test("P2 class-merge splits the cell off the LAST colon (Tailwind-variant class names)", () => {
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="i" data-adh-on="load">
-      <div id="box" data-adh-class="hover:bg-blue:0">box</div>
+    <div a b="i" c="load">
+      <div id="box" f="hover:bg-blue:0">box</div>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":true}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -257,9 +257,9 @@ test("P2 class-merge splits the cell off the LAST colon (Tailwind-variant class 
 
 test("P6 show toggles display, keeping the node in the DOM", () => {
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="i" data-adh-on="load">
-      <button data-adh-on:click="toggle#0">t</button>
-      <p id="msg" data-adh-show="0" style="display:none">hi</p>
+    <div a b="i" c="load">
+      <button c:click="toggle#0">t</button>
+      <p id="msg" g="0" style="display:none">hi</p>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -274,9 +274,9 @@ test("P6 show toggles display, keeping the node in the DOM", () => {
 
 test("P6 When mounts/unmounts the template content on the cell", () => {
   document.body.innerHTML = `
-    <div data-adh-island data-adh-id="i" data-adh-on="load">
-      <button data-adh-on:click="toggle#0">t</button>
-      <template data-adh-if="0"><p id="panel">panel</p></template>
+    <div a b="i" c="load">
+      <button c:click="toggle#0">t</button>
+      <template h="0"><p id="panel">panel</p></template>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[{"$":"sig","v":false}],"islands":[{"id":"i","on":"load","scope":[0]}]}
@@ -305,7 +305,7 @@ test("morph reconciles a subtree and preserves a node by id", () => {
 
 test("connect applies an SSE morph event to the named island", () => {
   // Drive the morph branch of connect() directly with a synthetic EventSource (no network).
-  document.body.innerHTML = `<div data-adh-id="region"><p>before</p></div>`;
+  document.body.innerHTML = `<div b="region"><p>before</p></div>`;
   const listeners = {};
   const fakeSource = {
     addEventListener(type, fn) {
@@ -319,7 +319,7 @@ test("connect applies an SSE morph event to the named island", () => {
   connect("/events", { cells: [], islands: [] }, document);
   listeners.morph({ data: JSON.stringify({ id: "region", html: "<p>after</p>" }) });
 
-  expect(document.querySelector('[data-adh-id="region"] p').textContent).toBe("after");
+  expect(document.querySelector('[b="region"] p').textContent).toBe("after");
 });
 
 test("a malformed inline state block degrades to null (failure-safe, page stays static)", () => {
@@ -329,7 +329,7 @@ test("a malformed inline state block degrades to null (failure-safe, page stays 
 });
 
 test("connect ignores a malformed SSE frame instead of throwing", () => {
-  document.body.innerHTML = `<div data-adh-id="r"><p>x</p></div>`;
+  document.body.innerHTML = `<div b="r"><p>x</p></div>`;
   const listeners = {};
   const fakeSource = {
     addEventListener(type, fn) {
@@ -392,19 +392,19 @@ test("morph inserts/removes keyed children without disturbing the rest", () => {
 });
 
 test("an action inside a Region defaults its morph target to the Region (RFC-0020 §1.6)", async () => {
-  // A Region renders as an island whose stable key is BOTH `id` and `data-adh-id`. An inner action with
-  // no explicit target resolves the closest `data-adh-id` (the Region) and morphs it via getElementById —
+  // A Region renders as an island whose stable key is BOTH `id` and `b`. An inner action with
+  // no explicit target resolves the closest `b` (the Region) and morphs it via getElementById —
   // the plain `id` is what makes that resolution land. No runtime change: this is the unchanged transport.
   document.body.innerHTML = `
-    <div data-adh-island id="content" data-adh-id="content" data-adh-on="load">
-      <button data-adh-action="get" data-adh-url="/rows">reload</button>
+    <div a id="content" b="content" c="load">
+      <button p="get" q="/rows">reload</button>
       <ul id="rows"><li>initial</li></ul>
     </div>
     <script type="application/adh-state+json" id="adh-state">
       {"v":1,"cells":[],"islands":[{"id":"content","on":"load","scope":[]}]}
     </script>`;
   const fragment =
-    `<button data-adh-action="get" data-adh-url="/rows">reload</button><ul id="rows"><li>reloaded</li></ul>`;
+    `<button p="get" q="/rows">reload</button><ul id="rows"><li>reloaded</li></ul>`;
   const original = globalThis.fetch;
   globalThis.fetch = /** @type {any} */ (async () => ({ ok: true, text: async () => fragment }));
   try {

@@ -5,6 +5,8 @@
 // each pair reconciles its direct children, pushing matched element children for deeper reconciliation.
 // v1 reconciles positionally with id preference, which still yields a DOM that matches the new HTML.
 
+import { T } from "./tokens";
+
 /** @type {HTMLTemplateElement | undefined} */
 let parseTemplate;
 
@@ -48,12 +50,12 @@ export function oobSwap(html, doc = document) {
   const template = doc.createElement("template");
   template.innerHTML = html;
   for (const element of template.content.children) {
-    const id = element.getAttribute("data-adh-oob") || element.id;
+    const id = element.getAttribute(T.oob) || element.id;
     const target = id ? doc.getElementById(id) : null;
     if (!target) continue;
     // Normalize the marker to the target's own id so the attribute sync preserves identity rather than
     // replacing `id` with `data-adh-oob` (which would orphan the region for any later swap).
-    element.removeAttribute("data-adh-oob");
+    element.removeAttribute(T.oob);
     element.id = id;
     morphElement(target, element);
   }

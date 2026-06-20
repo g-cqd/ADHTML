@@ -12,12 +12,12 @@ public enum BindTarget: String, Sendable, Equatable {
 extension HTMLElement {
     /// Wire a client behavior to a DOM event — emits `data-adh-on:<event>="<behavior>#<cell>[#param…]"`.
     public consuming func on(_ event: String, _ invocation: BehaviorInvocation) -> Self {
-        attribute("data-adh-on:\(event)", invocation.attributeValue)
+        attribute("\(WireToken.on):\(event)", invocation.attributeValue)
     }
 
     /// Bind a reactive cell to this element's text/value/class — emits `data-adh-bind:<target>="<cell>"`.
     public consuming func bind(_ target: BindTarget, to cell: CellID) -> Self {
-        attribute("data-adh-bind:\(target.rawValue)", "\(cell.raw)")
+        attribute("\(WireToken.bind):\(target.rawValue)", "\(cell.raw)")
     }
 
     /// Bind a `Signal` directly (no `.id` ceremony).
@@ -56,11 +56,11 @@ extension HTMLElement {
     /// field. Targets `<input>`/`<textarea>` (both expose `.value`); the initial `value` attribute is the
     /// `<input>` form (a `<textarea>`/`<select>` author renders its own initial content, the runtime syncs).
     public consuming func model(_ signal: Signal<String>) -> Self {
-        attribute("data-adh-model", "\(signal.id.raw)").attribute("value", signal.stored)
+        attribute(WireToken.model, "\(signal.id.raw)").attribute("value", signal.stored)
     }
     /// Two-way bind to a raw `CellID` (no initial-value knowledge — the author renders the initial `value`).
     public consuming func model(_ cell: CellID) -> Self {
-        attribute("data-adh-model", "\(cell.raw)")
+        attribute(WireToken.model, "\(cell.raw)")
     }
 
     // MARK: - P4: event refinements — key filter + prevent/stop (ADR-0018)
@@ -68,13 +68,13 @@ extension HTMLElement {
     /// Fire this element's keyboard behavior only for these `event.key`s (`data-adh-keys="Enter,Escape"`).
     /// No filter ⇒ every key. The keyboard-vocabulary gate (T5): `.on(.keydown, …).keys("ArrowDown")`.
     public consuming func keys(_ keys: String...) -> Self {
-        attribute("data-adh-keys", keys.joined(separator: ","))
+        attribute(WireToken.keys, keys.joined(separator: ","))
     }
     /// `preventDefault()` the event when this element's behavior fires (`data-adh-prevent`) — e.g. stop the
     /// browser's default Enter/Arrow handling in a combobox.
-    public consuming func preventDefault() -> Self { attribute("data-adh-prevent", "") }
+    public consuming func preventDefault() -> Self { attribute(WireToken.prevent, "") }
     /// `stopPropagation()` the event when this element's behavior fires (`data-adh-stop`).
-    public consuming func stopPropagation() -> Self { attribute("data-adh-stop", "") }
+    public consuming func stopPropagation() -> Self { attribute(WireToken.stop, "") }
 
     // MARK: - P2: class-merge (ADR-0017)
 
@@ -84,7 +84,7 @@ extension HTMLElement {
     /// one attribute (`name:cell;name2:cell2`). The `cell`-typed overloads also paint the class into the
     /// initial `class` when the cell is initially on, so there is no hydration flash.
     public consuming func classToggle(_ name: String, when cell: CellID) -> Self {
-        attribute("data-adh-class", "\(name):\(cell.raw)")
+        attribute(WireToken.classToggle, "\(name):\(cell.raw)")
     }
     /// Toggle `name` from a `Signal<Bool>` (no `.id` ceremony); paints the class initially if the signal is on.
     public consuming func classToggle(_ name: String, when signal: Signal<Bool>) -> Self {
@@ -101,7 +101,7 @@ extension HTMLElement {
         return classToggling(name, cell: context.arena.computed(reactive).id, initiallyOn: reactive.value)
     }
     private consuming func classToggling(_ name: String, cell: CellID, initiallyOn: Bool) -> Self {
-        var node = attribute("data-adh-class", "\(name):\(cell.raw)")
+        var node = attribute(WireToken.classToggle, "\(name):\(cell.raw)")
         if initiallyOn { node = node.class(name) }  // no-FOUC: the initial server class matches the cell
         return node
     }
@@ -112,7 +112,7 @@ extension HTMLElement {
     /// stays in the DOM (vs `When`, which mounts/unmounts); the `cell`-typed overloads stamp the initial
     /// `display:none` when the cell is initially off, so it is hidden without JS and never flashes.
     public consuming func show(when cell: CellID) -> Self {
-        attribute("data-adh-show", "\(cell.raw)")
+        attribute(WireToken.show, "\(cell.raw)")
     }
     /// Show/hide from a `Signal<Bool>`; renders hidden initially (inline `display:none`) when the signal is off.
     public consuming func show(when signal: Signal<Bool>) -> Self {
@@ -128,7 +128,7 @@ extension HTMLElement {
         return showing(cell: context.arena.computed(reactive).id, initiallyVisible: reactive.value)
     }
     private consuming func showing(cell: CellID, initiallyVisible: Bool) -> Self {
-        var node = attribute("data-adh-show", "\(cell.raw)")
+        var node = attribute(WireToken.show, "\(cell.raw)")
         if !initiallyVisible { node = node.attribute("style", "display:none") }  // hidden without JS, no FOUC
         return node
     }
@@ -177,7 +177,7 @@ public struct When<Content: HTML>: HTML {
             return
         }
         target.openTagStart("<template")
-        target.attribute(name: "data-adh-if", value: "\(cell.raw)", context: .attribute)
+        target.attribute(name: WireToken.`if`, value: "\(cell.raw)", context: .attribute)
         target.openTagEnd()
         Content._render(html.content, into: &target)
         target.closeTag("</template>")

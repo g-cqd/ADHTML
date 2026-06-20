@@ -1,12 +1,35 @@
 // Build + minify the runtime and gate its gzipped size (<= 4 KB, ADR-0006). Uses bun's built-in
 // bundler + gzip — no external dependencies. Run: `bun run build.js` (or `bun run build`).
+//
+// Wire-token MANGLING (build-time): the source reads the shared `T.<name>` constants (single source of
+// truth, generated Swift-side into src/tokens.js) for readability + Swift↔JS parity. Here we inline each
+// `T.<name>` to its short literal via esbuild `define`, so the `T` object tree-shakes away entirely and
+// the bundle carries only the 1-char tokens — the readable source costs zero bytes in production.
 
 const BUDGET_BYTES = 4 * 1024;
+
+// The mangling step: inline every `T.<name>` to its short literal across the source before bundling, so
+// the `T` object + its import tree-shake away and the bundle carries only the 1-char tokens. (Bun's
+// `define` only handles bare identifiers, not the `T.<name>` member expression, so we do it in an onLoad.)
+const { T } = await import("./src/tokens.js");
+const inlineTokens = {
+  name: "adh-token-inline",
+  setup(build) {
+    build.onLoad({ filter: /\.js$/ }, async (args) => {
+      const code = (await Bun.file(args.path).text()).replace(
+        /\bT\.([A-Za-z]+)\b/g,
+        (match, name) => (name in T ? JSON.stringify(T[name]) : match),
+      );
+      return { contents: code, loader: "js" };
+    });
+  },
+};
 
 const result = await Bun.build({
   entrypoints: ["./src/runtime.js"],
   minify: true,
   target: "browser",
+  plugins: [inlineTokens],
 });
 
 if (!result.success) {

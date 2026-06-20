@@ -115,23 +115,23 @@ extension HTMLElement {
     /// `-include`, `-target`, `-swap`, `-optimistic`). The runtime fetches with the `ADH-Request: 1`
     /// header (C1) and applies the `text/html` response (C2) per ``Action/swap``.
     public consuming func action(_ action: Action) -> Self {
-        var node = attribute("data-adh-action", action.method)
-        node = node.attribute("data-adh-url", action.path)
+        var node = attribute(WireToken.action, action.method)
+        node = node.attribute(WireToken.url, action.path)
         if let trigger = action.trigger {
-            node = node.attribute("data-adh-trigger", trigger.name)
+            node = node.attribute(WireToken.trigger, trigger.name)
         }
         if let milliseconds = action.debounceMilliseconds {
-            node = node.attribute("data-adh-debounce", String(milliseconds))
+            node = node.attribute(WireToken.debounce, String(milliseconds))
         }
         if !action.includes.isEmpty {
-            node = node.attribute("data-adh-include", action.includes.joined(separator: ","))
+            node = node.attribute(WireToken.include, action.includes.joined(separator: ","))
         }
         if let targetID = action.targetID {
-            node = node.attribute("data-adh-target", targetID.raw)
+            node = node.attribute(WireToken.target, targetID.raw)
         }
-        node = node.attribute("data-adh-swap", action.swap.rawValue)
+        node = node.attribute(WireToken.swap, action.swap.rawValue)
         if let optimistic = action.optimistic {
-            node = node.attribute("data-adh-optimistic", optimistic.attributeValue)
+            node = node.attribute(WireToken.optimistic, optimistic.attributeValue)
         }
         return node
     }

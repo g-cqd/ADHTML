@@ -3,16 +3,16 @@ import Testing
 @testable import ADHTMLCore
 
 // RFC-0021 P1 (two-way binding) + P4 (extended event + behavior vocabulary), ADR-0018. Byte-exact lowering
-// of `data-adh-model`, the key-filter / prevent / stop refinements, and the new closed behaviors.
+// of `i`, the key-filter / prevent / stop refinements, and the new closed behaviors.
 struct EventVocabTests {
     // MARK: P1 — `.model(_:)`
 
     @Test
-    func `model emits data-adh-model and the initial value (no FOUC)`() {
+    func `model emits i and the initial value (no FOUC)`() {
         let arena = CellArena()
         let query = arena.signal("hi")  // id 0
-        #expect(input().model(query).render() == #"<input data-adh-model="0" value="hi">"#)
-        #expect(input().model(CellID(2)).render() == #"<input data-adh-model="2">"#)
+        #expect(input().model(query).render() == #"<input i="0" value="hi">"#)
+        #expect(input().model(CellID(2)).render() == #"<input i="2">"#)
     }
 
     // MARK: P4 — event refinements
@@ -24,9 +24,9 @@ struct EventVocabTests {
         #expect(
             input().on(.keydown, Behavior.setFromValue(query)).keys("Enter", "Escape")
                 .preventDefault().render()
-                == #"<input data-adh-on:keydown="setFromValue#0" data-adh-keys="Enter,Escape" "#
-                + #"data-adh-prevent="">"#)
-        #expect(div { "x" }.stopPropagation().render() == #"<div data-adh-stop="">x</div>"#)
+                == #"<input c:keydown="setFromValue#0" j="Enter,Escape" "#
+                + #"k="">"#)
+        #expect(div { "x" }.stopPropagation().render() == #"<div l="">x</div>"#)
     }
 
     // MARK: P4 — the new behaviors' wire tokens

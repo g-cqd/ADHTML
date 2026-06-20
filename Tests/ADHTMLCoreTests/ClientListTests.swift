@@ -3,7 +3,7 @@ import Testing
 @testable import ADHTMLCore
 
 // RFC-0021 P3 — a client list: `ForEach` over a `Signal<[String]>`. Lowers to a `<template
-// data-adh-each="cell">ROW</template>` (the row structure with `EachText` slots) followed by the initial
+// m="cell">ROW</template>` (the row structure with `EachText` slots) followed by the initial
 // server rows from the signal's current value (the no-JS fallback). The runtime clones + morph-reconciles.
 struct ClientListTests {
     @Test
@@ -12,21 +12,21 @@ struct ClientListTests {
         let items = arena.signal(["a", "b"])  // id 0
         #expect(
             ForEach(items) { item in li { item.text } }.render()
-                == #"<template data-adh-each="0"><li><span data-adh-each-text=""></span></li></template>"#
-                + #"<li><span data-adh-each-text="">a</span></li>"#
-                + #"<li><span data-adh-each-text="">b</span></li>"#)
+                == #"<template m="0"><li><span n=""></span></li></template>"#
+                + #"<li><span n="">a</span></li>"#
+                + #"<li><span n="">b</span></li>"#)
     }
 
     @Test
-    func `a filtered client list carries data-adh-filter`() {
+    func `a filtered client list carries o`() {
         let arena = CellArena()
         let items = arena.signal(["x"])  // id 0
         let query = arena.signal("")  // id 1
         #expect(
             ForEach(items, filteredBy: query) { item in li { item.text } }.render()
-                == #"<template data-adh-each="0" data-adh-filter="1">"#
-                + #"<li><span data-adh-each-text=""></span></li></template>"#
-                + #"<li><span data-adh-each-text="">x</span></li>"#)
+                == #"<template m="0" o="1">"#
+                + #"<li><span n=""></span></li></template>"#
+                + #"<li><span n="">x</span></li>"#)
     }
 
     @Test
@@ -35,8 +35,8 @@ struct ClientListTests {
         let items = arena.signal(["<b>"])  // id 0
         #expect(
             ForEach(items) { item in li { item.text } }.render()
-                == #"<template data-adh-each="0"><li><span data-adh-each-text=""></span></li></template>"#
-                + #"<li><span data-adh-each-text="">&lt;b&gt;</span></li>"#)
+                == #"<template m="0"><li><span n=""></span></li></template>"#
+                + #"<li><span n="">&lt;b&gt;</span></li>"#)
     }
 
     @Test
@@ -51,6 +51,6 @@ struct ClientListTests {
         let items = arena.signal([String]())  // id 0
         #expect(
             ForEach(items) { item in li { item.text } }.render()
-                == #"<template data-adh-each="0"><li><span data-adh-each-text=""></span></li></template>"#)
+                == #"<template m="0"><li><span n=""></span></li></template>"#)
     }
 }

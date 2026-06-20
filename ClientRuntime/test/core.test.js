@@ -3,7 +3,15 @@ import { expect, test } from "bun:test";
 import { BEHAVIOR_NAMES, applyBehavior, parseInvocation } from "../src/behaviors";
 import { BINARY_OPS, UNARY_OPS, evalExpr, highlight } from "../src/expr";
 import { Signal, effect } from "../src/signals";
+import { T } from "../src/tokens";
 import { WIRE_VERSION, parseState } from "../src/wire";
+import spec from "../../wire-tokens.json";
+
+test("tokens.js mirrors wire-tokens.json (generated Swift-side, no drift)", () => {
+  // Both tokens.js and Swift WireTokens.swift are generated from this spec by the command plugin.
+  expect(T).toEqual(Object.fromEntries(spec.tokens));
+  expect(Object.values(T).every((t) => t.length === 1)).toBe(true); // single-char, maximal density
+});
 
 test("an effect re-runs when a signal it read changes", () => {
   const count = new Signal(0);

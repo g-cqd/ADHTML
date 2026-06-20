@@ -48,9 +48,9 @@ public struct ForEach<Row: HTML>: HTML {
     public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
         if let eachCell = html.eachCell {  // client mode: emit the row template before the initial rows
             target.openTagStart("<template")
-            target.attribute(name: "data-adh-each", value: "\(eachCell.raw)", context: .attribute)
+            target.attribute(name: WireToken.each, value: "\(eachCell.raw)", context: .attribute)
             if let filterCell = html.filterCell {
-                target.attribute(name: "data-adh-filter", value: "\(filterCell.raw)", context: .attribute)
+                target.attribute(name: WireToken.filter, value: "\(filterCell.raw)", context: .attribute)
             }
             target.openTagEnd()
             if let templateRow = html.templateRow { Row._render(templateRow, into: &target) }
@@ -80,7 +80,7 @@ public struct EachText: HTML {
     @inlinable
     public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
         target.openTagStart("<span")
-        target.attribute(name: "data-adh-each-text", value: "", context: .attribute)
+        target.attribute(name: WireToken.eachText, value: "", context: .attribute)
         target.openTagEnd()
         if let value = html.value { target.text(value) }
         target.closeTag("</span>")

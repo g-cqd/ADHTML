@@ -75,7 +75,7 @@ struct XSSTests {
     // the attribute it lands in (the runtime resolves it via getElementById, never by parsing it as markup).
     @Test
     func `out-of-band id is attribute-escaped`() {
-        let out = div {}.attribute("data-adh-oob", #""><script>alert(1)</script>"#).render()
+        let out = div {}.attribute("x", #""><script>alert(1)</script>"#).render()
         #expect(!out.contains("<script"))
         #expect(out.contains("&quot;") && out.contains("&lt;"))
     }

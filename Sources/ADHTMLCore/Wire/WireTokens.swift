@@ -1,58 +1,58 @@
-// GENERATED from wire-tokens.json by ClientRuntime/gen-tokens.js — DO NOT EDIT.
-// The closed wire-attribute vocabulary, shared with ClientRuntime/src/tokens.js (parity-tested). Short htmx-style 'a-' prefix.
+// GENERATED from wire-tokens.json by `swift package generate-wire-tokens` — DO NOT EDIT.
+// The closed wire-attribute vocabulary, shared with ClientRuntime/src/tokens.js (parity-tested). 1-char base36 tokens.
 
 /// The closed set of ADHTML wire attribute tokens (RFC-0021 / ADR-0007), shared with the JS runtime.
 public enum WireToken {
-    public static let island = "a-i"
-    public static let id = "a-id"
-    public static let on = "a-on"
-    public static let connect = "a-c"
-    public static let bind = "a-b"
-    public static let classToggle = "a-cls"
-    public static let show = "a-show"
-    public static let `if` = "a-if"
-    public static let model = "a-m"
-    public static let keys = "a-k"
-    public static let prevent = "a-pd"
-    public static let stop = "a-sp"
-    public static let each = "a-each"
-    public static let eachText = "a-t"
-    public static let filter = "a-flt"
-    public static let action = "a-ac"
-    public static let url = "a-u"
-    public static let trigger = "a-tr"
-    public static let debounce = "a-db"
-    public static let include = "a-in"
-    public static let target = "a-tg"
-    public static let swap = "a-sw"
-    public static let optimistic = "a-op"
-    public static let oob = "a-oob"
+    public static let island = "a"
+    public static let id = "b"
+    public static let on = "c"
+    public static let connect = "d"
+    public static let bind = "e"
+    public static let classToggle = "f"
+    public static let show = "g"
+    public static let `if` = "h"
+    public static let model = "i"
+    public static let keys = "j"
+    public static let prevent = "k"
+    public static let stop = "l"
+    public static let each = "m"
+    public static let eachText = "n"
+    public static let filter = "o"
+    public static let action = "p"
+    public static let url = "q"
+    public static let trigger = "r"
+    public static let debounce = "s"
+    public static let include = "t"
+    public static let target = "u"
+    public static let swap = "v"
+    public static let optimistic = "w"
+    public static let oob = "x"
 
     /// Every (name, token) pair — the input to the Swift↔JS parity test.
     public static let all: [(name: String, token: String)] = [
-        ("island", "a-i"),
-        ("id", "a-id"),
-        ("on", "a-on"),
-        ("connect", "a-c"),
-        ("bind", "a-b"),
-        ("classToggle", "a-cls"),
-        ("show", "a-show"),
-        ("if", "a-if"),
-        ("model", "a-m"),
-        ("keys", "a-k"),
-        ("prevent", "a-pd"),
-        ("stop", "a-sp"),
-        ("each", "a-each"),
-        ("eachText", "a-t"),
-        ("filter", "a-flt"),
-        ("action", "a-ac"),
-        ("url", "a-u"),
-        ("trigger", "a-tr"),
-        ("debounce", "a-db"),
-        ("include", "a-in"),
-        ("target", "a-tg"),
-        ("swap", "a-sw"),
-        ("optimistic", "a-op"),
-        ("oob", "a-oob"),
+        ("island", "a"),
+        ("id", "b"),
+        ("on", "c"),
+        ("connect", "d"),
+        ("bind", "e"),
+        ("classToggle", "f"),
+        ("show", "g"),
+        ("if", "h"),
+        ("model", "i"),
+        ("keys", "j"),
+        ("prevent", "k"),
+        ("stop", "l"),
+        ("each", "m"),
+        ("eachText", "n"),
+        ("filter", "o"),
+        ("action", "p"),
+        ("url", "q"),
+        ("trigger", "r"),
+        ("debounce", "s"),
+        ("include", "t"),
+        ("target", "u"),
+        ("swap", "v"),
+        ("optimistic", "w"),
+        ("oob", "x")
     ]
 }

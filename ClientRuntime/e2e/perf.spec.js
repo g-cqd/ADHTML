@@ -19,6 +19,6 @@ test("hydrate + interaction of 500 islands is fast in a real browser (native DOM
   expect(clickMs / clicks).toBeLessThan(0.5);  // < 0.5 ms per full delegated round-trip (generous)
 
   // Functional sanity: the burst of delegated clicks drove c0's bound node via closest() delegation
-  // (the clicks landed on a nested <span>, so closest() had to walk up to the data-adh-on element).
-  await expect(page.locator('[data-adh-id="c0"] output')).toHaveText(String(clicks));
+  // (the clicks landed on a nested <span>, so closest() had to walk up to the c element).
+  await expect(page.locator('[b="c0"] output')).toHaveText(String(clicks));
 });
