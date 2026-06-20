@@ -1,8 +1,12 @@
 # ADR 0003 — Escape-by-default + context-aware escaping
 
-- **Status**: Proposed
+- **Status**: Accepted (implemented; perf-hardened 2026-06-20 — see ADR-0013)
 - **Date**: 2026-06-19
-- **Related**: RFC-0002, RFC-0003; ADR-0011 (ADFCore reuse). OWASP A03 Injection; CWE-79 (XSS, #1 on the 2025 CWE Top 25)
+- **Related**: RFC-0002, RFC-0003; ADR-0011 (ADFCore reuse), ADR-0013 (escaper perf). OWASP A03 Injection; CWE-79 (XSS, #1 on the 2025 CWE Top 25)
+- **Implementation**: context-aware encoders (`.text`/`.attribute` HTML-entity, `.url` scheme-allowlist).
+  The hot loop bulk-copies safe byte runs (ADR-0013). The inline state script is escaped by ADJSON's
+  HTML-safe JSON encoder (`escapeHTMLUnsafe`), not a bespoke pass (ADR-0011/0013). `.css`/`.scriptJSON`
+  value contexts remain conservative over-escape stubs.
 
 ## Context
 

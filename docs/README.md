@@ -31,6 +31,7 @@ ADRs are immutable once accepted: supersede with a new ADR rather than editing a
 | [0010](adr/0010-package-layering-and-gating.md) | Package layering & dependency gating (mirror ADJSON) | Proposed |
 | [0011](adr/0011-adfcore-adjson-adserve-reuse.md) | `ADFCore`/`ADJSON`/`ADServeCore` reuse policy (no duplication) | Proposed |
 | [0012](adr/0012-adserve-integration.md) | ADServe integration & the streaming dependency | Proposed |
+| [0013](adr/0013-ownership-escaping-memory-safety-performance.md) | Ownership, escaping & memory-safety performance | Accepted |
 
 ## Integration
 

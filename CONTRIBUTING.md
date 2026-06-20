@@ -37,6 +37,11 @@ SwiftPM/toolchain bug, not an ADHTML one. The classic **`native`** build system 
 correctly, so all `swift build` / `swift test` / `swift package` commands take `--build-system native`
 (CI does too). Drop the flag once the swiftbuild macro/test-link bug is fixed (ADR-0008).
 
+**After changing parameter ownership (`borrowing` ↔ `consuming`), do a clean build** (`swift package
+clean`). That changes the calling convention (an ABI change), and an *incremental* build can leave the
+macro test bundle linked against the old convention — it crashes at runtime (SIGTRAP/SIGSEGV) rather
+than failing to compile. CI builds clean, so this only bites incremental local runs (ADR-0013).
+
 The toolchain is pinned to **Swift 6.4** via [`.swift-version`](.swift-version). swiftly users can run
 `swiftly install 6.4 && swiftly use 6.4` to manage it; otherwise select an Xcode whose Swift is 6.4.
 
