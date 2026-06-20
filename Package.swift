@@ -12,7 +12,7 @@ let strictSettings: [SwiftSetting] = [
     .enableUpcomingFeature("ExistentialAny"),
     .enableUpcomingFeature("InferIsolatedConformances"),
     .enableUpcomingFeature("InternalImportsByDefault"),
-    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("MemberImportVisibility")
 ]
 
 // Compile-time type-check timing warnings (flag slow expressions / function bodies). These use unsafe
@@ -21,7 +21,7 @@ let strictSettings: [SwiftSetting] = [
 let timingWarningFlags: [SwiftSetting] = [
     .unsafeFlags([
         "-Xfrontend", "-warn-long-function-bodies=100",
-        "-Xfrontend", "-warn-long-expression-type-checking=100",
+        "-Xfrontend", "-warn-long-expression-type-checking=100"
     ])
 ]
 let benchSettings: [SwiftSetting] = strictSettings + timingWarningFlags
@@ -44,6 +44,9 @@ func adPackage(env: String, url: String) -> Package.Dependency {
 }
 let adfoundationDependency = adPackage(env: "ADFOUNDATION_PATH", url: "https://github.com/g-cqd/ADFoundation.git")
 let adjsonDependency = adPackage(env: "ADJSON_PATH", url: "https://github.com/g-cqd/ADJSON.git")
+// The family's deterministic-testing toolkit (AsyncEventProbe, TestClock, gates, ConstrainedStack).
+// Used by test targets only; consumers of the library products never resolve it.
+let adtestkitDependency = adPackage(env: "ADTESTKIT_PATH", url: "https://github.com/g-cqd/ADTestKit.git")
 
 // Default graph (all Foundation-free): ADFoundation (ADFCore byte/ASCII/hash primitives), ADJSON
 // (ADJSONCore — the wire-state serializer's JSON emit + JSONMergePatch, RFC-0003/0007), swift-collections
@@ -51,8 +54,9 @@ let adjsonDependency = adPackage(env: "ADJSON_PATH", url: "https://github.com/g-
 var packageDependencies: [Package.Dependency] = [
     adfoundationDependency,
     adjsonDependency,
+    adtestkitDependency,
     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "603.0.0"),
-    .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0"),
+    .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0")
 ]
 if isDev {
     if let path = Context.environment["ADBUILDTOOLS_PATH"], !path.isEmpty {
@@ -64,9 +68,10 @@ if isDev {
     packageDependencies.append(.package(url: "https://github.com/ordo-one/benchmark", from: "1.4.0"))
 }
 if isNIO {
-    packageDependencies.append(.package(url: "https://github.com/apple/swift-nio.git", from: "2.50.0"))
-    // ADJSON is already a default dependency (the wire serializer); the ADServe response/bridge
-    // dependency wires in when the adapter is implemented (ADR-0012).
+    // The ADServe response bridge (ADR-0012, RFC-0007 §3). ADServe already ships the transport
+    // primitives (.html/.stream/.sse/Static/CSPNonce); ADHTMLNIO forwards ADHTML's AsyncHTMLByteSink to
+    // ADServe's ResponseBodyWriter (both `[UInt8]`, shaped 1:1). Resolves from ADSERVE_PATH locally.
+    packageDependencies.append(adPackage(env: "ADSERVE_PATH", url: "https://github.com/g-cqd/ADServe.git"))
 }
 if isMarkdown {
     packageDependencies.append(.package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0"))
@@ -98,7 +103,7 @@ let package = Package(
         // The umbrella: core + macros + conveniences.
         .library(name: "ADHTML", targets: ["ADHTML"]),
         // The Foundation-free engine on its own (DOM, iterative renderer, escaping).
-        .library(name: "ADHTMLCore", targets: ["ADHTMLCore"]),
+        .library(name: "ADHTMLCore", targets: ["ADHTMLCore"])
     ],
     dependencies: packageDependencies,
     targets: [
@@ -111,7 +116,7 @@ let package = Package(
                 .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
                 .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
                 .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
-                .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+                .product(name: "SwiftDiagnostics", package: "swift-syntax")
             ],
             swiftSettings: strictSettings),
 
@@ -145,24 +150,26 @@ let package = Package(
         // A lightweight, network-free release perf probe over ADHTMLCore (no swift-syntax / DEV deps).
         // Run: `swift run -c release ADHTMLPerfProbe`. Complements the ordo-one suite (the CI gate with
         // mallocCountTotal) for quick local before/after wall-clock measurement. Not a product.
-        .executableTarget(name: "ADHTMLPerfProbe", dependencies: ["ADHTMLCore"], swiftSettings: strictSettings),
+        .executableTarget(name: "ADHTMLPerfProbe", dependencies: ["ADHTMLCore"], swiftSettings: strictSettings)
     ]
 )
 
 // --- Gated targets/products (each mirrors ADJSON's append-after-construction pattern) ---
 
 if isNIO {
-    // swift-nio ByteBuffer sink + the ADServe response bridge + ADJSON wire serialization.
-    let nioCore: Target.Dependency = .product(name: "NIOCore", package: "swift-nio")
+    // The ADServe response bridge: forward ADHTML's rendered bytes into ADServe's `ResponseContent`
+    // (.html / .stream). Depends only on ADHTMLCore + ADServeCore (ADServe brings NIO transitively).
     package.products.append(.library(name: "ADHTMLNIO", targets: ["ADHTMLNIO"]))
     package.targets.append(
         .target(
             name: "ADHTMLNIO",
-            dependencies: [
-                "ADHTMLCore", nioCore,
-                .product(name: "ADJSON", package: "ADJSON"),
-            ],
+            dependencies: ["ADHTMLCore", .product(name: "ADServeCore", package: "ADServe")],
             swiftSettings: strictSettings))
+    package.targets.append(
+        .testTarget(
+            name: "ADHTMLNIOTests",
+            dependencies: ["ADHTMLNIO", .product(name: "ADTestKit", package: "ADTestKit")],
+            swiftSettings: testSettings))
 }
 if isMarkdown {
     package.products.append(.library(name: "ADHTMLMarkdown", targets: ["ADHTMLMarkdown"]))
@@ -192,7 +199,7 @@ if isObs {
                 "ADHTMLCore",
                 .product(name: "Logging", package: "swift-log"),
                 .product(name: "Metrics", package: "swift-metrics"),
-                .product(name: "Tracing", package: "swift-distributed-tracing"),
+                .product(name: "Tracing", package: "swift-distributed-tracing")
             ],
             swiftSettings: strictSettings))
 }
