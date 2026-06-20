@@ -93,6 +93,32 @@ function bindDirectives(root, cells) {
     });
     input.addEventListener("input", () => cell.set(input.value));
   }
+  // P3: client list. `<template data-adh-each="cell">ROW</template>` + initial server rows (no-JS). An
+  // effect rebuilds the rows from the array cell (optionally filtered by `data-adh-filter`'s query) and
+  // reconciles them via morph — the template stays the first child (matched positionally), rows match by
+  // key/position, so identity + focus survive a re-filter. Each row's `[data-adh-each-text]` slots take
+  // the element's (escaped) text.
+  for (const template of root.querySelectorAll("template[data-adh-each]")) {
+    const cell = cells[Number(template.getAttribute("data-adh-each"))];
+    const parent = template.parentElement;
+    const rowEl = /** @type {HTMLTemplateElement} */ (template).content.firstElementChild;
+    if (!cell || !parent || !rowEl) continue;
+    const filterRef = template.getAttribute("data-adh-filter");
+    const filterCell = filterRef ? cells[Number(filterRef)] : null;
+    effect(() => {
+      const items = /** @type {unknown[]} */ (cell.get());
+      const query = filterCell ? String(filterCell.get()).toLowerCase() : null;
+      let html = template.outerHTML;  // keep the template first (morph matches it positionally)
+      for (const raw of items) {
+        const item = String(raw);
+        if (query !== null && !item.toLowerCase().includes(query)) continue;
+        const row = /** @type {Element} */ (rowEl.cloneNode(true));
+        for (const slot of row.querySelectorAll("[data-adh-each-text]")) slot.textContent = item;
+        html += row.outerHTML;
+      }
+      morph(parent, html);
+    });
+  }
 }
 
 /** Whether `node`'s key filter (`data-adh-keys="Enter,Escape"`) admits this event — true when there is no

@@ -137,6 +137,48 @@ test("a value binding writes to an input's value", () => {
   expect(input.value).toBe("hello");
 });
 
+test("P3 client list reconciles rows from a signal array (commit appends, removeLast pops)", () => {
+  // Markup is whitespace-free between the template and rows, exactly as the Swift renderer emits it.
+  document.body.innerHTML =
+    `<div data-adh-island data-adh-id="i" data-adh-on="load">` +
+    `<ul id="list"><template data-adh-each="0"><li><span data-adh-each-text></span></li></template>` +
+    `<li><span data-adh-each-text>a</span></li></ul>` +
+    `<input id="q" data-adh-model="1" value="">` +
+    `<button id="add" data-adh-on:click="commit#0#1">add</button>` +
+    `<button id="pop" data-adh-on:click="removeLast#0">pop</button>` +
+    `</div>` +
+    `<script type="application/adh-state+json" id="adh-state">` +
+    `{"v":1,"cells":[{"$":"sig","v":["a"]},{"$":"sig","v":""}],"islands":[{"id":"i","on":"load","scope":[0,1]}]}` +
+    `</script>`;
+  hydrate(document);
+  const list = /** @type {Element} */ (document.getElementById("list"));
+  const texts = () => [...list.querySelectorAll("li [data-adh-each-text]")].map((s) => s.textContent);
+  expect(texts()).toEqual(["a"]); // initial SSR row, reconciled in place
+
+  const input = /** @type {HTMLInputElement} */ (document.getElementById("q"));
+  input.value = "b";
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  document.getElementById("add")?.click(); // commit "b" -> ["a","b"]
+  expect(texts()).toEqual(["a", "b"]);
+
+  document.getElementById("pop")?.click(); // removeLast -> ["a"]
+  expect(texts()).toEqual(["a"]);
+});
+
+test("P3 client list filters rows by a query cell (data-adh-filter)", () => {
+  document.body.innerHTML =
+    `<div data-adh-island data-adh-id="i" data-adh-on="load">` +
+    `<ul id="list"><template data-adh-each="0" data-adh-filter="1"><li><span data-adh-each-text></span></li></template></ul>` +
+    `</div>` +
+    `<script type="application/adh-state+json" id="adh-state">` +
+    `{"v":1,"cells":[{"$":"sig","v":["apple","banana","grape"]},{"$":"sig","v":"an"}],` +
+    `"islands":[{"id":"i","on":"load","scope":[0,1]}]}</script>`;
+  hydrate(document);
+  const list = /** @type {Element} */ (document.getElementById("list"));
+  const texts = () => [...list.querySelectorAll("li [data-adh-each-text]")].map((s) => s.textContent);
+  expect(texts()).toEqual(["banana"]); // only "banana" contains "an"
+});
+
 test("P1 v-model: typing updates the cell, and a programmatic change writes the field back", () => {
   document.body.innerHTML = `
     <div data-adh-island data-adh-id="i" data-adh-on="load">
