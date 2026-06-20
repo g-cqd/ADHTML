@@ -30,9 +30,11 @@ const PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>adh e2e</t
   <script type="module" src="/adh-runtime.min.js"></script>
 </body></html>`;
 
-// A perf page: builds N islands client-side then times a single hydrate() in the REAL browser (native
-// DOM), exposing the result on window.__hydrateMs. The auto-hydrate on module import is a no-op (the
-// state block doesn't exist yet), so the measured call is the only one.
+// A perf page: builds N islands client-side then times, in the REAL browser (native DOM): (1) a single
+// hydrate(), and (2) a burst of delegated clicks dispatched at a NESTED target — so each one exercises
+// the document listener's closest() up-walk -> behavior -> signal -> bound node write (the full
+// interaction round-trip the closest() rewrite optimizes). Results land on window.__*. The auto-hydrate
+// on module import is a no-op (no state block yet), so the measured hydrate() is the only one.
 const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf</title></head><body>
 <div id="container"></div>
 <script type="module">
@@ -41,18 +43,26 @@ const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf<
   let html = "";
   for (let i = 0; i < N; i++) {
     html += '<div data-adh-island data-adh-id="c' + i + '" data-adh-on="load">' +
-      '<button data-adh-on:click="increment#' + i + '#1">+</button>' +
-      '<span data-adh-bind:text="' + i + '">0</span></div>';
+      '<button data-adh-on:click="increment#' + i + '#1"><span class="hit">+</span></button>' +
+      '<output data-adh-bind:text="' + i + '">0</output></div>';
   }
   const cells = Array.from({ length: N }, () => '{"$":"sig","v":0}').join(",");
   const islands = Array.from({ length: N }, (_, i) => '{"id":"c' + i + '","on":"load","scope":[' + i + ']}').join(",");
   html += '<script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[' + cells + '],"islands":[' + islands + ']}<\\/script>';
   document.getElementById("container").innerHTML = html;
+
   const t0 = performance.now();
   hydrate(document);
-  const ms = performance.now() - t0;
-  window.__hydrateMs = ms;
-  document.title = "hydrated " + N + " islands in " + ms.toFixed(3) + "ms";
+  window.__hydrateMs = performance.now() - t0;
+
+  // Interaction latency: dispatch CLICKS clicks at a nested element inside c0's button.
+  const hit = document.querySelector('[data-adh-id="c0"] .hit');
+  const CLICKS = 2000;
+  const t1 = performance.now();
+  for (let i = 0; i < CLICKS; i++) hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  window.__clickMs = performance.now() - t1;
+  window.__clickCount = CLICKS;
+  document.title = "hydrated " + N + " in " + window.__hydrateMs.toFixed(2) + "ms; " + CLICKS + " clicks in " + window.__clickMs.toFixed(2) + "ms";
 </script>
 </body></html>`;
 

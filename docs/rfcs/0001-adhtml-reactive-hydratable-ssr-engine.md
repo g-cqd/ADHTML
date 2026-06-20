@@ -23,7 +23,7 @@ One constraint frames the whole engine:
 
 The result is a two-tier model: **static Swift-rendered HTML + hypermedia** for the CRUD majority, and
 **opt-in resumable islands** (Astro island topology × Qwik serialization mechanics × Solid/Svelte-5
-fine-grained signals) for the interactive minority, all over a hand-written **~2–6 KB** client
+fine-grained signals) for the interactive minority, all over a hand-written **~2–4 KB** client
 runtime. Because views are Swift (result builders + macros) with **no template files**, the entire
 server scope type-checks and compiles as one unit (RFC-0004).
 
@@ -109,7 +109,7 @@ on bundle, cold-start, TTI, and DOM-access cost — ADR-0006.
 5. **Wire format (RFC-0003, ADR-0007)** — island attributes + one inline
    `<script type="application/adh-state+json">` index-deduped graph serialized via `ADJSON`; server
    push via **SSE + JSON Merge Patch (RFC 7396)** + HTML morph / out-of-band swaps.
-6. **Client runtime (ADR-0006)** — one hand-written **~2–6 KB** generic interpreter (delegated
+6. **Client runtime (ADR-0006)** — one hand-written **~2–4 KB** generic interpreter (delegated
    listener + signals + DOM binding + SSE morph), shipped once as an **SRI-hashed** static asset.
 
 ## 5. Products & packaging (ADR-0010)
@@ -166,7 +166,7 @@ lands, server-rendered pages/fragments already work via buffered `.raw(text/html
 - The whole server scope compiles as one `swift build`; illegal element/attribute combinations fail to
   compile (negative tests) — RFC-0004.
 - Render throughput / allocations / p50-p99 gated by the ordo-one suite; the client runtime stays
-  ≤ 6 KB gzipped.
+  ≤ 4 KB gzipped.
 
 ## References
 

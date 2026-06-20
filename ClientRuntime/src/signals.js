@@ -1,6 +1,6 @@
 // Tiny push-pull fine-grained signals (alien-signals/Preact-signals inspired, minimal). An effect
 // records the signals it reads; setting a signal re-runs its dependent effects. DOM-free + unit-tested;
-// the DOM bindings in runtime.ts are just effects that write to a node.
+// the DOM bindings in runtime.js are just effects that write to a node.
 //
 // Updates flow through a small synchronous scheduler: a `set` enqueues its subscribers (deduped via a
 // per-effect `queued` flag — no per-`set` array copy) and flushes them; effects triggered during the
@@ -8,22 +8,25 @@
 // most once per propagation. Flushing is synchronous (a behavior's DOM update lands before the event
 // handler returns), just batched + deduped.
 
-let active: Effect | null = null;
+/** @type {Effect | null} */
+let active = null;
 let flushing = false;
-const pending: Effect[] = [];
+/** @type {Effect[]} */
+const pending = [];
 
-function enqueue(effect: Effect): void {
+/** @param {Effect} effect */
+function enqueue(effect) {
   if (effect.queued) return;
   effect.queued = true;
   pending.push(effect);
 }
 
-function flush(): void {
+function flush() {
   if (flushing) return;  // a re-entrant set() during a flush just appends to `pending`
   flushing = true;
   try {
     for (let i = 0; i < pending.length; i++) {
-      const effect = pending[i]!;
+      const effect = /** @type {Effect} */ (pending[i]);
       effect.queued = false;
       effect.run();
     }
@@ -33,54 +36,61 @@ function flush(): void {
   }
 }
 
-export class Signal<T> {
-  #subs = new Set<Effect>();
-  #value: T;
+/** A reactive value. @template T */
+export class Signal {
+  /** @type {Set<Effect>} */
+  #subs = new Set();
+  /** @type {T} */
+  #value;
 
-  constructor(value: T) {
+  /** @param {T} value */
+  constructor(value) {
     this.#value = value;
   }
 
-  /** Read the value, recording a dependency on the active effect. */
-  get(): T {
+  /** Read the value, recording a dependency on the active effect. @returns {T} */
+  get() {
     if (active) {
       this.#subs.add(active);
-      active.deps.add(this as Signal<unknown>);
+      active.deps.add(/** @type {Signal<unknown>} */ (this));
     }
     return this.#value;
   }
 
-  /** Read without subscribing. */
-  peek(): T {
+  /** Read without subscribing. @returns {T} */
+  peek() {
     return this.#value;
   }
 
-  /** Set the value; schedules dependent effects (deduped, batched) if it changed. */
-  set(value: T): void {
+  /** Set the value; schedules dependent effects (deduped, batched) if it changed. @param {T} value */
+  set(value) {
     if (Object.is(value, this.#value)) return;
     this.#value = value;
     for (const effect of this.#subs) enqueue(effect);
     flush();
   }
 
-  /** @internal */
-  remove(effect: Effect): void {
+  /** @internal @param {Effect} effect */
+  remove(effect) {
     this.#subs.delete(effect);
   }
 }
 
 export class Effect {
-  deps = new Set<Signal<unknown>>();
+  /** @type {Set<Signal<unknown>>} */
+  deps = new Set();
   /** @internal — set while this effect is in the scheduler's pending queue (dedup). */
   queued = false;
-  #fn: () => void;
+  /** @type {() => void} */
+  #fn;
 
-  constructor(fn: () => void) {
+  /** @param {() => void} fn */
+  constructor(fn) {
     this.#fn = fn;
     this.run();
   }
 
-  run(): void {
+  run() {
     for (const dep of this.deps) dep.remove(this);
     this.deps.clear();
     const previous = active;
@@ -93,6 +103,7 @@ export class Effect {
   }
 }
 
-export function effect(fn: () => void): Effect {
+/** @param {() => void} fn @returns {Effect} */
+export function effect(fn) {
   return new Effect(fn);
 }

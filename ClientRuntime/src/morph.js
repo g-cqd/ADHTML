@@ -3,15 +3,23 @@
 // by id and by tag where possible, instead of clobbering `innerHTML`. The walk is **iterative** (an
 // explicit worklist of parent pairs, no recursion — matching the Swift engine's no-recursion stance):
 // each pair reconciles its direct children, pushing matched element children for deeper reconciliation.
-// v1 reconciles positionally with id preference, which still yields a DOM that matches the new HTML;
-// full idiomorph-style reordering is a follow-up.
+// v1 reconciles positionally with id preference, which still yields a DOM that matches the new HTML.
 
-/** Reconcile `target`'s children to `html` (parsed as a fragment), morphing in place where possible. */
-export function morph(target: Element, html: string): void {
-  const template = document.createElement("template");
+/** @type {HTMLTemplateElement | undefined} */
+let parseTemplate;
+
+/** Reconcile `target`'s children to `html` (parsed as a fragment), morphing in place where possible.
+ * @param {Element} target @param {string} html @returns {void} */
+export function morph(target, html) {
+  // Reuse one <template> across calls (created lazily so importing this module never touches the DOM).
+  // `innerHTML =` resets its content each call, and the walk only ever reads/clones template nodes
+  // (never moves them out), so reuse is safe.
+  const template = (parseTemplate ??= document.createElement("template"));
   template.innerHTML = html;
-  const work: Array<[Node, Node]> = [[target, template.content]];
-  let pair: [Node, Node] | undefined;
+  /** @type {Array<[Node, Node]>} */
+  const work = [[target, template.content]];
+  /** @type {[Node, Node] | undefined} */
+  let pair;
   while ((pair = work.pop())) {
     reconcileChildren(pair[0], pair[1], work);
   }
@@ -20,10 +28,12 @@ export function morph(target: Element, html: string): void {
 /** Make `oldParent`'s children match `newParent`'s; queue matched element pairs for deeper morphing.
  * id-set aware (idiomorph heuristic): a new child whose id exists among the old siblings reuses that
  * node — **moved** into place with `insertBefore` rather than replaced — so keyed nodes (and their
- * focus/state) survive a reorder. Falls back to positional tag matching when there is no id. */
-function reconcileChildren(oldParent: Node, newParent: Node, work: Array<[Node, Node]>): void {
+ * focus/state) survive a reorder. Falls back to positional tag matching when there is no id.
+ * @param {Node} oldParent @param {Node} newParent @param {Array<[Node, Node]>} work @returns {void} */
+function reconcileChildren(oldParent, newParent, work) {
   // Index old element children by id, so a reordered keyed node can be found wherever it now sits.
-  const oldById = new Map<string, Element>();
+  /** @type {Map<string, Element>} */
+  const oldById = new Map();
   for (let node = oldParent.firstChild; node; node = node.nextSibling) {
     if (node instanceof Element && node.id) oldById.set(node.id, node);
   }
@@ -34,7 +44,8 @@ function reconcileChildren(oldParent: Node, newParent: Node, work: Array<[Node, 
     const nextNew = newChild.nextSibling;
 
     // Prefer a keyed match (anywhere among the old siblings); else the current positional node.
-    let match: ChildNode | null = null;
+    /** @type {ChildNode | null} */
+    let match = null;
     if (newChild instanceof Element && newChild.id && oldById.has(newChild.id)) {
       match = oldById.get(newChild.id) ?? null;
       oldById.delete(newChild.id);
@@ -68,8 +79,9 @@ function reconcileChildren(oldParent: Node, newParent: Node, work: Array<[Node, 
   }
 }
 
-/** Two nodes are "the same slot" (morph in place) vs. a replacement: by id when either has one, else tag. */
-function sameNode(a: Node, b: Node): boolean {
+/** Two nodes are "the same slot" (morph in place) vs. a replacement: by id when either has one, else tag.
+ * @param {Node} a @param {Node} b @returns {boolean} */
+function sameNode(a, b) {
   if (a.nodeType !== b.nodeType) return false;
   if (a instanceof Element && b instanceof Element) {
     if (a.id || b.id) return a.id === b.id && a.tagName === b.tagName;
@@ -78,11 +90,19 @@ function sameNode(a: Node, b: Node): boolean {
   return true;  // text / comment of the same node type
 }
 
-function patchAttributes(oldEl: Element, newEl: Element): void {
-  for (const attr of [...newEl.attributes]) {
+/** Sync `oldEl`'s attributes to `newEl`'s. Iterates the live `NamedNodeMap`s by index (no `[...attrs]`
+ * snapshot allocation): forward for the set pass; backward for the remove pass so deleting an attribute
+ * from the live map can't skip the next one.
+ * @param {Element} oldEl @param {Element} newEl @returns {void} */
+function patchAttributes(oldEl, newEl) {
+  const newAttrs = newEl.attributes;
+  for (let i = 0; i < newAttrs.length; i++) {
+    const attr = /** @type {Attr} */ (newAttrs[i]);
     if (oldEl.getAttribute(attr.name) !== attr.value) oldEl.setAttribute(attr.name, attr.value);
   }
-  for (const attr of [...oldEl.attributes]) {
+  const oldAttrs = oldEl.attributes;
+  for (let i = oldAttrs.length - 1; i >= 0; i--) {
+    const attr = /** @type {Attr} */ (oldAttrs[i]);
     if (!newEl.hasAttribute(attr.name)) oldEl.removeAttribute(attr.name);
   }
 }

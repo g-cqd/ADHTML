@@ -43,7 +43,14 @@ deterministic by construction and the numbers are from quiescent runs.
 
 6. **JS failure-safe + de-recursion.** Every `JSON.parse` degrades instead of throwing (malformed inline
    state → static page; malformed SSE frame → dropped; per-island wiring isolated; `set` never assigns
-   NaN). `morph` is now an iterative worklist (no DOM-subtree recursion). 1.73 KiB gzip (≤ 6 KiB).
+   NaN). `morph` is now an iterative worklist (no DOM-subtree recursion). ≈ 2.2 KiB gzip (≤ 4 KiB).
+
+7. **JS authored in JavaScript + JSDoc; fastest native APIs.** The runtime is plain JS with JSDoc types
+   (strict `tsc --checkJs`, no transpile) rather than TypeScript — perf-identical output, authored to
+   reach for the fastest native API on each hot path: document-level delegation resolves a handler with
+   `Element.closest()` (one native ancestor-walk, no `composedPath()` array allocated per event), and
+   `morph` reuses one `<template>` and patches attributes over the live `NamedNodeMap` with no `[...]`
+   snapshot. A batched, deduped signals scheduler runs each effect at most once per propagation.
 
 ## Consequences
 

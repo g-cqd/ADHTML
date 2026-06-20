@@ -5,36 +5,41 @@
 // dependency cells in-browser (no server round-trip). A `cmp` without `e` (opaque Swift closure) stays
 // server-updated via SSE patch. The runtime's WIRE_VERSION must match `ADHTMLCore.wireFormatVersion`.
 
-import { type WireExprJSON, evalExpr } from "./expr";
+import { evalExpr } from "./expr";
 import { Signal, effect } from "./signals";
 
 export const WIRE_VERSION = 1;
 
-export interface IslandSpec {
-  id: string;
-  on: string;
-  scope: number[];
-}
+/**
+ * @typedef {object} IslandSpec
+ * @property {string} id
+ * @property {string} on
+ * @property {number[]} scope
+ */
 
-export interface WireState {
-  cells: Signal<unknown>[];
-  islands: IslandSpec[];
-}
+/**
+ * @typedef {object} WireState
+ * @property {Signal<unknown>[]} cells
+ * @property {IslandSpec[]} islands
+ */
 
-interface RawCell {
-  $: string;
-  v: unknown;
-  e?: WireExprJSON;
-}
+/**
+ * @typedef {object} RawCell
+ * @property {string} $
+ * @property {unknown} v
+ * @property {import("./expr").WireExprJSON} [e]
+ */
 
-interface RawPayload {
-  v: number;
-  cells: RawCell[];
-  islands?: IslandSpec[];
-}
+/**
+ * @typedef {object} RawPayload
+ * @property {number} v
+ * @property {RawCell[]} cells
+ * @property {IslandSpec[]} [islands]
+ */
 
-export function parseState(json: unknown): WireState {
-  const payload = json as RawPayload;
+/** @param {unknown} json @returns {WireState} */
+export function parseState(json) {
+  const payload = /** @type {RawPayload} */ (json);
   if (payload.v !== WIRE_VERSION) {
     throw new Error(`adh: unsupported wire version ${payload.v} (runtime expects ${WIRE_VERSION})`);
   }
@@ -53,8 +58,9 @@ export function parseState(json: unknown): WireState {
 }
 
 /** Read + parse the inline state block, or `null` if the page has none / it is malformed or an
- * unsupported version. Failure-safe: a bad block degrades to a static page instead of throwing. */
-export function readState(doc: Document = document): WireState | null {
+ * unsupported version. Failure-safe: a bad block degrades to a static page instead of throwing.
+ * @param {Document} [doc] @returns {WireState | null} */
+export function readState(doc = document) {
   const element = doc.getElementById("adh-state");
   if (!element) return null;
   try {

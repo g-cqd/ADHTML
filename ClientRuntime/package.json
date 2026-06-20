@@ -7,7 +7,7 @@
   "scripts": {
     "test": "bun test ./test",
     "typecheck": "tsc --noEmit",
-    "build": "bun run build.ts",
+    "build": "bun run build.js",
     "e2e": "playwright test"
   },
   "devDependencies": {

@@ -3,15 +3,15 @@ import { afterAll, beforeAll, beforeEach, expect, test } from "bun:test";
 
 // Browser-in-the-loop tests for the DOM layer (the glue the unit tests can't reach): hydration wiring,
 // delegated events, reactive bindings, and the SSE morph. happy-dom provides a real DOM, so a click
-// actually bubbles through composedPath and an effect actually writes to a node.
+// actually bubbles to the document and an effect actually writes to a node.
 
 beforeAll(() => GlobalRegistrator.register());
 afterAll(() => GlobalRegistrator.unregister());
 
-let hydrate: typeof import("../src/runtime").hydrate;
-let connect: typeof import("../src/runtime").connect;
-let morph: typeof import("../src/morph").morph;
-let readState: typeof import("../src/wire").readState;
+let hydrate;
+let connect;
+let morph;
+let readState;
 
 beforeAll(async () => {
   ({ hydrate, connect } = await import("../src/runtime"));
@@ -24,7 +24,7 @@ beforeEach(() => {
 });
 
 /** A counter island + its inline state, exactly as the Swift renderer emits them. */
-function mountCounter(on = "load"): void {
+function mountCounter(on = "load") {
   document.body.innerHTML = `
     <div data-adh-island data-adh-id="counter" data-adh-on="${on}">
       <button data-adh-on:click="increment#0#1">+</button>
@@ -39,8 +39,8 @@ test("hydrate wires a delegated click -> behavior -> bound node update", () => {
   mountCounter();
   hydrate(document);
 
-  const button = document.querySelector("button")!;
-  const span = document.querySelector("span")!;
+  const button = document.querySelector("button");
+  const span = document.querySelector("span");
   expect(span.textContent).toBe("0");
 
   button.click();
@@ -49,25 +49,36 @@ test("hydrate wires a delegated click -> behavior -> bound node update", () => {
   expect(span.textContent).toBe("2");
 });
 
+test("a delegated click reaches a deeply nested target via closest()", () => {
+  // The clicked node is a child of the data-adh-on element; closest() must still find the handler.
+  document.body.innerHTML = `
+    <div data-adh-island data-adh-id="i" data-adh-on="load">
+      <button data-adh-on:click="increment#0#1"><span class="inner">+</span></button>
+      <output data-adh-bind:text="0">0</output>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">
+      {"v":1,"cells":[{"$":"sig","v":0}],"islands":[{"id":"i","on":"load","scope":[0]}]}
+    </script>`;
+  hydrate(document);
+  document.querySelector(".inner").click();  // click the inner span, not the button itself
+  expect(document.querySelector("output").textContent).toBe("1");
+});
+
 /** Swap in an IntersectionObserver that fires (or not) on observe; happy-dom's never intersects. */
-function stubIntersectionObserver(fire: boolean): () => void {
+function stubIntersectionObserver(fire) {
   const original = globalThis.IntersectionObserver;
   class Stub {
-    private cb: IntersectionObserverCallback;
-    constructor(cb: IntersectionObserverCallback) {
+    constructor(cb) {
       this.cb = cb;
     }
-    observe(element: Element): void {
+    observe(element) {
       if (fire) {
-        this.cb(
-          [{ isIntersecting: true, target: element } as IntersectionObserverEntry],
-          this as unknown as IntersectionObserver,
-        );
+        this.cb([{ isIntersecting: true, target: element }], this);
       }
     }
-    disconnect(): void {}
+    disconnect() {}
   }
-  globalThis.IntersectionObserver = Stub as unknown as typeof IntersectionObserver;
+  globalThis.IntersectionObserver = Stub;
   return () => {
     globalThis.IntersectionObserver = original;
   };
@@ -78,8 +89,8 @@ test("the visible directive wires once the island intersects", () => {
   try {
     mountCounter("visible");
     hydrate(document);
-    document.querySelector("button")!.click();
-    expect(document.querySelector("span")!.textContent).toBe("1");
+    document.querySelector("button").click();
+    expect(document.querySelector("span").textContent).toBe("1");
   } finally {
     restore();
   }
@@ -90,8 +101,8 @@ test("the visible directive stays inert until it intersects (lazy)", () => {
   try {
     mountCounter("visible");
     hydrate(document);
-    document.querySelector("button")!.click();
-    expect(document.querySelector("span")!.textContent).toBe("0");  // never wired
+    document.querySelector("button").click();
+    expect(document.querySelector("span").textContent).toBe("0");  // never wired
   } finally {
     restore();
   }
@@ -99,12 +110,12 @@ test("the visible directive stays inert until it intersects (lazy)", () => {
 
 test("the visible directive falls back to immediate when IntersectionObserver is unavailable", () => {
   const original = globalThis.IntersectionObserver;
-  (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = undefined;
+  globalThis.IntersectionObserver = undefined;
   try {
     mountCounter("visible");
     hydrate(document);
-    document.querySelector("button")!.click();
-    expect(document.querySelector("span")!.textContent).toBe("1");
+    document.querySelector("button").click();
+    expect(document.querySelector("span").textContent).toBe("1");
   } finally {
     globalThis.IntersectionObserver = original;
   }
@@ -120,16 +131,16 @@ test("a value binding writes to an input's value", () => {
       {"v":1,"cells":[{"$":"sig","v":"hi"}],"islands":[{"id":"i","on":"load","scope":[0]}]}
     </script>`;
   hydrate(document);
-  const input = document.querySelector("input")!;
+  const input = document.querySelector("input");
   expect(input.value).toBe("hi");
-  document.querySelector("button")!.click();
+  document.querySelector("button").click();
   expect(input.value).toBe("hello");
 });
 
 test("morph reconciles a subtree and preserves a node by id", () => {
   document.body.innerHTML = `<div id="root"><p id="keep">old</p><span>gone</span></div>`;
-  const root = document.getElementById("root")!;
-  const keep = document.getElementById("keep")!;
+  const root = document.getElementById("root");
+  const keep = document.getElementById("keep");
 
   morph(root, `<p id="keep">new</p><strong>added</strong>`);
 
@@ -137,26 +148,26 @@ test("morph reconciles a subtree and preserves a node by id", () => {
   expect(document.getElementById("keep")).toBe(keep);
   expect(keep.textContent).toBe("new");
   expect(root.querySelector("span")).toBeNull();
-  expect(root.querySelector("strong")!.textContent).toBe("added");
+  expect(root.querySelector("strong").textContent).toBe("added");
 });
 
 test("connect applies an SSE morph event to the named island", () => {
   // Drive the morph branch of connect() directly with a synthetic EventSource (no network).
   document.body.innerHTML = `<div data-adh-id="region"><p>before</p></div>`;
-  const listeners: Record<string, (e: MessageEvent) => void> = {};
+  const listeners = {};
   const fakeSource = {
-    addEventListener(type: string, fn: (e: MessageEvent) => void) {
+    addEventListener(type, fn) {
       listeners[type] = fn;
     },
   };
-  (globalThis as { EventSource?: unknown }).EventSource = function () {
+  globalThis.EventSource = function () {
     return fakeSource;
   };
 
   connect("/events", { cells: [], islands: [] }, document);
-  listeners.morph!({ data: JSON.stringify({ id: "region", html: "<p>after</p>" }) } as MessageEvent);
+  listeners.morph({ data: JSON.stringify({ id: "region", html: "<p>after</p>" }) });
 
-  expect(document.querySelector('[data-adh-id="region"] p')!.textContent).toBe("after");
+  expect(document.querySelector('[data-adh-id="region"] p').textContent).toBe("after");
 });
 
 test("a malformed inline state block degrades to null (failure-safe, page stays static)", () => {
@@ -167,28 +178,28 @@ test("a malformed inline state block degrades to null (failure-safe, page stays 
 
 test("connect ignores a malformed SSE frame instead of throwing", () => {
   document.body.innerHTML = `<div data-adh-id="r"><p>x</p></div>`;
-  const listeners: Record<string, (e: MessageEvent) => void> = {};
+  const listeners = {};
   const fakeSource = {
-    addEventListener(type: string, fn: (e: MessageEvent) => void) {
+    addEventListener(type, fn) {
       listeners[type] = fn;
     },
   };
-  (globalThis as { EventSource?: unknown }).EventSource = function () {
+  globalThis.EventSource = function () {
     return fakeSource;
   };
 
   connect("/events", { cells: [], islands: [] }, document);
-  expect(() => listeners.morph!({ data: "{not json" } as MessageEvent)).not.toThrow();
-  expect(() => listeners.patch!({ data: "nope" } as MessageEvent)).not.toThrow();
-  expect(document.querySelector("p")!.textContent).toBe("x");  // untouched
+  expect(() => listeners.morph({ data: "{not json" })).not.toThrow();
+  expect(() => listeners.patch({ data: "nope" })).not.toThrow();
+  expect(document.querySelector("p").textContent).toBe("x");  // untouched
 });
 
 test("morph handles deep nesting iteratively and preserves a deep node by id", () => {
   let inner = `<span id="leaf">old</span>`;
   for (let i = 0; i < 60; i++) inner = `<div>${inner}</div>`;  // 60 levels (would overflow a recursive morph budget)
   document.body.innerHTML = `<div id="root">${inner}</div>`;
-  const root = document.getElementById("root")!;
-  const leaf = document.getElementById("leaf")!;
+  const root = document.getElementById("root");
+  const leaf = document.getElementById("leaf");
 
   let next = `<span id="leaf">new</span>`;
   for (let i = 0; i < 60; i++) next = `<div>${next}</div>`;
@@ -200,10 +211,10 @@ test("morph handles deep nesting iteratively and preserves a deep node by id", (
 
 test("morph reorders keyed children, preserving node identity", () => {
   document.body.innerHTML = `<ul id="list"><li id="a">A</li><li id="b">B</li><li id="c">C</li></ul>`;
-  const list = document.getElementById("list")!;
-  const a = document.getElementById("a")!;
-  const b = document.getElementById("b")!;
-  const c = document.getElementById("c")!;
+  const list = document.getElementById("list");
+  const a = document.getElementById("a");
+  const b = document.getElementById("b");
+  const c = document.getElementById("c");
 
   morph(list, `<li id="c">C</li><li id="a">A</li><li id="b">B</li>`);
 
@@ -215,8 +226,8 @@ test("morph reorders keyed children, preserving node identity", () => {
 
 test("morph inserts/removes keyed children without disturbing the rest", () => {
   document.body.innerHTML = `<ul id="list"><li id="a">A</li><li id="b">B</li></ul>`;
-  const list = document.getElementById("list")!;
-  const a = document.getElementById("a")!;
+  const list = document.getElementById("list");
+  const a = document.getElementById("a");
 
   morph(list, `<li id="a">A</li><li id="x">X</li><li id="b">B</li>`);  // insert x
   expect(document.getElementById("a")).toBe(a);
@@ -230,11 +241,11 @@ test("morph inserts/removes keyed children without disturbing the rest", () => {
 
 test("a reordered keyed input keeps its live value (state survives the move)", () => {
   document.body.innerHTML = `<form id="f"><input id="i1"><input id="i2"></form>`;
-  const form = document.getElementById("f")!;
-  (document.getElementById("i1") as HTMLInputElement).value = "typed";  // live state, not in the HTML
+  const form = document.getElementById("f");
+  document.getElementById("i1").value = "typed";  // live state, not in the HTML
 
   morph(form, `<input id="i2"><input id="i1">`);  // reordered
 
-  expect((document.getElementById("i1") as HTMLInputElement).value).toBe("typed");
+  expect(document.getElementById("i1").value).toBe("typed");
   expect([...form.children].map((el) => el.id)).toEqual(["i2", "i1"]);
 });

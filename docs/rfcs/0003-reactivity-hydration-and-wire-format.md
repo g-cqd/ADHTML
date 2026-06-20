@@ -11,7 +11,7 @@
 This is the novel subsystem — the reason ADHTML exists rather than adopting Elementary. A
 **server-evaluated, wire-serializable signal graph** drives both the initial HTML and a **resumable
 islands** hydration model: the server serializes listeners + island-scope state into the document, and
-a **~2–6 KB hand-written JS runtime** (ADR-0006) resumes interactivity with no full-tree hydration and
+a **~2–4 KB hand-written JS runtime** (ADR-0006) resumes interactivity with no full-tree hydration and
 no replay of view logic. Live updates are server-pushed over **SSE** as HTML morphs and **JSON Merge
 Patch (RFC 7396)** signal patches. It is the largest review surface; the security crux is that **only
 island-scope state is serialized** (a data-leak guard).
@@ -128,7 +128,7 @@ SRI-pinned (ADR-0006).
 - Wire round-trip: `serialize(graph)` then parse-and-rebuild equals the original (shared/cyclic cells
   collapse to one ref); differential parse via `ADJSON` confirms well-formed JSON.
 - An SSE `patch` applies via `JSONMergePatch` and updates exactly the bound nodes.
-- The runtime asset stays ≤ 6 KB gzipped (hard CI gate).
+- The runtime asset stays ≤ 4 KB gzipped (hard CI gate).
 
 ## References
 

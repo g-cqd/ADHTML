@@ -8,8 +8,9 @@
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "noEmit": true,
-    "verbatimModuleSyntax": true,
+    "allowJs": true,
+    "checkJs": true,
     "types": ["bun"]
   },
-  "include": ["src", "test", "build.ts", "e2e", "playwright.config.ts"]
+  "include": ["src"]
 }

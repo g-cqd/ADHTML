@@ -3,27 +3,29 @@
 // recomputed in-browser from its dependency cells, with no server round-trip. No recursion (explicit
 // work + value stacks), matching the engine's no-recursion stance.
 
-import type { Signal } from "./signals";
+/**
+ * A serialized expression node: a cell ref `{c}`, a literal `{i|d|b|s}`, or a binary `{o,l,r}`.
+ * @typedef {{c: number} | {i: number} | {d: number} | {b: boolean} | {s: string}
+ *   | {o: string, l: WireExprJSON, r: WireExprJSON}} WireExprJSON
+ */
 
-/** A serialized expression node: a cell ref `{c}`, a literal `{i|d|b|s}`, or a binary `{o,l,r}`. */
-export type WireExprJSON =
-  | { c: number }
-  | { i: number }
-  | { d: number }
-  | { b: boolean }
-  | { s: string }
-  | { o: string; l: WireExprJSON; r: WireExprJSON };
+/** @typedef {{visit: WireExprJSON} | {fold: string}} Work */
 
 /** The binary op tokens this evaluator supports — must equal Swift `BinaryOp.rawValue` (parity test). */
-export const BINARY_OPS = ["+", "-", "*", "++"] as const;
+export const BINARY_OPS = ["+", "-", "*", "++"];
 
 /** Evaluate `expr` over `cells`, reading each referenced cell via `.get()` so an enclosing effect
- * subscribes to it (reactive recompute). Iterative post-order. */
-export function evalExpr(expr: WireExprJSON, cells: Array<Signal<unknown>>): unknown {
-  type Work = { visit: WireExprJSON } | { fold: string };
-  const work: Work[] = [{ visit: expr }];
-  const values: unknown[] = [];
-  let item: Work | undefined;
+ * subscribes to it (reactive recompute). Iterative post-order.
+ * @param {WireExprJSON} expr
+ * @param {Array<import("./signals").Signal<unknown>>} cells
+ * @returns {unknown} */
+export function evalExpr(expr, cells) {
+  /** @type {Work[]} */
+  const work = [{ visit: expr }];
+  /** @type {unknown[]} */
+  const values = [];
+  /** @type {Work | undefined} */
+  let item;
   while ((item = work.pop())) {
     if ("fold" in item) {
       const rhs = values.pop();
@@ -42,14 +44,15 @@ export function evalExpr(expr: WireExprJSON, cells: Array<Signal<unknown>>): unk
   return values.pop();
 }
 
-function applyOp(op: string, lhs: unknown, rhs: unknown): unknown {
+/** @param {string} op @param {unknown} lhs @param {unknown} rhs @returns {unknown} */
+function applyOp(op, lhs, rhs) {
   switch (op) {
     case "+":
-      return (lhs as number) + (rhs as number);
+      return /** @type {number} */ (lhs) + /** @type {number} */ (rhs);
     case "-":
-      return (lhs as number) - (rhs as number);
+      return /** @type {number} */ (lhs) - /** @type {number} */ (rhs);
     case "*":
-      return (lhs as number) * (rhs as number);
+      return /** @type {number} */ (lhs) * /** @type {number} */ (rhs);
     case "++":
       return String(lhs) + String(rhs);
     default:

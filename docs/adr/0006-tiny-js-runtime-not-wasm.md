@@ -3,10 +3,11 @@
 - **Status**: Accepted (implemented 2026-06-20)
 - **Date**: 2026-06-19
 - **Related**: RFC-0003; ADR-0005 (islands), ADR-0007 (wire format), ADR-0011 (SRI via swift-crypto)
-- **Implementation**: hand-written TypeScript (signals, wire parse, closed behavior registry, DOM layer
-  with delegated events, bindings, Astro load directives incl. `IntersectionObserver`, SSE `patch` +
-  `morph`), built with bun → **1.64 KiB gzip** (≤ 6 KiB hard gate). 13 tests (DOM-free core + happy-dom
-  DOM layer); strict `tsc` typecheck. Full idiomorph-style reordering remains a follow-up.
+- **Implementation**: hand-written **JavaScript with JSDoc types** (signals, wire parse, closed behavior
+  registry, client expression evaluator, DOM layer with delegated events, bindings, Astro load directives
+  incl. `IntersectionObserver`, SSE `patch` + `morph`), built with bun → **≈ 2.2 KiB gzip** (≤ 4 KiB hard
+  gate). 23 unit (DOM-free core + happy-dom DOM layer) + 3 chromium e2e tests; strict `tsc --checkJs`
+  typecheck over the JSDoc. Fast native APIs (`Element.closest()` delegation, reusable `<template>` morph).
 
 ## Context
 
@@ -21,7 +22,7 @@ KB, Datastar ≈ 10–15 KB) with zero boundary cost and parses+executes in < 5 
 
 ## Decision
 
-Ship a **hand-written generic JS runtime, target ≈ 2–6 KB gzipped** — a delegated-listener loader
+Ship a **hand-written generic JS runtime, target ≈ 2–4 KB gzipped** — a delegated-listener loader
 (qwikloader-style) + a fine-grained signals core + declarative DOM binding + an SSE morph/patch client
 — served **once** as a static, **SRI-hashed** asset (SHA-256 via swift-crypto, gated `ADHTML_SRI`,
 ADR-0011). It is versioned to match the wire format (`"v"`). **Reject Swift→WASM** as the baseline
@@ -35,5 +36,5 @@ is amortized over real work.
   where it is unconstrained.
 - **Negative**: a (small) hand-written JS artifact to maintain and test outside the Swift
   type-checker (RFC-0004 §4 names this as part of the ~2% non-checked surface) — covered by browser
-  smoke tests and a hard ≤ 6 KB CI size gate. A build/minify step (esbuild) is dev-gated; the minified
-  output is committed and SRI-pinned so consumers need no Node.
+  smoke tests, a strict `tsc --checkJs` JSDoc typecheck, and a hard ≤ 4 KB CI size gate. A build/minify
+  step (bun) is dev-gated; the minified output is committed and SRI-pinned so consumers need no Node.

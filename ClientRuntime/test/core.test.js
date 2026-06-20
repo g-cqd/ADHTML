@@ -35,12 +35,12 @@ test("an effect drops dependencies it no longer reads (dynamic deps)", () => {
 
 test("behaviors mirror the Swift registry (increment/toggle/set)", () => {
   const cells = [new Signal(0), new Signal(false), new Signal("a")];
-  applyBehavior(parseInvocation("increment#0#2")!, cells);
-  expect(cells[0]!.peek()).toBe(2);
-  applyBehavior(parseInvocation("toggle#1")!, cells);
-  expect(cells[1]!.peek()).toBe(true);
-  applyBehavior(parseInvocation("set#2#z")!, cells);
-  expect(cells[2]!.peek()).toBe("z");
+  applyBehavior(parseInvocation("increment#0#2"), cells);
+  expect(cells[0].peek()).toBe(2);
+  applyBehavior(parseInvocation("toggle#1"), cells);
+  expect(cells[1].peek()).toBe(true);
+  applyBehavior(parseInvocation("set#2#z"), cells);
+  expect(cells[2].peek()).toBe("z");
 });
 
 test("malformed invocations are rejected", () => {
@@ -50,8 +50,8 @@ test("malformed invocations are rejected", () => {
 
 test("set on a number cell ignores a non-numeric param (failure-safe: no NaN)", () => {
   const cells = [new Signal(5)];
-  applyBehavior(parseInvocation("set#0#notanumber")!, cells);
-  expect(cells[0]!.peek()).toBe(5);  // unchanged, never NaN
+  applyBehavior(parseInvocation("set#0#notanumber"), cells);
+  expect(cells[0].peek()).toBe(5);  // unchanged, never NaN
 });
 
 test("parseState builds signals and enforces the wire version", () => {
@@ -61,8 +61,8 @@ test("parseState builds signals and enforces the wire version", () => {
     islands: [{ id: "c", on: "load", scope: [0] }],
   });
   expect(state.cells.length).toBe(1);
-  expect(state.cells[0]!.peek()).toBe(0);
-  expect(state.islands[0]!.id).toBe("c");
+  expect(state.cells[0].peek()).toBe(0);
+  expect(state.islands[0].id).toBe("c");
   expect(() => parseState({ v: 999, cells: [], islands: [] })).toThrow();
 });
 
@@ -79,9 +79,9 @@ test("a cmp cell with an expression recomputes reactively from its deps (no SSE)
     ],
     islands: [],
   });
-  expect(state.cells[1]!.peek()).toBe(6); // server value, re-derived on hydrate
-  state.cells[0]!.set(10); // count changes client-side
-  expect(state.cells[1]!.peek()).toBe(20); // doubled recomputed in-browser, no round-trip
+  expect(state.cells[1].peek()).toBe(6); // server value, re-derived on hydrate
+  state.cells[0].set(10); // count changes client-side
+  expect(state.cells[1].peek()).toBe(20); // doubled recomputed in-browser, no round-trip
 });
 
 test("evalExpr covers each binary op (parity with Swift BinaryOp.rawValue)", () => {

@@ -26,7 +26,7 @@ compiles as one unit*. `swift build` is the template compiler.
 - **State of the art, most performant possible**: an **iterative (non-recursive)** renderer over a
   flat opcode program (bounded memory, no deep-input stack-overflow DoS), **escape-by-default**
   context-aware output encoding, and **resumable islands** (Astro topology × Qwik serialization ×
-  fine-grained signals) over a **~2–6 KB hand-written JS runtime** — not Swift→WASM.
+  fine-grained signals) over a **~2–4 KB hand-written JS runtime** — not Swift→WASM.
 
 ## Hello, world
 
@@ -54,7 +54,7 @@ Text is **escaped by default** in the correct context; raw insertion is the sing
 | Reactivity | Serializable fine-grained signals (not `@Observable`); server-evaluated for SSR | ADR-0004 |
 | Hydration | Opt-in **islands + resumable wiring** (reject full / whole-page hydration) | ADR-0005 |
 | Wire format | Versioned, index-deduped JSON via ADJSON; SSE + JSON Merge Patch (RFC 7396) | ADR-0007 |
-| Client runtime | One hand-written ~2–6 KB JS interpreter, SRI-hashed (reject Swift→WASM) | ADR-0006 |
+| Client runtime | One hand-written ~2–4 KB JS interpreter, SRI-hashed (reject Swift→WASM) | ADR-0006 |
 | Swift-only | No template files; whole-scope compile-time type-checking | RFC-0004 · ADR-0009 |
 | Packaging | Foundation-free `ADHTMLCore`; env-gated NIO/Markdown/SRI/Obs/Fuzz | ADR-0010 |
 

@@ -1,10 +1,10 @@
-// Build + minify the runtime and gate its gzipped size (<= 6 KB, ADR-0006). Uses bun's built-in
-// bundler + gzip — no external dependencies. Run: `bun run build.ts` (or `bun run build`).
+// Build + minify the runtime and gate its gzipped size (<= 4 KB, ADR-0006). Uses bun's built-in
+// bundler + gzip — no external dependencies. Run: `bun run build.js` (or `bun run build`).
 
-const BUDGET_BYTES = 6 * 1024;
+const BUDGET_BYTES = 4 * 1024;
 
 const result = await Bun.build({
-  entrypoints: ["./src/runtime.ts"],
+  entrypoints: ["./src/runtime.js"],
   minify: true,
   target: "browser",
 });
@@ -14,7 +14,7 @@ if (!result.success) {
   process.exit(1);
 }
 
-const code = await result.outputs[0]!.text();
+const code = await result.outputs[0].text();
 await Bun.write("./adh-runtime.min.js", code);
 
 const gzipped = Bun.gzipSync(new TextEncoder().encode(code));
@@ -26,5 +26,3 @@ if (gzipped.length > BUDGET_BYTES) {
   process.exit(1);
 }
 console.log(`OK: within the ${BUDGET_BYTES / 1024} KiB gzip budget`);
-
-export {}  // make this a module (top-level await + isolated build script)
