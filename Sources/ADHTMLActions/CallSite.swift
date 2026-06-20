@@ -7,8 +7,9 @@
 public import ADHTMLCore  // HTML, form/input/button, Action, RegionID
 
 /// A hidden form field — rides the POST body on both paths (`new FormData(form)` for the runtime fetch,
-/// the native submit for no-JS), so the runtime never needs to know a field is an action token.
-public func Hidden(_ name: String, _ value: String) -> some HTML {
+/// the native submit for no-JS), so the runtime never needs to know a field is an action token. Concrete
+/// return type (not `some HTML`) so it composes cleanly inside another element's opaque builder.
+public func Hidden(_ name: String, _ value: String) -> HTMLElement<Tags.Input, EmptyHTML> {
     input().attribute("type", "hidden").attribute("name", name).attribute("value", value)
 }
 

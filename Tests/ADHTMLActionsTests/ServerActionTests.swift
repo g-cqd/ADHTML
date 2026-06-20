@@ -83,4 +83,42 @@ import ADServeCore  // ResponseContent for the dummy handler
                 + #"data-u="r" data-v="a"><input type="hidden" name="_adh" value="T">"#
                 + #"<button type="submit">X</button></form>"#)
     }
+
+    // MARK: .submits(to:) — the ambient-signer call site (P3)
+
+    @Test func `the ambient signer mints a token that the dispatcher verifies`() throws {
+        let signer = try ActionSigner(secret: [UInt8](repeating: 0x44, count: 32))
+        let signing = ActionRenderContext.Signing(signer: signer, sessionBinding: "sess1234", now: 1000)
+        let verified = try #require(signer.verified(signing.token(for: ActionID("xyz"))))
+        #expect(verified.id == "xyz")
+        #expect(verified.sid8 == "sess1234")  // CSRF binding flows from the render's session
+        #expect(verified.exp == 1000 + 3600)  // now + the default ttl
+    }
+
+    @Test func `submits lowers to the dual-world form with the signed token + value fields`() throws {
+        let signer = try ActionSigner(secret: [UInt8](repeating: 0x44, count: 32))
+        let handle = ActionHandle(id: ActionID("xyz"), region: "parts")
+        let html = ActionRenderContext.$current.withValue(
+            ActionRenderContext.Signing(signer: signer, sessionBinding: nil, now: 0)
+        ) {
+            form { button { "Go" }.attribute("type", "submit") }
+                .submits(to: handle, values: ["id": "7"])
+                .render()
+        }
+        #expect(
+            html.hasPrefix(
+                #"<form method="post" action="/_adh/act/xyz" data-p="post" data-q="/_adh/act/xyz" "#
+                    + #"data-u="parts" data-v="a">"#))
+        #expect(html.contains(#"<input type="hidden" name="id" value="7">"#))  // a value field
+        #expect(html.contains(#"<input type="hidden" name="_adh" value=""#))  // the signed token (non-empty)
+        #expect(html.contains(#"<button type="submit">Go</button></form>"#))
+    }
+
+    @Test func `submits outside an action render emits an empty token (fail-closed, still posts)`() {
+        let html = form { button { "Go" }.attribute("type", "submit") }
+            .submits(to: ActionHandle(id: ActionID("z"), region: "r"))
+            .render()
+        #expect(html.contains(#"<input type="hidden" name="_adh" value="">"#))  // no signer -> empty -> server rejects
+        #expect(html.contains(#"action="/_adh/act/z""#))  // the native form still posts
+    }
 }
