@@ -7,7 +7,6 @@ import Testing
 // stored `count` (the default) plus a `countSignal` accessor that resolves through
 // `ADHTMLRenderContext`. These tests pin the three guarantees the model must give: the default renders,
 // repeated `@State` reads dedup to one cell, and sibling instances get distinct cells.
-@Suite("State context")
 struct StateContextTests {
     /// The hand-written equivalent of `@Component struct Counter { @State var count = 0; … }`.
     struct Counter: Component {
@@ -22,8 +21,8 @@ struct StateContextTests {
         }
     }
 
-    @Test("renders its default and registers exactly one cell despite three reads")
-    func single() throws {
+    @Test
+    func `renders its default and registers exactly one cell despite three reads`() throws {
         let arena = CellArena()
         let html = String(decoding: try Counter().renderHydratable(arena: arena), as: UTF8.self)
 
@@ -37,16 +36,16 @@ struct StateContextTests {
         #expect(arena.cells[0].value == .int(0))
     }
 
-    @Test("a non-default initial value flows into the cell and the markup")
-    func nonDefault() throws {
+    @Test
+    func `a non-default initial value flows into the cell and the markup`() throws {
         let arena = CellArena()
         let html = String(decoding: try Counter(count: 7).renderHydratable(arena: arena), as: UTF8.self)
         #expect(html.contains(#"<span data-adh-bind:text="0">7</span>"#))
         #expect(arena.cells[0].value == .int(7))
     }
 
-    @Test("sibling component instances get distinct cells (per-instance scope)")
-    func multipleInstances() throws {
+    @Test
+    func `sibling component instances get distinct cells (per-instance scope)`() throws {
         let arena = CellArena()
         _ = try div {
             Counter(count: 1)
@@ -59,8 +58,8 @@ struct StateContextTests {
         #expect(arena.cells[1].value == .int(2))
     }
 
-    @Test("a static render needs no arena and still emits the default text")
-    func staticRender() {
+    @Test
+    func `a static render needs no arena and still emits the default text`() {
         // No ambient context: `countSignal` falls back to a throwaway arena; `count` is the default.
         #expect(Counter(count: 3).render().contains(">3</span>"))
     }
