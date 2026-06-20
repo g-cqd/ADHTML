@@ -73,4 +73,11 @@ struct HTMLExtractTests {
             })
         #expect(extracted.sections[0].content == "see [link](/docs/x) and ext")
     }
+
+    @Test func splitsByH3WhenNoH2() {
+        let extracted = HTMLDocument.extract("<main><h3>A</h3><p>x</p><h3>B</h3><p>y</p></main>")
+        #expect(extracted.sections.count == 2)
+        #expect(extracted.sections[0] == HTMLSection(heading: "A", content: "x"))
+        #expect(extracted.sections[1] == HTMLSection(heading: "B", content: "y"))
+    }
 }

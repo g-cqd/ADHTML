@@ -100,4 +100,34 @@ struct HTMLTreeTests {
         #expect(article?.elements(tag: "a").first?.attribute("href") == "/x")
         #expect(article?.firstElement(tag: "h1")?.textContent == "T")
     }
+
+    @Test func impliedDefinitionListAndOptionClose() {
+        #expect(
+            HTMLNode.parse("<dl><dt>a<dd>b<dt>c</dl>")
+                == [
+                    el(
+                        "dl", [:],
+                        [
+                            el("dt", [:], [.text("a")]), el("dd", [:], [.text("b")]),
+                            el("dt", [:], [.text("c")])
+                        ])
+                ])
+        #expect(
+            HTMLNode.parse("<select><option>a<option>b</select>")
+                == [
+                    el(
+                        "select", [:],
+                        [el("option", [:], [.text("a")]), el("option", [:], [.text("b")])])
+                ])
+    }
+
+    @Test func tableSectionImpliedClose() {
+        #expect(
+            HTMLNode.parse("<table><thead><tr><td>h</table>")
+                == [
+                    el(
+                        "table", [:],
+                        [el("thead", [:], [el("tr", [:], [el("td", [:], [.text("h")])])])])
+                ])
+    }
 }

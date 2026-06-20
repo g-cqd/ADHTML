@@ -77,4 +77,9 @@ struct HTMLMarkdownTests {
         #expect(md("<a href=\"old\">t</a>", linkResolver: { _ in "new" }) == "[t](new)")
         #expect(md("<a href=\"x\">t</a>", linkResolver: { _ in nil }) == "t")
     }
+
+    @Test func nestedListFlattensIntoItem() {
+        // A nested <ul> inside an <li> renders inline within that item (one line per top-level item).
+        #expect(md("<ul><li>a<ul><li>b</li></ul></li><li>c</li></ul>") == "- a - b\n- c")
+    }
 }
