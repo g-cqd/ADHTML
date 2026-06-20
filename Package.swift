@@ -136,6 +136,11 @@ let package = Package(
         .testTarget(name: "ADHTMLCoreTests", dependencies: ["ADHTMLCore"], swiftSettings: testSettings),
         .testTarget(name: "ADHTMLTests", dependencies: ["ADHTML"], swiftSettings: testSettings),
         .testTarget(name: "ADHTMLXSSTests", dependencies: ["ADHTMLCore"], swiftSettings: testSettings),
+
+        // The element/attribute table generator (ADR-0009). Run manually (`swift run ADHTMLCodegen`);
+        // its output is committed under DOM/Generated. Not a product, so consumers never build it; it
+        // depends only on Foundation (a dev-time tool, never shipped in a library product).
+        .executableTarget(name: "ADHTMLCodegen", swiftSettings: strictSettings),
     ]
 )
 

@@ -23,6 +23,11 @@ extension HTMLElement {
     public func aria(_ name: String, _ value: String) -> Self { attribute("aria-\(name)", value) }
 }
 
+extension HTMLElement where Tag: HasHref {
+    /// `href` (scheme-allowlisted URL — `javascript:`/`data:` rejected, ADR-0003). Offered only on tags
+    /// that may carry one (`<a>`, `<area>`, `<link>`, `<base>`).
+    public func href(_ value: String) -> Self { attribute("href", value, context: .url) }
+}
 extension HTMLElement where Tag: HasSrc {
     /// `src` (scheme-allowlisted URL).
     public func src(_ value: String) -> Self { attribute("src", value, context: .url) }
@@ -58,4 +63,20 @@ extension HTMLElement where Tag: HasAlt {
 extension HTMLElement where Tag: HasRel {
     /// `rel`.
     public func rel(_ value: String) -> Self { attribute("rel", value) }
+}
+extension HTMLElement where Tag: HasTarget {
+    /// `target` (e.g. `_blank`, `_self`).
+    public func target(_ value: String) -> Self { attribute("target", value) }
+}
+extension HTMLElement where Tag: HasContent {
+    /// `content` (`<meta>` value).
+    public func content(_ value: String) -> Self { attribute("content", value) }
+}
+extension HTMLElement where Tag: HasAction {
+    /// `action` (form submission URL — scheme-allowlisted).
+    public func action(_ value: String) -> Self { attribute("action", value, context: .url) }
+}
+extension HTMLElement where Tag: HasMethod {
+    /// `method` (`get`/`post`/`dialog`).
+    public func method(_ value: String) -> Self { attribute("method", value) }
 }
