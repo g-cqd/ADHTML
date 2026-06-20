@@ -1,18 +1,24 @@
 // Lean, id-aware DOM morph (idiomorph-inspired) for SSE `morph` out-of-band swaps. It reconciles a
 // target subtree to new server HTML, preserving nodes — and their focus, selection, and bound effects —
-// by id and by tag where possible, instead of clobbering `innerHTML`. Recursion here is over a TRUSTED,
-// server-generated subtree whose depth is bounded (not the unbounded/adversarial-input concern the
-// server renderer guards against), so it stays simple. v1 reconciles positionally with id preference,
-// which still yields a DOM that matches the new HTML; full idiomorph-style reordering is a follow-up.
+// by id and by tag where possible, instead of clobbering `innerHTML`. The walk is **iterative** (an
+// explicit worklist of parent pairs, no recursion — matching the Swift engine's no-recursion stance):
+// each pair reconciles its direct children, pushing matched element children for deeper reconciliation.
+// v1 reconciles positionally with id preference, which still yields a DOM that matches the new HTML;
+// full idiomorph-style reordering is a follow-up.
 
 /** Reconcile `target`'s children to `html` (parsed as a fragment), morphing in place where possible. */
 export function morph(target: Element, html: string): void {
   const template = document.createElement("template");
   template.innerHTML = html;
-  reconcile(target, template.content);
+  const work: Array<[Node, Node]> = [[target, template.content]];
+  let pair: [Node, Node] | undefined;
+  while ((pair = work.pop())) {
+    reconcileChildren(pair[0], pair[1], work);
+  }
 }
 
-function reconcile(oldParent: Node, newParent: Node): void {
+/** Make `oldParent`'s children match `newParent`'s; queue matched element pairs for deeper morphing. */
+function reconcileChildren(oldParent: Node, newParent: Node, work: Array<[Node, Node]>): void {
   let oldChild = oldParent.firstChild;
   let newChild = newParent.firstChild;
   while (newChild) {
@@ -21,8 +27,16 @@ function reconcile(oldParent: Node, newParent: Node): void {
       oldParent.appendChild(newChild.cloneNode(true));
     } else {
       const nextOld = oldChild.nextSibling;
-      if (sameNode(oldChild, newChild)) patchNode(oldChild, newChild);
-      else oldParent.replaceChild(newChild.cloneNode(true), oldChild);
+      if (sameNode(oldChild, newChild)) {
+        if (oldChild instanceof Element && newChild instanceof Element) {
+          patchAttributes(oldChild, newChild);
+          work.push([oldChild, newChild]);  // reconcile its children later (iteratively)
+        } else if (oldChild.nodeValue !== newChild.nodeValue) {
+          oldChild.nodeValue = newChild.nodeValue;  // text / comment content
+        }
+      } else {
+        oldParent.replaceChild(newChild.cloneNode(true), oldChild);
+      }
       oldChild = nextOld;
     }
     newChild = nextNew;
@@ -43,15 +57,6 @@ function sameNode(a: Node, b: Node): boolean {
     return a.tagName === b.tagName;
   }
   return true;  // text / comment of the same node type
-}
-
-function patchNode(oldNode: ChildNode, newNode: ChildNode): void {
-  if (oldNode instanceof Element && newNode instanceof Element) {
-    patchAttributes(oldNode, newNode);
-    reconcile(oldNode, newNode);
-  } else if (oldNode.nodeValue !== newNode.nodeValue) {
-    oldNode.nodeValue = newNode.nodeValue;  // text / comment content
-  }
 }
 
 function patchAttributes(oldEl: Element, newEl: Element): void {

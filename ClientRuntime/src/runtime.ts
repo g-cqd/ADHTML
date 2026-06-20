@@ -74,13 +74,22 @@ function schedule(on: string, root: Element, wire: () => void): void {
   else wire()  // "load"
 }
 
-/** Resume every island declared in the inline state block. */
+/** Resume every island declared in the inline state block. Each island wires independently: one
+ * island's failure (a bad binding, a missing API) must not break the others, so wiring is guarded. */
 export function hydrate(doc: Document = document): void {
   const state = readState(doc);
   if (!state) return;
   for (const island of state.islands) {
     const root = doc.querySelector(`[data-adh-id="${CSS.escape(island.id)}"]`);
-    if (root) schedule(island.on, root, () => wireIsland(root, state.cells));
+    if (root) {
+      schedule(island.on, root, () => {
+        try {
+          wireIsland(root, state.cells);
+        } catch {
+          // isolate per-island failures — the rest of the page stays interactive
+        }
+      });
+    }
   }
 }
 
@@ -94,19 +103,29 @@ export function hydrate(doc: Document = document): void {
 export function connect(url: string, state: WireState, doc: Document = document): EventSource {
   const source = new EventSource(url);
   source.addEventListener("patch", (event) => {
-    const data = JSON.parse((event as MessageEvent).data) as { cells?: Record<string, { v: unknown }> };
+    const data = parseEventData<{ cells?: Record<string, { v: unknown }> }>(event);
+    if (!data) return;  // malformed frame -> drop the update, never throw out of the listener
     for (const [index, change] of Object.entries(data.cells ?? {})) {
       state.cells[Number(index)]?.set(change.v);
     }
   });
   source.addEventListener("morph", (event) => {
-    const data = JSON.parse((event as MessageEvent).data) as { id?: string; html?: string };
-    if (data.id && typeof data.html === "string") {
+    const data = parseEventData<{ id?: string; html?: string }>(event);
+    if (data && data.id && typeof data.html === "string") {
       const target = doc.querySelector(`[data-adh-id="${CSS.escape(data.id)}"]`);
       if (target) morph(target, data.html);
     }
   });
   return source;
+}
+
+/** Parse an SSE event's JSON `data`, or `null` if it is malformed (failure-safe). */
+function parseEventData<T>(event: Event): T | null {
+  try {
+    return JSON.parse((event as MessageEvent).data) as T;
+  } catch {
+    return null;
+  }
 }
 
 if (typeof document !== "undefined") hydrate();

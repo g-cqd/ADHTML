@@ -11,10 +11,12 @@ afterAll(() => GlobalRegistrator.unregister());
 let hydrate: typeof import("../src/runtime").hydrate;
 let connect: typeof import("../src/runtime").connect;
 let morph: typeof import("../src/morph").morph;
+let readState: typeof import("../src/wire").readState;
 
 beforeAll(async () => {
   ({ hydrate, connect } = await import("../src/runtime"));
   ({ morph } = await import("../src/morph"));
+  ({ readState } = await import("../src/wire"));
 });
 
 beforeEach(() => {
@@ -155,4 +157,43 @@ test("connect applies an SSE morph event to the named island", () => {
   listeners.morph!({ data: JSON.stringify({ id: "region", html: "<p>after</p>" }) } as MessageEvent);
 
   expect(document.querySelector('[data-adh-id="region"] p')!.textContent).toBe("after");
+});
+
+test("a malformed inline state block degrades to null (failure-safe, page stays static)", () => {
+  document.body.innerHTML = `<script type="application/adh-state+json" id="adh-state">{ broken json</script>`;
+  expect(readState(document)).toBeNull();
+  expect(() => hydrate(document)).not.toThrow();
+});
+
+test("connect ignores a malformed SSE frame instead of throwing", () => {
+  document.body.innerHTML = `<div data-adh-id="r"><p>x</p></div>`;
+  const listeners: Record<string, (e: MessageEvent) => void> = {};
+  const fakeSource = {
+    addEventListener(type: string, fn: (e: MessageEvent) => void) {
+      listeners[type] = fn;
+    },
+  };
+  (globalThis as { EventSource?: unknown }).EventSource = function () {
+    return fakeSource;
+  };
+
+  connect("/events", { cells: [], islands: [] }, document);
+  expect(() => listeners.morph!({ data: "{not json" } as MessageEvent)).not.toThrow();
+  expect(() => listeners.patch!({ data: "nope" } as MessageEvent)).not.toThrow();
+  expect(document.querySelector("p")!.textContent).toBe("x");  // untouched
+});
+
+test("morph handles deep nesting iteratively and preserves a deep node by id", () => {
+  let inner = `<span id="leaf">old</span>`;
+  for (let i = 0; i < 60; i++) inner = `<div>${inner}</div>`;  // 60 levels (would overflow a recursive morph budget)
+  document.body.innerHTML = `<div id="root">${inner}</div>`;
+  const root = document.getElementById("root")!;
+  const leaf = document.getElementById("leaf")!;
+
+  let next = `<span id="leaf">new</span>`;
+  for (let i = 0; i < 60; i++) next = `<div>${next}</div>`;
+  morph(root, next);
+
+  expect(document.getElementById("leaf")).toBe(leaf);  // same node, preserved through 60 levels
+  expect(leaf.textContent).toBe("new");
 });

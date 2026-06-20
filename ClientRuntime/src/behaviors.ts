@@ -38,9 +38,13 @@ export function applyBehavior(inv: Invocation, cells: Array<Signal<unknown>>): v
   }
 }
 
-/** Coerce a string param to the cell's current value type (numbers/booleans/strings). */
+/** Coerce a string param to the cell's current value type (numbers/booleans/strings). Failure-safe:
+ * a non-finite number keeps the current value rather than setting NaN/Infinity. */
 function coerce(raw: string, like: unknown): unknown {
-  if (typeof like === "number") return Number(raw);
+  if (typeof like === "number") {
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : like;
+  }
   if (typeof like === "boolean") return raw === "true";
   return raw;
 }

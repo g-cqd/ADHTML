@@ -47,6 +47,12 @@ test("malformed invocations are rejected", () => {
   expect(parseInvocation("increment#x")).toBeNull();
 });
 
+test("set on a number cell ignores a non-numeric param (failure-safe: no NaN)", () => {
+  const cells = [new Signal(5)];
+  applyBehavior(parseInvocation("set#0#notanumber")!, cells);
+  expect(cells[0]!.peek()).toBe(5);  // unchanged, never NaN
+});
+
 test("parseState builds signals and enforces the wire version", () => {
   const state = parseState({
     v: WIRE_VERSION,

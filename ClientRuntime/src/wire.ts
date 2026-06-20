@@ -35,9 +35,14 @@ export function parseState(json: unknown): WireState {
   return { cells, islands: payload.islands ?? [] };
 }
 
-/** Read + parse the inline state block, or `null` if the page has none. */
+/** Read + parse the inline state block, or `null` if the page has none / it is malformed or an
+ * unsupported version. Failure-safe: a bad block degrades to a static page instead of throwing. */
 export function readState(doc: Document = document): WireState | null {
   const element = doc.getElementById("adh-state");
   if (!element) return null;
-  return parseState(JSON.parse(element.textContent ?? "{}"));
+  try {
+    return parseState(JSON.parse(element.textContent ?? "{}"));
+  } catch {
+    return null;
+  }
 }
