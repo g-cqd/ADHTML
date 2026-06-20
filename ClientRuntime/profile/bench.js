@@ -63,16 +63,7 @@ bench("hydrate/200-islands", 100, () => {
   hydrate(document);
 });
 
-// 5. Delegated click round-trip: dispatch N clicks at a NESTED target (so the document listener must
-// closest()-walk up to the data-adh-on element) -> behavior -> signal -> bound node write. Exercises the
-// full interaction path the closest() rewrite optimizes (no composedPath array alloc per event).
-document.body.innerHTML =
-  `<div data-adh-island data-adh-id="c" data-adh-on="load">` +
-  `<button id="b" data-adh-on:click="increment#0#1"><span class="inner">+</span></button>` +
-  `<span data-adh-bind:text="0">0</span></div>` +
-  `<script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[{"$":"sig","v":0}],"islands":[{"id":"c","on":"load","scope":[0]}]}</script>`;
-hydrate(document);
-const clickTarget = document.querySelector(".inner");
-bench("delegate/click-roundtrip-5000", 50, () => {
-  for (let i = 0; i < 5000; i++) clickTarget.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-});
+// Interaction latency (the delegated click round-trip the closest() rewrite optimizes) is measured in a
+// REAL browser instead — see e2e/server.js `/perf` + e2e/perf.spec.js. happy-dom's synthetic
+// `dispatchEvent` is ~100x slower than chromium and not representative of native event/closest() cost, so
+// timing it here would be both glacial and misleading; chromium runs the full 2000-click burst in ms.
