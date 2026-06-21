@@ -62,21 +62,25 @@ function collectParams(node, doc) {
 }
 
 /** Apply the response HTML to the target per `swap`. `morph` (default) reuses the id-aware reconciler;
- * `outOfBand` lets the response name its own regions (morph.js `oobSwap`).
+ * `outOfBand` lets the response name its own regions (morph.js `oobSwap`). After the DOM changes, `rewire`
+ * (when provided) resumes any island/binding the response brought in — so a morphed-in editable field is
+ * live, not inert (RFC-0019). `rewire` is idempotent, so re-scanning the whole target is safe.
  * @param {string} swap @param {string} html @param {Element | null} target @param {Document} doc
- * @returns {void} */
-function applySwap(swap, html, target, doc) {
-  if (swap === S.outOfBand) return oobSwap(html, doc);
+ * @param {((region: Element) => void) | undefined} [rewire] @returns {void} */
+function applySwap(swap, html, target, doc, rewire) {
+  if (swap === S.outOfBand) return oobSwap(html, doc, rewire);
   if (!target) return;
   if (swap === S.innerHTML) target.innerHTML = html;
   else if (swap === S.append) target.insertAdjacentHTML("beforeend", html);
   else morph(target, html);
+  rewire?.(target);
 }
 
 /** The fetch + swap CORE, shared by the declarative action interpreter (`perform`) and the programmatic
  * component-mount bridge (`ctx.action`, mount.js) — so a widget can ONLY reach the network through the
  * signed RFC-0019 endpoint, with the `ADH-Request: 1` header (C1). Never throws (guarded by the callers).
- * @param {{method?: string, url: string, params?: URLSearchParams, swap?: string, target?: Element | null}} req
+ * @param {{method?: string, url: string, params?: URLSearchParams, swap?: string, target?: Element | null,
+ *   rewire?: (region: Element) => void}} req
  * @param {Document} doc @returns {Promise<void>} */
 export async function request(req, doc) {
   const method = (req.method || "get").toUpperCase();
@@ -97,7 +101,7 @@ export async function request(req, doc) {
   if (!response.ok) return;
   const html = await response.text();
   if (html.length > MAX_RESPONSE_CHARS) return;  // failure-safe: drop an oversized fragment, keep the page live
-  applySwap(req.swap || S.morph, html, req.target ?? null, doc);
+  applySwap(req.swap || S.morph, html, req.target ?? null, doc, req.rewire);
 }
 
 /** Perform one declarative action: optimistic pre-apply, then the shared `request` core (fetch + swap).
@@ -118,6 +122,7 @@ function perform(node, state, doc) {
       swap: node.getAttribute(T.swap) || S.morph,
       params: collectParams(node, doc),
       target: targetId ? doc.getElementById(targetId) : null,
+      rewire: state.rewire,  // resume morphed-in islands/bindings after the swap (RFC-0019)
     },
     doc);
 }

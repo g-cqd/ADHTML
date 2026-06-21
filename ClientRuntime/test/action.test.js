@@ -188,6 +188,73 @@ test("evalExpr bails (undefined) on an oversized formula — the node-count ceil
   expect(evalExpr({ o: "+", l: { i: 2 }, r: { i: 3 } }, [])).toBe(5);
 });
 
+test("a morphed-in bound node is wired AND stays reactive (re-wire after a swap)", async () => {
+  // The fragment the search-morph brings in carries `data-e:text="0"` but was never present at hydration.
+  // Before the re-wire fix it stayed inert ("stale"); now it resolves against the existing cell and tracks it.
+  stubFetch(`<span id="out" data-e:text="0">stale</span>`);
+  const doc = mount(`
+    <div data-a data-b="isle" data-c="load">
+      <button id="plus" data-c:click="a#0#1">+</button>
+      <button id="go" data-p="get" data-q="/frag" data-u="t">load</button>
+    </div>
+    <div id="t"></div>
+    <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[{"$":"sig","v":5}],"islands":[{"id":"isle","on":"load","scope":[0]}]}</script>`);
+
+  doc.getElementById("go").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  await flush();
+  expect(doc.getElementById("out").textContent).toBe("5");  // the binding wired + ran against the live cell
+
+  doc.getElementById("plus").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  expect(doc.getElementById("out").textContent).toBe("6");  // and it is LIVE — the morphed-in node recomputes
+});
+
+test("a morphed-in editable field is two-way live — the token-field survives a search-morph", async () => {
+  // The headline bug: an editable field brought in by a server-side morph must hydrate, not go inert. The
+  // model binding writes cell→value AND the input pushes value→cell, so typing flows through to the echo.
+  stubFetch(`<input id="field" data-i="0"><span id="echo" data-e:text="0">x</span>`);
+  const doc = mount(`
+    <div data-a data-b="isle" data-c="load">
+      <button id="go" data-p="get" data-q="/frag" data-u="t">load</button>
+    </div>
+    <div id="t"></div>
+    <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[{"$":"sig","v":"hi"}],"islands":[{"id":"isle","on":"load","scope":[0]}]}</script>`);
+
+  doc.getElementById("go").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  await flush();
+  const field = doc.getElementById("field");
+  expect(field.value).toBe("hi");  // model effect wired: cell → value
+  expect(doc.getElementById("echo").textContent).toBe("hi");
+
+  field.value = "bye";
+  field.dispatchEvent(new Event("input", { bubbles: true }));
+  expect(doc.getElementById("echo").textContent).toBe("bye");  // input listener wired: value → cell → echo
+});
+
+test("a node that SURVIVES a morph is not re-wired (no doubled `model` input listener)", async () => {
+  // Idempotency: re-wiring scans the whole swapped region, but `firstWire` skips the id-preserved survivor —
+  // so it keeps exactly one input listener (a doubled one would leak + push twice per keystroke).
+  stubFetch(`<input id="f" data-i="0" value="">`);
+  const doc = mount(`
+    <div data-a data-b="isle" data-c="load">
+      <button id="go" data-p="get" data-q="/frag" data-u="wrap">load</button>
+      <div id="wrap"><input id="f" data-i="0" value=""></div>
+    </div>
+    <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[{"$":"sig","v":""}],"islands":[{"id":"isle","on":"load","scope":[0]}]}</script>`);
+
+  const field = doc.getElementById("f");
+  let added = 0;
+  const realAdd = field.addEventListener.bind(field);
+  field.addEventListener = (type, ...rest) => {
+    if (type === "input") added++;
+    return realAdd(type, ...rest);
+  };
+
+  doc.getElementById("go").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  await flush();
+  expect(doc.getElementById("f")).toBe(field);  // same node — it survived the morph by id
+  expect(added).toBe(0);  // ...so the re-wire added NO second input listener
+});
+
 test("morph-apply is inert — a <script> in the response never executes (RFC-0019 §6.3-J)", () => {
   // The defense is server-side escaping (fragments are escape-by-default), but the apply path is also
   // inert by construction: morph parses through a <template> and moves nodes, and parser/innerHTML-created

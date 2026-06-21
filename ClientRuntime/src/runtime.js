@@ -27,6 +27,22 @@ const BIND_SELECTOR = `[${T.bind}\\:text],[${T.bind}\\:value],[${T.bind}\\:class
 /** @type {WeakSet<Element>} */
 const wired = new WeakSet();
 
+// Per-node, per-directive wiring guard. Initial hydration and the post-swap re-wire (`rewire`) share
+// `bindElements`/`bindDirectives`, so a re-wire attaches effects ONLY to nodes a morph brought in — never
+// doubling an effect (or a `model` input listener) on a node that survived the morph by id. A morph clones
+// fresh nodes (unguarded) and MOVES survivors (already guarded), so this cleanly separates the two. A small
+// bitmask per node records which directives are live: 1/2/4 = bind text/value/class, 8 = class-toggle,
+// 16 = show, 32 = if, 64 = model, 128 = each.
+/** @type {WeakMap<Element, number>} */
+const wiredBits = new WeakMap();
+/** @param {Element} node @param {number} bit @returns {boolean} `true` only the FIRST time `bit` wires on `node`. */
+function firstWire(node, bit) {
+  const bits = wiredBits.get(node) ?? 0;
+  if (bits & bit) return false;
+  wiredBits.set(node, bits | bit);
+  return true;
+}
+
 /** @param {Element} root @param {Array<import("./signals").Signal<unknown>>} cells @returns {void} */
 function bindElements(root, cells) {
   // One combined query for all bind targets (vs one querySelectorAll per target).
@@ -36,6 +52,7 @@ function bindElements(root, cells) {
       if (ref === null) continue;
       const cell = cells[Number(ref)];
       if (!cell) continue;
+      if (!firstWire(element, 1 << BIND_TARGETS.indexOf(target))) continue;  // bound already (morph survivor)
       effect(() => {
         const value = String(cell.get());
         if (target === "text") element.textContent = value;
@@ -55,6 +72,7 @@ function bindElements(root, cells) {
  * @param {Element} root @param {Array<import("./signals").Signal<unknown>>} cells @returns {void} */
 function bindDirectives(root, cells) {
   for (const element of root.querySelectorAll(`[${T.classToggle}]`)) {
+    if (!firstWire(element, 8)) continue;  // morph survivor — its toggles are already live
     for (const pair of (element.getAttribute(T.classToggle) ?? "").split(";")) {
       const at = pair.lastIndexOf(":");
       if (at < 1) continue;
@@ -65,11 +83,13 @@ function bindDirectives(root, cells) {
   }
   for (const element of root.querySelectorAll(`[${T.show}]`)) {
     const cell = cells[Number(element.getAttribute(T.show))];
-    if (cell) effect(() => void (/** @type {HTMLElement} */ (element).style.display = cell.get() ? "" : "none"));
+    if (cell && firstWire(element, 16)) {
+      effect(() => void (/** @type {HTMLElement} */ (element).style.display = cell.get() ? "" : "none"));
+    }
   }
   for (const template of root.querySelectorAll(`template[${T.if}]`)) {
     const cell = cells[Number(template.getAttribute(T.if))];
-    if (!cell) continue;
+    if (!cell || !firstWire(template, 32)) continue;
     /** @type {ChildNode[]} */
     let mounted = [];
     effect(() => {
@@ -88,7 +108,7 @@ function bindDirectives(root, cells) {
   // `element.value` (a programmatic change updates the field). The `!==` guard avoids a cursor jump on echo.
   for (const element of root.querySelectorAll(`[${T.model}]`)) {
     const cell = cells[Number(element.getAttribute(T.model))];
-    if (!cell) continue;
+    if (!cell || !firstWire(element, 64)) continue;  // guard: never add a SECOND input listener to a survivor
     const input = /** @type {HTMLInputElement} */ (element);
     effect(() => {
       const value = String(cell.get());
@@ -105,7 +125,7 @@ function bindDirectives(root, cells) {
     const cell = cells[Number(template.getAttribute(T.each))];
     const parent = template.parentElement;
     const rowEl = /** @type {HTMLTemplateElement} */ (template).content.firstElementChild;
-    if (!cell || !parent || !rowEl) continue;
+    if (!cell || !parent || !rowEl || !firstWire(template, 128)) continue;
     const filterRef = template.getAttribute(T.filter);
     const filterCell = filterRef ? cells[Number(filterRef)] : null;
     effect(() => {
@@ -198,6 +218,28 @@ function wireIsland(root, cells) {
   wired.add(root);  // the document-level listener now delivers this island's events
 }
 
+/** Re-wire the bindings + islands a server-side swap (action morph/innerHTML/append, an out-of-band swap, or
+ * an SSE `morph` frame) brought into `region` — so a morphed-in island resumes and an editable field survives
+ * a search-morph (RFC-0019). Idempotent: `firstWire` skips nodes that survived the morph by id, so only the
+ * freshly-inserted nodes wire (no doubled effect or `model` listener). A morphed-in island root joins `wired`
+ * (the delegated listener now delivers its behaviors) and, if it carries `data-adh-connect`, subscribes to its
+ * stream — exactly as initial hydration does. Bindings resolve against the EXISTING cell graph (a server-side
+ * morph re-emits stable cell refs); a swap introducing brand-new cells would need a fresh state block, which
+ * this does not synthesize.
+ * @param {Element} region @param {import("./wire").WireState} state @param {Document} doc @returns {void} */
+function rewire(region, state, doc) {
+  const roots = region.matches(`[${T.id}]`) ? [region] : [];
+  for (const element of region.querySelectorAll(`[${T.id}]`)) roots.push(element);
+  for (const root of roots) {
+    if (wired.has(root)) continue;  // already a live island (id-preserved across the morph)
+    wired.add(root);
+    const stream = root.getAttribute(T.connect);
+    if (stream) connect(stream, state, doc);
+  }
+  bindElements(region, state.cells);
+  bindDirectives(region, state.cells);
+}
+
 /** Wire when `root` first scrolls into view (`IntersectionObserver`); falls back to immediate if the API
  * is missing (old/headless environments) — correct, just not lazy.
  * @param {Element} root @param {() => void} wire @returns {void} */
@@ -234,6 +276,9 @@ function schedule(on, root, wire) {
 export function hydrate(doc = document) {
   const state = readState(doc);
   if (!state) return;
+  // The declarative action layer (action.js) re-wires what a swap brings in WITHOUT importing this module
+  // (no cycle): it reaches `rewire` through the state object it already carries.
+  state.rewire = (region) => rewire(region, state, doc);
   // One delegated listener per event type for the WHOLE page (not one per island) — O(1) listeners.
   // They carry both the behavior path (`data-adh-on`) and the action path (`data-adh-action`); `submit`
   // gets a dedicated listener (it is not delegated — it has a native default action we must prevent).
@@ -298,7 +343,10 @@ export function connect(url, state, doc = document) {
     const data = /** @type {{id?: string, html?: string} | null} */ (parseEventData(event));
     if (data && data.id && typeof data.html === "string") {
       const target = doc.querySelector(`[${T.id}="${CSS.escape(data.id)}"]`);
-      if (target) morph(target, data.html);
+      if (target) {
+        morph(target, data.html);
+        rewire(target, state, doc);  // resume any island/binding the pushed frame brought in
+      }
     }
   });
   return source;

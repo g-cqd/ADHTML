@@ -104,6 +104,24 @@ const CART_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>cart<
 <script type="module" src="/adh-runtime.min.js"></script>
 </body></html>`;
 
+// Morph re-wiring fixture (RFC-0019): a live-search `<input>` morphs `#panel` with an editable token-field
+// (`data-i` model) + an echo (`data-e:text`), both bound to the EXISTING cell 0. Proves a morphed-in field
+// hydrates — model two-way live — instead of going inert, i.e. it survives a server-side search-morph.
+const TOKEN_FRAG = `<input id="tok" data-i="0" value=""><output id="echo" data-e:text="0">·</output>`;
+const REWIRE_STATE = JSON.stringify({
+  v: 1,
+  cells: [{ $: "sig", v: "seed" }],
+  islands: [{ id: "search", on: "load", scope: [0] }],
+});
+const REWIRE_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>rewire</title></head><body>
+  <div data-a data-b="search" data-c="load">
+    <input id="q" name="q" data-p="get" data-q="/token-frag" data-r="input" data-s="10" data-u="panel">
+  </div>
+  <div id="panel">type to load the field</div>
+  <script type="application/adh-state+json" id="adh-state">${REWIRE_STATE}</script>
+  <script type="module" src="/adh-runtime.min.js"></script>
+</body></html>`;
+
 /** Minimal HTML-escape for the reflected query (the fixture mirrors the server's escape-by-default). */
 function escapeHtml(value) {
   return value.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
@@ -125,6 +143,12 @@ Bun.serve({
     }
     if (path === "/cart") {
       return new Response(CART_PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    if (path === "/rewire") {
+      return new Response(REWIRE_PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    if (path === "/token-frag") {
+      return new Response(TOKEN_FRAG, { headers: { "content-type": "text/html; charset=utf-8" } });
     }
     if (path === "/rows") {
       // Fragment: filtered rows reflecting the query (the morph target's new children).

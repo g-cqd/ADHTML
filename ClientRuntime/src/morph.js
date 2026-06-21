@@ -46,8 +46,9 @@ function drain(work) {
  * the page region it updates — via `data-adh-oob="<id>"` or its own `id` — and is morphed into that
  * region. Parsed inertly through a `<template>` (nothing in `html` runs on parse), and only id-resolved
  * regions are touched; an element naming no live region is ignored. Used by the action `outOfBand` swap.
- * @param {string} html @param {Document} [doc] @returns {void} */
-export function oobSwap(html, doc = document) {
+ * @param {string} html @param {Document} [doc] @param {((region: Element) => void)} [rewire] resume any
+ *   island/binding a morphed-in region brought in (runtime.js sets this; absent for a bare morph) @returns {void} */
+export function oobSwap(html, doc = document, rewire) {
   const template = doc.createElement("template");
   template.innerHTML = html;
   for (const element of template.content.children) {
@@ -59,6 +60,7 @@ export function oobSwap(html, doc = document) {
     element.removeAttribute(T.oob);
     element.id = id;
     morphElement(target, element);
+    rewire?.(target);
   }
 }
 

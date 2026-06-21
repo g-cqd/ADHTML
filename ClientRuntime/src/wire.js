@@ -21,6 +21,8 @@ export const WIRE_VERSION = 1;
  * @typedef {object} WireState
  * @property {Signal<unknown>[]} cells
  * @property {IslandSpec[]} islands
+ * @property {(region: Element) => void} [rewire] Re-wire a server-swapped region (set by runtime.js
+ *   `hydrate`); the action layer calls it after a swap so morphed-in islands/bindings resume.
  */
 
 /**

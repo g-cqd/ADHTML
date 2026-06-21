@@ -1,4 +1,4 @@
-// Build + minify the runtime and gate its gzipped size (<= 4 KB, ADR-0006). Uses bun's built-in
+// Build + minify the runtime and gate its gzipped size (<= 5 KiB, ADR-0006). Uses bun's built-in
 // bundler + gzip — no external dependencies. Run: `bun run build.js` (or `bun run build`).
 //
 // Wire-token MANGLING (build-time): the source reads the shared `T.<name>` constants (single source of
@@ -6,7 +6,7 @@
 // `T.<name>` to its short literal via esbuild `define`, so the `T` object tree-shakes away entirely and
 // the bundle carries only the 1-char tokens — the readable source costs zero bytes in production.
 
-const BUDGET_BYTES = 4608;  // 4.5 KiB (ADR-0006 amend): the full P1-P9 vocabulary + SPA-nav (P7) + store (P8). htmx ~14 KiB, Alpine ~15 KiB.
+const BUDGET_BYTES = 5120;  // 5 KiB (ADR-0006 amend): the full P1-P9 vocabulary + SPA-nav (P7) + store (P8) + morphed-in island re-wiring (RFC-0019). htmx ~14 KiB, Alpine ~15 KiB.
 
 // The mangling step: inline every `T.<name>` to its short literal across the source before bundling, so
 // the `T` object + its import tree-shake away and the bundle carries only the 1-char tokens. (Bun's
