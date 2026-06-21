@@ -181,6 +181,34 @@ CLIENT (`ws.js` + `ctx.ws`, opt-in module) + the deferred sugar (typed inbound, 
 
 ---
 
+## Iteration #7 — 2026-06-21 (audit + native-leverage, not a feature)
+
+**Reassessment:** the backlog's next item (client `ws.js`/`ctx.ws`) is gated on a build-system code-split —
+`build.js` is a single `Bun.build` entrypoint with a hard 5 KiB gate and the core sits at 4.92 KiB (86 B
+headroom), so `ws.js` needs a real second-bundle + lazy-`import()` + served-URL split (too build-risky for a
+safe fire). And the loop had done 6 feature iterations while neglecting the prism's two most-repeated asks:
+**"identify"** and **"leverage apple-docs"**. So this iteration diversifies to those.
+
+**Done:**
+- **Identify sweep of ADServe** (~6,700 hand-written lines, agent-assisted, every candidate grepped across
+  Sources/Tests/Benchmarks). Result — a strong *integrity* signal: the codebase is very clean. The ONLY
+  truly-dead internal symbol was the OpenAPI generator's `DocJSON.int` case (+ its serializer arm); the
+  generator never emits a JSON integer. Removed it — behavior-preserving, exhaustiveness-safe (committed
+  `739395d`; 62 DSL tests green). Everything else flagged (`MediaType` presets, `HTTPError` REST factories,
+  the `UTType`/`Charset` init) is intentional public API. Verified false-positives: the deprecated `Group`
+  alias is tested; `percentDecodeToken`'s `i+2` bound is correct; `SSELimiter`/`ConnectionLimiter` differ by
+  design; streaming routes' dropped route-middleware is documented.
+- **Native-leverage check (apple-docs)** on `WebSocketHub`: the only broadcast-to-subscribers primitives are
+  **Combine** `PassthroughSubject`/`Publishers.Multicast` (Apple-only → unusable in a Linux server) and
+  `swift-async-algorithms` `AsyncChannel` (a single back-pressured handoff, not topic-keyed fan-out). →
+  the hand-rolled actor `WebSocketHub` is the correct cross-platform design; **no native-leverage gap.**
+
+**Assessment (×3):** *Pro* — honors the under-served prism pillars; the sweep doubles as an integrity audit;
+the one fix is provably safe. *Con* — small code delta (a clean codebase yields little to cut). *Consolidate*
+— ship the dead-case removal + record the audit + native-leverage conclusions as durable findings.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
