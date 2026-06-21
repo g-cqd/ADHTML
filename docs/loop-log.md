@@ -585,6 +585,35 @@ ADR/RFC requirements remain unblocked pending the user's `PersistenceADDB` refac
 
 ---
 
+## Iteration #21 — 2026-06-21 (a deploy gap my own code-split created — found + fixed + the morph path proven)
+
+**Trigger:** re-measure the INTERACTIVE path (not just the no-JS PRG of #20): does the runtime asset serve,
+and does the RFC-0019 morph-fragment contract work?
+
+**Found (a real gap my iter-#15 code-split introduced):** the app's `SyncRuntime` SwiftPM plugin
+(`swift package sync-runtime`) copies ADHTML's `adh-runtime.min.js` into `Public/` — but **not the
+`adh-ws.min.js` opt-in bundle the code-split added.** Any app using `ctx.ws` would lazy-load a 404. My own
+work left the deploy incomplete.
+
+**Done (spare-parts working tree — NOT committed, user WIP):**
+- `Plugins/SyncRuntime/SyncRuntime.swift` — extracted a `sync(_:into:required:fm:)` helper (de-dup) and now
+  copies BOTH the required core `adh-runtime.min.js` AND the optional `adh-ws.min.js` (copy-if-present,
+  forward-compatible). Ran `sync-runtime` → both land in `Public/` (13197 B + 714 B).
+- **Validated live:** `/assets/adh-runtime.min.js`, `/assets/adh-ws.min.js`, `/assets/app.css` all **200**;
+  `POST …/manufacturers` with `ADH-Request: 1` → **200 `text/html`** chip fragment (`token-name`/`token-x`,
+  the new value), without it → **303** PRG. The RFC-0019 interactive ⇄ no-JS dual-path works end-to-end.
+
+**Assessment (×3):** *Pro* — found + closed a deploy gap I created (the responsible finish of the code-split);
+validated the app's interactive enhancement (the morph the runtime drives); safe (the plugin change is
+obviously-correct + run-proven). *Con* — left in the user's WIP (correct). *Consolidate* — complete the
+code-split's deploy, validate, document.
+
+**#3 fully exercised:** build + 18/18 unit + live SSR + API + web mutations (incl. the proven delete fix) +
+static assets + the interactive morph fragment. The app's no-JS AND runtime-enhanced paths are both proven.
+**Seventh re-measure to pay off** (#15→#21): the "interactive path" check surfaced a concrete deploy gap.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
