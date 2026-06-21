@@ -38,12 +38,22 @@ private struct TreeBuilder {
     private var stack: [Frame] = []
     private var roots: [HTMLNode] = []
 
+    /// Maximum element-nesting depth: beyond it a start tag is coerced to a childless LEAF instead of
+    /// opening a new frame, so the built tree can never be deeper than this. The tokenizer + this builder
+    /// are iterative (they would fold `<div>`×100000 into a 100000-deep tree), but the crawl feeds UNTRUSTED
+    /// HTML (DocC/HIG pages) and the downstream `markdown()`/`plainText()`/`first(where:)` passes walk the
+    /// tree by RECURSION — so the bound is sized for THEM: well under a worst-case ~512 KiB worker-thread
+    /// stack (the renderer's iterative 512 ceiling would still let those recursive walks overflow), yet far
+    /// deeper than real documentation HTML ever nests (a handful of levels). An adversarial deeply-nested
+    /// page is thus flattened, never a stack overflow (failure-safe, ADR-0002).
+    private static let maxDepth = 128
+
     mutating func consume(_ token: HTMLToken) {
         switch token {
             case .startTag(let name, let attributes, let selfClosing):
                 impliedClose(before: name)
                 let attrs = dictionary(attributes)
-                if selfClosing || voidElements.contains(name) {
+                if selfClosing || voidElements.contains(name) || stack.count >= Self.maxDepth {
                     append(.element(tag: name, attributes: attrs, children: []))
                 } else {
                     stack.append(Frame(tag: name, attributes: attrs, children: []))

@@ -130,4 +130,31 @@ struct HTMLTreeTests {
                         [el("thead", [:], [el("tr", [:], [el("td", [:], [.text("h")])])])])
                 ])
     }
+
+    /// Iterative max element-nesting depth (an explicit-stack walk, no recursion in the measurement itself).
+    private func treeDepth(_ nodes: [HTMLNode]) -> Int {
+        var maxDepth = 0
+        var work: [(HTMLNode, Int)] = nodes.map { ($0, 1) }
+        while let (node, depth) = work.popLast() {
+            maxDepth = max(maxDepth, depth)
+            if case .element(_, _, let children) = node { for c in children { work.append((c, depth + 1)) } }
+        }
+        return maxDepth
+    }
+
+    @Test func adversarialNestingIsDepthCappedSoRecursiveWalksCannotOverflow() {
+        // The crawl feeds UNTRUSTED HTML and the markdown/extract passes walk the tree by recursion, so a
+        // deeply-nested page must not build a tree deeper than `Renderer.defaultMaxDepth` — else those walks
+        // overflow the native stack. 20_000 nested <div> (well past any stack limit) parses, but the tree is
+        // capped (over-deep opens coerce to childless leaves), and markdown()/plainText() complete WITHOUT
+        // crashing and still surface the innermost text.
+        let n = 20_000
+        let html = String(repeating: "<div>", count: n) + "DEEP" + String(repeating: "</div>", count: n)
+        let parsed = HTMLNode.parse(html)
+
+        // Bounded far below the 20_000 input depth (the builder's cap + the leaf level) — proof the cap held.
+        #expect(treeDepth(parsed) <= 130)
+        #expect(parsed.first?.plainText().contains("DEEP") == true)  // walk completed; content preserved
+        #expect(parsed.first?.markdown().contains("DEEP") == true)  // the recursive markdown walk is safe
+    }
 }
