@@ -830,6 +830,43 @@ open); the bigger leak-vector decision (P2, default extension set) is breaking a
 
 ---
 
+## Iteration #28 — 2026-06-21 (the "avoid recursion" pillar finds a real one: an HTML-parse stack-overflow DoS)
+
+**Trigger:** the prism explicitly says *avoid recursion*, and both cores advertise iterative engines — so check
+where recursion actually lives, and whether any is unbounded over untrusted input. (Also re-checked spare-parts:
+still 29 uncommitted, refactor in flight — #3 stays blocked, untouched.)
+
+**Found — a genuine bug, not just a style nit:**
+- The cores ARE rigorously iterative (ADR-0002, explicit stacks everywhere: renderer, wire serializer,
+  expression eval, the route trie) with depth caps. As designed.
+- The exception is the **crawl's HTML pipeline**. `HTMLTape` (tokenize) + `HTMLTreeBuilder` (tree-construct) are
+  both iterative, so they fold an adversarial `<div>`×100000 page into a 100000-deep `HTMLNode` tree with **no
+  nesting cap** (caps existed for name-length + attr-count, not depth). But the downstream passes —
+  `markdown()`/`plainText()` (HTMLMarkdown) and `first(where:)`/`firstElement`/all-descendants (HTMLExtract) —
+  walk that tree by **RECURSION with no depth guard**. The crawl parses UNTRUSTED pages, so a deeply-nested one
+  **overflowed the native stack** — verified: the test process died with **signal 10 / SIGBUS**. A real
+  reliability/DoS hole, and a violation of the codebase's own iterative-for-untrusted discipline.
+
+**Done — single-point fix (ADHTML `b2e256c`):**
+- Cap element-nesting depth in the tree builder: past the bound a start tag is coerced to a childless leaf
+  instead of opening a frame, so the tree can never exceed it and **every downstream recursive walk inherits the
+  protection at once** — no need to rewrite five walks. Cap **128**, sized for the RECURSIVE consumers: my first
+  attempt reused the renderer's `defaultMaxDepth` 512 and **still crashed** (512-deep recursion overflows a
+  ~512 KiB worker-thread stack — the renderer's 512 is safe only because IT is iterative). 128 is well under
+  that stack yet far deeper than real documentation HTML nests.
+- Test: 20_000 nested `<div>` parses to a tree bounded ≤130 deep, and `markdown()`/`plainText()` complete
+  without crashing and still surface the innermost text. **Full suite 254 green** (was 253), lint clean.
+
+**Assessment (×3):** *Pro* — a real, verified stack-overflow DoS on untrusted input, fixed at the single choke
+point so all consumers are covered; the cap value was empirically derived (the 512 attempt crashing taught the
+recursive-vs-iterative distinction); restores the codebase's own ADR-0002 discipline. *Con* — a build-time
+crawl feature (blast radius is "crash the build," not the server); the walks are still recursion (now bounded,
+the CSSScoper precedent) rather than rewritten iterative — a fuller fix if the crawl ever moves to request time.
+*Consolidate* — the bounded-depth cap is the minimal, correct, failure-safe fix now; note iterative walks as the
+follow-up if the threat model escalates.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
