@@ -73,10 +73,19 @@ public enum WireSerializer {
         let reachable = reachableCells(cells: cells, islands: islands)
         let oldToNew = reindex(cellCount: cells.count, reachable: reachable)
 
+        // Emit cells up to the highest reachable index, each at its ORIGINAL creation index (NO compaction),
+        // so the wire array stays aligned with the DOM binding/behavior attributes — which carry the raw
+        // index and are emitted during lowering, before reachability (hence islands) is known and so cannot
+        // be compacted in lockstep. An unreachable hole below that bound becomes a null `sig` placeholder:
+        // the index is preserved but its value + kind are dropped (the data-leak guard holds — no server
+        // value reaches the client), so a dropped orphan can never desync a bound cell index. Trailing
+        // unreachable cells are simply not emitted.
+        let emitCount = reachable.max().map { $0 + 1 } ?? 0
         var cellsJSON: [JSONValue] = []
-        cellsJSON.reserveCapacity(oldToNew.count)
-        for index in 0 ..< cells.count where reachable.contains(index) {
-            cellsJSON.append(try encodeCell(cells[index], oldToNew: oldToNew))
+        cellsJSON.reserveCapacity(emitCount)
+        for index in 0 ..< emitCount {
+            cellsJSON.append(
+                reachable.contains(index) ? try encodeCell(cells[index], oldToNew: oldToNew) : Self.placeholderCell)
         }
 
         var islandsJSON: [JSONValue] = []
@@ -91,6 +100,15 @@ public enum WireSerializer {
         root["islands"] = .array(islandsJSON)
         return .object(root)
     }
+
+    /// A null `sig` standing in for an unreachable cell whose index sits below a reachable one — it keeps the
+    /// array index aligned with the DOM refs without exposing the dropped cell's value or kind.
+    private static let placeholderCell: JSONValue = {
+        var object = OrderedDictionary<String, JSONValue>()
+        object["$"] = .string("sig")
+        object["v"] = .null
+        return .object(object)
+    }()
 
     // MARK: - The island-scope allowlist (explicit worklist, no recursion)
 
@@ -109,14 +127,14 @@ public enum WireSerializer {
         return reachable
     }
 
-    /// Map each reachable old index to its compacted new index, in creation order.
+    /// Map each reachable cell to ITSELF — cells keep their original creation index (no compaction), so the
+    /// wire array stays aligned with the DOM attribute refs (`bind`/behavior values carry the raw index,
+    /// emitted during lowering before reachability is known). Unreachable cells are absent from the map;
+    /// ``payload`` fills their slots with ``placeholderCell`` up to the highest reachable index, and
+    /// `remap` drops a ref to one (it is not a key) — so deps/scope still expose only reachable cells.
     private static func reindex(cellCount: Int, reachable: Set<Int>) -> [Int: Int] {
         var oldToNew: [Int: Int] = [:]
-        var next = 0
-        for index in 0 ..< cellCount where reachable.contains(index) {
-            oldToNew[index] = next
-            next += 1
-        }
+        for index in 0 ..< cellCount where reachable.contains(index) { oldToNew[index] = index }
         return oldToNew
     }
 
