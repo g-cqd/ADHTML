@@ -797,19 +797,52 @@ next steps.
 
 ---
 
+## Iteration #27 — 2026-06-21 (the "make safe" pillar: O_NOFOLLOW closes the static open's TOCTOU)
+
+**Trigger:** the prism weights security heavily, and the carry-forward still listed static-serving hardening
+from the early `/etc/passwd` audit (canonicalize root, symlink TOCTOU, extension allow-list, traversal tests).
+Re-measure the *current* static defense before assuming any item is open.
+
+**Re-measured — the static jail is far more hardened than the backlog implied (Nth time):**
+- Paths are canonicalized via `standardizedFileURL` + `resolvingSymlinksInPath`, then jailed with
+  `isInsideRoot` — for the identity file AND the `.br`/`.gz` precompressed siblings. So `..` and symlink
+  *escape* are caught at plan time (P1 ✅).
+- **Dotfiles are rejected at the engine level** (`.env`, `.git/config`) — even via a hand-built `.file()`
+  route, with the engine as the final gate, not just the DSL. Regular-file-only. Every failure collapses to
+  404 with no leak about why. The DSL also has an extension allow-list.
+- The ONE genuine residual: `openForReading` opened with `O_RDONLY` only. The plan stats a symlink-resolved,
+  jailed path, but a final component swapped to a symlink BETWEEN the stat and the open (an attacker racing a
+  planted link to read outside the root) would be followed — a narrow TOCTOU.
+
+**Done — O_NOFOLLOW on the static open (ADServe `897348d`):**
+- `open(path, O_RDONLY | O_NOFOLLOW)`. **Provably non-breaking:** the plan only ever passes a symlink-resolved
+  path, so a real asset's final component is never a symlink (a symlinked deploy root is resolved away before
+  the open) — O_NOFOLLOW never rejects a legitimate file. It rejects only a final component that *became* a
+  symlink after resolution (the race) → the open fails (ELOOP) → 404, like any other open failure.
+- Added a direct unit test (`openForReadingRefusesAFinalComponentSymlink`): a regular file opens; a symlink to
+  it — even an in-tree, otherwise-legitimate target — does not. **Full suite 274 green** (was 273), lint clean.
+
+**Assessment (×3):** *Pro* — closes the last known gap in the static defense on the #1 star with a minimal,
+SOTA, provably-safe change + a pinning test; exactly the "failure-safe / secure by default" the prism asks
+for. *Con* — narrow value (TOCTOU needs a local attacker with write access to the served tree racing the
+open); the bigger leak-vector decision (P2, default extension set) is breaking and stays an owner call. *Consolidate*
+— ship the zero-risk hardening + the test now; P2 needs an explicit decision, not a unilateral default change.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
-- *(P1)* Build-time `root` validation for `Static`. Design needed: a file-vs-dir `precondition` catches only
-  the inert probe; the real win is flagging a `root` that escapes the project CWD (catches `/etc/ssl`, `..`
-  climbs) — but must be a *warning*, not a trap (legit absolute deploy roots exist), and needs a stderr
-  channel without dragging `Foundation` into the DSL. Consider POSIX `stat` + `fputs`.
-- *(P2)* Tighten the default servable extension set — drop `.txt`/`.json`/`.map`/`.xml` from the *default*
-  (they're what leak `credentials.json` / sourcemaps under a misconfigured dir root). **Breaking** → needs an
-  explicit decision + an opt-in.
-- *(P4)* `O_NOFOLLOW` on the static `open()` (residual symlink TOCTOU). *(P5)* assert `root` absolute in
-  `isInsideRoot` once P1 canonicalizes.
-- Add `PathTraversalTests` cases for the directory-root exposure + NUL extension confusion (audit gap).
+- ✅ **Static jail is comprehensively hardened** (re-measured iter #27 — far more complete than this backlog
+  implied): canonicalize + `resolvingSymlinksInPath` + `isInsideRoot` jail (identity AND `.br`/`.gz` siblings),
+  **engine-level dotfile rejection** (`.env`/`.git` even via a hand-built `.file()` route), regular-file-only,
+  every failure → 404 (no info leak), and a DSL extension allow-list. **O_NOFOLLOW on the open landed iter #27**
+  (`897348d`), closing the last residual (open-time TOCTOU symlink swap) — provably non-breaking (the plan only
+  passes symlink-resolved paths) + a direct unit test. 15 `PathTraversalTests` green.
+- *(remaining, lower priority)* **P2** — tighten the DEFAULT servable extension set (drop `.txt`/`.json`/`.map`/
+  `.xml`, leak vectors under a misconfigured dir root): **breaking**, needs an explicit owner decision + opt-in.
+  **P1** — a build-time *warning* for a `root` escaping the project CWD (dev ergonomics, NOT a runtime hole; the
+  jail already contains it at runtime). **P5** — assert `root` absolute in `isInsideRoot` (belt-and-suspenders).
 
 **ADServe — performance (north star #1)**
 - **Live-load baseline + scaling CAPTURED (iters #24–25):** `ADServeBench` (runnable server, `ADSERVE_BENCH_LOOPS`
