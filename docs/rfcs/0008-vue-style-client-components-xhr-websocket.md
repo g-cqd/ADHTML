@@ -121,9 +121,11 @@ the static parts); the client owns only the *dynamic* state it declared — pres
 ## 5. ADServe API additions
 
 - **CORS for component XHR.** spare-parts proves the shape: the web app (`:webPort`) and the JSON API
-  (`:apiPort`) are *different origins*. A component fetching `/api/...` is cross-origin → ADServe needs a
-  first-class CORS surface (`App(cors:)` or middleware) with an explicit origin allowlist, credentials policy,
-  and preflight handling. (ADServe already owns OPTIONS preflight in its middleware builtins — formalize it.)
+  (`:apiPort`) are *different origins*. A component fetching `/api/...` is cross-origin → governed by CORS.
+  **Correction (verified iter #3):** ADServe **already ships a `CORS` middleware** (`Middleware.swift:111`)
+  that decorates responses with `Allow-Origin` and owns the OPTIONS preflight (both covered by tests). So this
+  is not a missing surface — Phase 1 only wants ergonomic sugar (e.g. `App(cors:)`) over the existing
+  middleware, plus an explicit origin allowlist + credentials policy for the cross-port case.
 - **Typed WebSocket channel.** `WS(_:)` exists but is raw. Add a component-facing **`Channel`** ergonomic: a
   typed message contract (`Codable` in/out), an `origin`/auth check at upgrade, a broadcast/pub-sub helper for
   live fan-out (one mutation → push to subscribed sockets), and back-pressure bounds. The frame shape reuses
@@ -199,7 +201,7 @@ Tier 2 (escape hatch) authors a client `setup` module bound by name to a `[data-
 
 | Phase | Item | Needs ADServe? |
 |---|---|---|
-| 1 | Generalized request core (JSON mode, AbortController/dedupe) + `ctx.fetch` (arbitrary same-origin JSON XHR); ADServe **CORS** surface (web↔api cross-port) | **yes** (CORS) |
+| 1 | ✅ `ctx.fetch` — failure-safe JSON XHR + AbortController + abort-on-teardown (`src/fetch.js`, iter #3). Cross-origin governed by server CORS, not a client block. ADServe **CORS already exists** (`Middleware.swift`) — wants only `App(cors:)` sugar | exists |
 | 2 | `ws.js` managed WebSocket (reconnect/backoff/heartbeat/size-cap) + `ctx.ws`; ADServe typed **`Channel`** (origin/auth check, broadcast helper) over existing `WS` | **yes** (Channel) |
 | 3 | Tier-1 **`Resource`** (fetch-on-trigger → value/isLoading/error cells) + new wire cell kind + the `.mount/.visible/.every/.on` triggers | partial |
 | 4 | Tier-1 **`Channel`** Swift surface (messages/status/send cells) + declarative reducer (`onChannel`) → cell mutations | yes |

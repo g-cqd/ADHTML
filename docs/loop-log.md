@@ -71,6 +71,35 @@ allocation-freedom is meanwhile guaranteed *by construction* (no `String(_:)`/`+
 
 ---
 
+## Iteration #3 — 2026-06-21
+
+**Trigger:** north star #2 (ADHTML as mature as Vue) → RFC-0008 **Phase 1** (component-issued XHR). Recon
+corrected two RFC-0008 assumptions: ADServe **already ships a `CORS` middleware** (`Middleware.swift:111`),
+and ClientRuntime has a real **TDD setup** (`bun test ./test`, happy-dom, `stubFetch`).
+
+**Assessment (×3):**
+- *Pro* — self-contained in `ClientRuntime/src`, TDD-able, the server CORS half already exists; direct
+  "component issues XHR" progress.
+- *Con* — must not regress the morph path or the ≤5 KiB budget; the security model needs a sane default
+  (don't re-implement CORS client-side).
+- *Consolidate* — add a small failure-safe JSON transport + `ctx.fetch`, abort-on-teardown, keep the morph
+  path byte-identical, let the server's CORS govern cross-origin. TDD throughout.
+
+**Done (ADHTML, committed `24cd1ed`, local-only):**
+- `src/fetch.js` — `fetchJSON`: never-throws JSON transport (rejection/non-2xx/oversize/non-JSON → `null`),
+  body-cap before parse, `AbortSignal`-aware. The JSON lane (no `ADH-Request` morph header).
+- `src/mount.js` — `ctx` grows to `{ root, action, fetch }`; per-root `AbortController` aborted in
+  `runCleanups`, so an unmounting component cancels in-flight `ctx.fetch` (Vue `onUnmounted` semantics).
+- **75 ClientRuntime tests pass** (9 new); strict `tsc` typecheck clean; runtime **4.92 KiB gzip** (within 5).
+
+**Corrected RFC-0008:** §5/§10 — ADServe CORS exists; Phase 1 reuses it (only ergonomic sugar may be wanted),
+it is not a missing surface.
+
+**Budget watch:** the runtime is at 4.92/5 KiB — Phase 2 (`ws.js`, `ctx.ws`) must adopt RFC-0008's opt-in
+module split rather than grow the core.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -94,9 +123,12 @@ allocation-freedom is meanwhile guaranteed *by construction* (no `String(_:)`/`+
   allocations the malloc gate would catch.
 
 **ADHTML — Vue maturity (north star #2)**
-- RFC-0008 Phase 1 is the next build: generalize `action.js`'s `request()` into a JSON transport +
-  `ctx.fetch`; add an ADServe CORS surface (web↔api cross-port). Then Phase 2: `ws.js` + `ctx.ws` + ADServe
-  typed `Channel`. No client WebSocket exists today; the mount `ctx` is `{root, action}` only.
+- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). Next: Phase 2 — `ws.js` (managed WebSocket:
+  reconnect/backoff/heartbeat/size-cap) + `ctx.ws`, shipped as an OPT-IN module (the core is at 4.92/5 KiB).
+  ADServe already has `WS`; add the typed `Channel` ergonomic (origin/auth check, broadcast helper). Also a
+  cross-origin allowlist and/or `App(cors:)` sugar so the web↔api cross-port `ctx.fetch` is one line.
+- Tier-1 declarative `@Resource`/`@Channel` Swift surface (RFC-0008 §4.2/§7) — the no-JS path — comes after
+  the Tier-2 primitives (`ctx.fetch` done, `ctx.ws` next) land + prove out.
 - Boilerplate: the 7 verb-overload pairs in `ServerDSL.swift` are near-identical — a candidate for a macro
   (the prism's "macros where relevant" / "reduce boilerplate"). Assess before doing (macros add build cost).
 
