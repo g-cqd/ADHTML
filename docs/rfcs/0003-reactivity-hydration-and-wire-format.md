@@ -36,9 +36,11 @@ runtime for SwiftUI invalidation; it is **not serializable to a wire format** an
 linearize a value graph. ADHTML's cells are:
 
 - **Server-evaluated** for the initial render (a `Signal`'s current value renders into the HTML);
-- **Wire-serializable** — each cell has a stable index; the graph linearizes to JSON (§4);
-- `Sendable` value types with a stable `CellID` derived via `ADFCore.XXH64` of the render-scope path
-  (so the same component tree yields the same IDs across renders — required for SSE morph targeting).
+- **Wire-serializable** — each cell keeps its creation index; the graph linearizes to JSON (§4);
+- `Sendable` value types with a `CellID` that is the cell's **creation index in Phase 1** (deterministic
+  across identical renders). A later refinement derives it from the render-scope path via `ADFCore.XXH64`
+  so the same component tree yields the same IDs under structural reordering — required only once SSE
+  morph/patch targets cells across renders (today's cross-render patching assumes byte-identical re-renders).
 
 Fine-grained (not virtual DOM): the client runtime updates only the DOM nodes bound to a changed cell,
 the Solid/Svelte-5 model. ADR-0004 documents the honest divergence from native `Observation`.
@@ -103,9 +105,11 @@ the event log; SSE transport is ADServe ADR-0046 (sequenced via ADR-0012).
 ## 6. Security: the island-scope allowlist (the crux)
 
 The dominant risk is **over-serialization** — leaking private read-model fields into the HTML — versus
-**under-serialization** breaking hydration. Resolution (Marko's model): a cell is wire-serialized
-**only if reachable from a declared island scope**. Server-global and non-island state is never
-emitted. A test asserts that a non-island `@State`/read-model field never appears in any payload. The
+**under-serialization** breaking hydration. Resolution (Marko's model): a cell's **value** is wire-serialized
+**only if reachable from a declared island scope**. A non-island cell's value, kind, and formula are never
+emitted — if its creation index sits below a reachable one it is replaced by a null placeholder (so bound
+cells keep their index, §4), carrying no server data; otherwise it is simply omitted. A test asserts that a
+non-island `@State`/read-model field's value never appears in any payload. The
 state `<script>` is encoded in the `scriptJSON` context (`</`→`<\/`, U+2028/2029 escaped) to prevent
 `</script>` breakout (ADR-0003), and is CSP-compatible via a nonce/hash; the runtime asset is
 SRI-pinned (ADR-0006).

@@ -39,8 +39,10 @@ Make **"interactive component"** the authoring unit and **"island"** an inferred
 
 - **Phase C — implicit islands.** `@Component` inspects its members at expansion: a type with `@State`/
   `@Bound` conforms to a marker `Interactive`. `Component._render` wraps an `Interactive` component's
-  body in island markup automatically — **id** = hash of the render-scope path (the stable `CellID`
-  scheme, RFC-0003 §2; also unblocks SSE morph targeting), **scope** = inferred (Phase B), **loading** =
+  body in island markup automatically — **id** = `c<render-scope number>` today (deterministic per identical
+  render — the Phase-1 `CellID`/scope scheme, RFC-0003 §2), to become the XXH64-of-render-scope-path id in a
+  later refinement (which also unblocks SSE morph targeting across renders), **scope** = inferred (Phase B),
+  **loading** =
   `.load` by default, overridable via `@Component(hydrate: .visible)` or a `.hydration(_)` use-site
   modifier. A component with no reactive members renders **inline** (no island, no JS) — the two-tier
   model, now inferred. Explicit `Island(...)` stays as a low-level escape hatch. Nested interactive

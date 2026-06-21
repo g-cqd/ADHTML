@@ -22,8 +22,10 @@ declarative bindings (`data-adh-bind:*`). The runtime **resumes** (reads wiring 
 delegated listener) — it never rebuilds the tree or replays view code. **Reject** full hydration and
 whole-page resumability.
 
-**Security-critical**: serialize **only state reachable from a declared island scope** (Marko's
-allowlist). Server-global/non-island state is never emitted.
+**Security-critical**: serialize **only the values reachable from a declared island scope** (Marko's
+allowlist). Server-global/non-island state carries no value to the wire — a dropped cell whose index sits
+below a reachable one is a null placeholder (keeping bound-cell indices aligned, RFC-0003 §4/§6), never its
+data.
 
 ## Consequences
 
@@ -32,5 +34,5 @@ allowlist). Server-global/non-island state is never emitted.
   non-island majority.
 - **Negative**: authors mark islands explicitly (a deliberate performance/security contract, not
   automatic); getting the scope allowlist right is the subsystem's main risk — mitigated by a test
-  that non-island state never reaches the wire (RFC-0003 §6/§8).
+  that a non-island state value never reaches the wire (RFC-0003 §6/§8).
 - **Failure-safe**: islands are additive; with the runtime absent, server HTML + hypermedia still work.

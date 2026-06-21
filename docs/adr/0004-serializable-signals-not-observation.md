@@ -16,11 +16,14 @@ payload. (Verified against Apple's `Observation` docs.)
 ## Decision
 
 Implement a custom **serializable signal graph**: `Signal<Value>` (a reactive cell) and
-`Computed<Value>` (a derived cell capturing dependency `CellID`s). Cells are `Sendable` value types
-with a stable `CellID` = `ADFCore.XXH64` of the render-scope path (stable across renders → SSE morph
-targeting). The graph is server-evaluated for the initial HTML and **linearized to the index-deduped
-wire format** (ADR-0007). Client updates are fine-grained (Solid/Svelte-5 model): only DOM nodes bound
-to a changed cell update.
+`Computed<Value>` (a derived cell capturing dependency `CellID`s). Cells are `Sendable` value types with a
+`CellID` that is, in **Phase 1, the cell's creation index** within its arena (deterministic across identical
+renders — enough for serialization). A later refinement derives it from the render-scope path via
+`ADFCore.XXH64`, giving stability under structural reordering — required only once SSE morph/patch targets
+cells *across* renders (until then, cross-render patching holds for byte-identical re-renders). The graph is
+server-evaluated for the initial HTML and **linearized to the wire format** (ADR-0007), where cells keep
+their creation index so the inline state stays aligned with the DOM's cell refs. Client updates are
+fine-grained (Solid/Svelte-5 model): only DOM nodes bound to a changed cell update.
 
 Document the divergence from native `Observation` honestly: we deliberately do **not** leverage it
 here because it cannot serialize — a justified "lack of native-API leverage" the prism asks us to
