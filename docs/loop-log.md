@@ -100,6 +100,33 @@ module split rather than grow the core.
 
 ---
 
+## Iteration #4 — 2026-06-21
+
+**Reassessment:** the backlog pointed at RFC-0008 Phase 2 (client `ws.js`), but two constraints redirected
+me: the client runtime is at 4.92/5 KiB (Phase 2 needs a build-system code-split — too big for one safe
+fire), and spare-parts is mid-refactor (audit unreliable; do not disturb). The **server** WebSocket half is
+pure ADServe + clean for me — and the prism's "make safe" pillar surfaced a real gap: the WS upgrade
+(`HTTPServerBootstrap.shouldUpgrade`) gated only on the path matching, **never on `Origin`** → Cross-Site
+WebSocket Hijacking (CSWSH), which CORS does not cover (the upgrade isn't a CORS-gated request).
+
+**Assessment (×3):**
+- *Pro* — closes a real CSWSH vuln; secure-by-default; localized to `shouldUpgrade` (no routing-core
+  threading); native clients (no `Origin`) keep working; the right sequencing — make the server WS safe
+  before Phase-2 clients connect.
+- *Con* — no per-route cross-origin allowlist yet (none in the AD-family need it); host:port compare has
+  default-port edges.
+- *Consolidate* — ship a pure, recursion-free, unit-testable same-origin gate + wire it into `shouldUpgrade`;
+  log the allowlist follow-up.
+
+**Done (ADServe, committed `004c2fc`, local-only):**
+- `webSocketOriginAllowed(origin:host:)` (`WebSocket.swift`) — allow an absent `Origin` (non-browser, no
+  ambient cookies) or a same-origin authority; reject cross-origin / `null` / scheme-less Origin or a missing
+  `Host`. Pure (Foundation-free via stdlib `firstRange(of:)`), framework-agnostic, no recursion.
+- Wired into `shouldUpgrade` — a cross-origin handshake no longer upgrades (falls to the route's 426).
+- **264 ADServe tests green** (+4 CSWSH cases); the real WS echo upgrade still works; pre-commit hooks pass.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -123,10 +150,11 @@ module split rather than grow the core.
   allocations the malloc gate would catch.
 
 **ADHTML — Vue maturity (north star #2)**
-- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). Next: Phase 2 — `ws.js` (managed WebSocket:
-  reconnect/backoff/heartbeat/size-cap) + `ctx.ws`, shipped as an OPT-IN module (the core is at 4.92/5 KiB).
-  ADServe already has `WS`; add the typed `Channel` ergonomic (origin/auth check, broadcast helper). Also a
-  cross-origin allowlist and/or `App(cors:)` sugar so the web↔api cross-port `ctx.fetch` is one line.
+- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). Server WS now CSWSH-safe (iter #4). Next: Phase 2 client —
+  `ws.js` (managed WebSocket: reconnect/backoff/heartbeat/size-cap) + `ctx.ws`, shipped as an OPT-IN module
+  (the core is at 4.92/5 KiB → needs a build-system code-split). The typed `Channel` ergonomic over `WS`
+  should REUSE `webSocketOriginAllowed` and add a per-route allowlist (the cross-origin escape hatch) +
+  Codable messages + a broadcast helper. Also `App(cors:)` sugar so the web↔api cross-port fetch is one line.
 - Tier-1 declarative `@Resource`/`@Channel` Swift surface (RFC-0008 §4.2/§7) — the no-JS path — comes after
   the Tier-2 primitives (`ctx.fetch` done, `ctx.ws` next) land + prove out.
 - Boilerplate: the 7 verb-overload pairs in `ServerDSL.swift` are near-identical — a candidate for a macro
