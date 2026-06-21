@@ -867,6 +867,43 @@ follow-up if the threat model escalates.
 
 ---
 
+## Iteration #29 — 2026-06-21 (close the CLASS: a full-pipeline HTML-parse robustness gate)
+
+**Trigger:** #28 fixed one DoS *instance*; bug classes cluster in untrusted parsers, and the prism asks for
+"CI/buildtime/runtime (through checks)" + failure-safe. So check the parser's actual fuzz coverage — why
+didn't the existing suite catch #28?
+
+**Re-measured — a real coverage gap:**
+- ADHTML *does* fuzz the HTML parser, but `HTMLTapeRobustnessTests` only exercises the **tokenizer** — it stops
+  at `HTMLTape.build(html).materialize()` (tokens), never reaching `HTMLNode.parse` (tree-build) or the
+  recursive `markdown()`/`plainText()`/`first(where:)` walks — and its inputs are ≤256 random chars / ≤40
+  balanced tags (never deep). That's exactly why #28's deep-nesting overflow slipped through: the gate didn't
+  cover the layers that overflowed, nor feed adversarially-deep input.
+- ADTestKit already ships the right tools — `runOnConstrainedStack` (512 KiB worker stack) + `DepthSweep` — and
+  ADServe has a precedent (`MultipartParser.parse on a 512 KiB stack survives adversarially deep input`). The
+  gap was just that ADHTML's parse pipeline had no equivalent.
+
+**Done — added `HTMLParseRobustnessTests` (ADHTML `56e8e11`):**
+- **Constrained-stack DepthSweep** (the #28 regression lock): pins a 512 KiB stack — the main multi-MB test
+  stack would *mask* a regression — and sweeps depths straddling the tree-builder cap up to 1_500 (several×
+  past the ~512 frames at which these walks overflow uncapped) across three nesting shapes (div, list, quote).
+  Reaching the end proves the cap keeps the recursion bounded.
+- **Full-pipeline soup fuzz:** random metacharacter soup + random (un)balanced tag streams through
+  `parse()` + the three walks; any crash/OOB/hang fails, seeded for replay. Covers the tree-build + walk layers
+  the tape-only fuzz can't reach.
+- **256 tests green** (was 254), lint clean. Tuning: the depth test was **60 s** at `upTo: 20_000` (the
+  over-cap leaf-width × the string-building walks); dialed to `upTo: 1_500` → **4 s**, still 3× past the
+  overflow threshold — measured, not guessed.
+
+**Assessment (×3):** *Pro* — closes the *class* #28 was one instance of, with a constrained-stack lock that
+actually reproduces the failure mode (the main stack hides it) + a full-pipeline fuzz, both reusing the
+codebase's own ADTestKit harness + ADServe precedent; a real CI/failure-safe improvement. *Con* — pure test
+infrastructure (no shipping code), and the depth test adds ~4 s to a 0.17 s suite (justified: it spawns real
+worker threads at multiple depths × shapes — comparable to ADServe's fuzz suite). *Consolidate* — ship the
+gate; it's the durable guard that turns #28 from a one-off fix into a permanent invariant.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
