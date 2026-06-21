@@ -530,6 +530,35 @@ now the spare-parts "blocked" assumption all dissolved on measurement. Re-measur
 
 ---
 
+## Iteration #19 — 2026-06-21 (north star #3: live end-to-end verification)
+
+**Trigger:** re-measure once more (#15's lesson). The app builds + unit-tests pass (#18) — but does the
+*refactored* app actually RUN end-to-end? No live integration test exists (`runner.swift` composes routes
+without HTTP; ADServe's serving is tested separately), so this is the one un-done verification — and the
+session opened with "investigate the running server."
+
+**Done (read-only live smoke test — throwaway DB, unused ports, server stopped + cleaned up after):**
+- `GET /parts` (web) → **200**, a full 112 KB SSR document: the runtime `<script>` (×2 markers), inline
+  `adh-state` (×3), the create form (`action="/parts"`), and **21 `tokenfield` comboboxes** over the seeded
+  data — the SSR shell + interactive islands render correctly.
+- `GET /api/parts` (api) → JSON of the seeded parts (`{"id":2,"ref":"BRG-6204","name":"Ball bearing …",…}`).
+- `POST /api/parts` (a LIVE mutation) → created **part id 11 "Live Smoke Test"** (generated ref `SP-YKAHX`,
+  defaulted status, empty relations) — write path + ADDB persistence work.
+
+→ **The refactored app (post-`PersistenceADDB`) runs correctly end-to-end** — NIO serve + ADDB + ADHTML SSR +
+JSON API + mutations. North star #3 is now FUNCTIONALLY validated at runtime, not just by unit tests
+(18/18) + the iter-#18 bug fix.
+
+**Assessment (×3):** *Pro* — verifies the integration layer the unit tests can't (the live composition root +
+serving); confirms the refactor is sound; safe (read-only run, temp DB, killed + cleaned up). *Con* — a
+verification, not new code. *Consolidate* — run it, record the evidence, leave nothing behind.
+
+**#3 status:** spare-parts builds + 18/18 unit tests + a live end-to-end smoke (web SSR + API + mutation). Its
+testable + runnable scope is validated; any remaining untested ADR/RFC requirements are unblocked once the
+user lands the in-flight `PersistenceADDB` refactor.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
