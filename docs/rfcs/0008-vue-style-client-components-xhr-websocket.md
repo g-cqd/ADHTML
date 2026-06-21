@@ -1,9 +1,12 @@
 # RFC 0008 — Vue-style client components: component-issued XHR/WebSocket and client-reactive state
 
-- **Status**: Phases 1 & 2 implemented. Phase 1 (`ctx.fetch` + `App(cors:)`) and **all of Phase 2** —
-  server (`WebSocketHub` + `Channel` + CSWSH gate) and client (`ctx.ws` + `ws.js`, opt-in code-split) — are
-  BUILT and hardened (see `docs/loop-log.md`). Remaining: the Tier-1 declarative Swift surface
-  (`@Resource`/`@Channel`) — the "no manual JS" data-source macros (Phase 3+).
+- **Status**: Phases 1 & 2 implemented; Phase 3 largely SUPERSEDED. Phase 1 (`ctx.fetch` + `App(cors:)`) and
+  **all of Phase 2** — server (`WebSocketHub` + `Channel` + CSWSH gate) and client (`ctx.ws` + `ws.js`, opt-in
+  code-split) — are BUILT and hardened (see `docs/loop-log.md`). The Tier-1 `@Resource`/`@Channel` "no-JS"
+  data sources (Phase 3) are **largely covered** for ADHTML's SSR-first model by the runtime's EXISTING
+  declarative SSE `connect` (`data-adh-connect` → `patch`/`morph`, `runtime.js`) + SSR (initial data) +
+  `ctx.fetch`/`ctx.ws` (imperative). A pure client fetch-on-load is the SPA pattern an SSR-first framework
+  rarely needs (iter #17 finding).
 - **Date**: 2026-06-21
 - **Related**: RFC-0003 (reactivity/hydration/wire), RFC-0006 (client dynamic content — this RFC **evolves
   its stance**), ADR-0005 (islands / data-leak boundary), ADR-0006 (tiny generic JS runtime, no Swift→WASM),
@@ -210,7 +213,7 @@ Tier 2 (escape hatch) authors a client `setup` module bound by name to a `[data-
 |---|---|---|
 | 1 | ✅ `ctx.fetch` — failure-safe JSON XHR + AbortController + abort-on-teardown (`src/fetch.js`, iter #3). Cross-origin governed by server CORS, not a client block. ADServe **CORS + `App(cors:)` sugar built** (`Middleware.swift`, iter #12) | ✅ |
 | 2 | ✅ **Server** (iters #4–6, #8, #10): `WebSocketHub` (broadcast + auto-prune) + `Channel` (subscribe-only + typed-inbound) + CSWSH origin gate. ✅ **Client** (iters #15–16): `ctx.ws` + `src/ws.js` shipped as an OPT-IN code-split bundle (`adh-ws.min.js`, 464 B; core +43 B) with **auto-reconnect** (capped backoff + jitter). `v3`: heartbeat/ping | ✅ |
-| 3 | Tier-1 **`Resource`** (fetch-on-trigger → value/isLoading/error cells) + new wire cell kind + the `.mount/.visible/.every/.on` triggers | partial |
+| 3 | Tier-1 **`Resource`** — **largely superseded** (iter #17): the runtime's existing declarative SSE `connect` (`data-adh-connect` → `patch`/`morph`) + SSR (initial) + `ctx.fetch` already cover it for the SSR-first model. A pure client fetch-on-load is an SPA pattern rarely needed here | superseded |
 | 4 | Tier-1 **`Channel`** Swift surface (messages/status/send cells) + declarative reducer (`onChannel`) → cell mutations | yes |
 | 5 | Tier-2 reactive `ctx` (`ref/computed/effect/watch`, `onMounted/onUnmounted`) for bespoke widgets | no |
 | 6 | **Proof:** spare-parts live updates — a part edit on one client pushes via `Channel` to others; the parts list becomes a `Resource`; remove a hand path | yes |

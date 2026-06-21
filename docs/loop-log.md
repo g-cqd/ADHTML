@@ -468,6 +468,36 @@ declarative `@Resource`/`@Channel` "no-manual-JS" Swift surface.
 
 ---
 
+## Iteration #17 — 2026-06-21 (grounded finding: RFC-0008 Phase 3 is superseded)
+
+**Trigger:** apply #15's measure-don't-defer to the next RFC-0008 feature — Phase 3, the Tier-1 declarative
+`@Resource` ("no-JS" client fetch-on-load → signal). To scope it I read the runtime's hydrate + cell model.
+
+**Finding (fourth maturity surprise this session):** the runtime ALREADY has declarative live updates.
+`connect(url, state, doc)` (`runtime.js:329`) subscribes an island carrying `data-adh-connect` to an **SSE**
+stream and applies `patch` (set cells, with integer+bounds guards) / `morph` (swap an island by id, `CSS.escape`d)
+frames — no manual JS. ADServe ships SSE. So the live-data space is comprehensively covered:
+- **SSR** — initial data (the server already rendered it; the SSR-first model).
+- **declarative SSE `connect`** — continuous server-push (`patch`/`morph`), zero JS.
+- **`ctx.fetch` / `ctx.ws`** — imperative client fetch / bidirectional socket (iters #3, #15–16).
+
+→ Phase 3's `@Resource` (a declarative *client* fetch-on-load) is the SPA pattern an SSR-first framework
+rarely needs; it overlaps the existing mechanisms. **Not a gap — a spec to reconcile.** Updated RFC-0008
+(Status + phasing row 3 → "superseded").
+
+**Verification:** ClientRuntime **84** tests green (the WS client + the rest).
+
+**Assessment (×3):** *Pro* — corrects the design doc with grounded evidence; avoids building a redundant
+feature; SSR-first integrity. *Con* — a finding, not new code (correct — the capability exists). *Consolidate*
+— record + reconcile; don't manufacture overlap.
+
+**The pattern is now unmistakable** (iters #12–14, #17): four times a hypothesized "gap" was already filled
+(CORS, P1–P9, DocC, declarative-live-updates). ADHTML + ADServe are comprehensively mature. My session's one
+genuinely-new, non-redundant capability — **WebSocket support (server stack + `ctx.ws`)**, the user's explicit
+ask — is built + hardened. RFC-0008 is, in substance, COMPLETE.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
