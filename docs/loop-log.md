@@ -153,6 +153,34 @@ hub; then the client `ws.js`/`ctx.ws`.
 
 ---
 
+## Iteration #6 — 2026-06-21
+
+**Trigger:** capstone the server WS story (iter #4 CSWSH gate + iter #5 `WebSocketHub`) — the hub's
+doc-comment spelled out the subscribe / hold-open / unsubscribe boilerplate by hand; collapse it into a DSL
+primitive (the prism's "reduce boilerplate / DSL").
+
+**Assessment (×3):**
+- *Pro* — turns 4 lines of lifecycle boilerplate into one; reuses `WebSocketHub` + the global CSWSH gate;
+  pure ADServeDSL; completable + TDD-able; the natural server-WS capstone.
+- *Con* — subscribe-only (typed-inbound + per-route allowlist deferred to stay minimal); the behavioural
+  test needs determinism without sleeps.
+- *Consolidate* — ship `Channel(_:on:topic:)` with **inline** unsubscribe-after-loop (deterministic, not a
+  fire-and-forget `defer`); test via a controllable stream + a yield-loop.
+
+**Done (ADServe, committed `317ea82`, local-only):**
+- `Channel(_:on:topic:)` (`ServerDSL.swift`) — a `WS` endpoint that auto-subscribes the connection to a
+  `WebSocketHub` topic on open and auto-unsubscribes on close/drop/quiesce; the server pushes via
+  `hub.broadcast`. Cleanup is awaited inline (deterministic).
+- **270 ADServe tests green** (+2: resolves-as-WS-route; auto-subscribe-while-open + unsubscribe-on-close,
+  deterministic — no sleeps); pre-commit hooks pass.
+
+**Server WebSocket story COMPLETE** (iters #4–6): CSWSH origin gate → `WebSocketHub` broadcast → `Channel`
+auto-subscribe DSL. A live-update app is now ~3 lines server-side. The remaining RFC-0008 Phase-2 work is the
+CLIENT (`ws.js` + `ctx.ws`, opt-in module) + the deferred sugar (typed inbound, per-route allowlist,
+`App(cors:)`, hub auto-prune).
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -176,12 +204,11 @@ hub; then the client `ws.js`/`ctx.ws`.
   allocations the malloc gate would catch.
 
 **ADHTML — Vue maturity (north star #2)**
-- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). Server WS: CSWSH-safe (iter #4) + `WebSocketHub` broadcast
-  (iter #5). Next server: the **`Channel` DSL** — wraps `WS`, REUSES `webSocketOriginAllowed`, adds a
-  per-route cross-origin allowlist + `Codable` messages + auto-subscribe/unsubscribe to a `WebSocketHub`.
-  Next client: `ws.js` (managed WebSocket: reconnect/backoff/heartbeat/size-cap) + `ctx.ws` as an OPT-IN
-  module (core at 4.92/5 KiB → build-system code-split). Also `App(cors:)` sugar for the cross-port fetch;
-  auto-prune a hub connection on send failure.
+- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). **Server WS COMPLETE** (iters #4–6): CSWSH gate +
+  `WebSocketHub` + `Channel` auto-subscribe DSL — a live-update app is ~3 lines server-side. Next CLIENT:
+  `ws.js` (managed WebSocket: reconnect/backoff/heartbeat/size-cap) + `ctx.ws` as an OPT-IN module (core at
+  4.92/5 KiB → needs a build-system code-split — the gating prerequisite). Deferred server sugar: `Channel`
+  typed-inbound overload + per-route cross-origin allowlist; `App(cors:)`; hub auto-prune on send failure.
 - Tier-1 declarative `@Resource`/`@Channel` Swift surface (RFC-0008 §4.2/§7) — the no-JS path — comes after
   the Tier-2 primitives (`ctx.fetch` done, `ctx.ws` next) land + prove out.
 - Boilerplate: the 7 verb-overload pairs in `ServerDSL.swift` are near-identical — a candidate for a macro
