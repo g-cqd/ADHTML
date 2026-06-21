@@ -236,6 +236,32 @@ story (iters #4–6, #8) is feature-complete; only the client (`ws.js`/`ctx.ws`,
 
 ---
 
+## Iteration #9 — 2026-06-21 (diversify to ADHTML; audit + cleanup)
+
+**Reassessment:** 8 iterations in, 7 had touched ADServe — the loop neglected ADHTML (1×) and spare-parts
+(0×, correctly — mid-refactor). The client `ws.js` is still code-split-gated (its browser lazy-load is
+unverifiable in this sandbox). So diversify: an identify sweep of ADHTML's Swift sources (agent-assisted,
+scoped away from the JS runtime + user WIP).
+
+**Done (ADHTML, committed `04a0efe`, local-only):**
+- Sweep result — like ADServe (iter #7), ADHTML is *very clean*: dense docs, parity tests for every wire
+  surface, no dead types. The ONE truly-dead item: two `ADHTMLDiagnostic` cases (`stateRequiresStoredVar`,
+  `stateNeedsType`) left behind when `@State` moved from a macro to a runtime property wrapper (an ADR-0008
+  leftover) — no `StateMacro` exists, so nothing emits them. Removed the cases + both switch arms each
+  (balanced, exhaustive switches preserved). **253 tests green**, macro plugin builds.
+- The two duplications the sweep found (a `lower` render helper; an `accessModifier` macro helper) — agent
+  and I both judged **skip**: factoring touches the render/macro paths for negligible gain.
+
+**Assessment (×3):** *Pro* — diversifies (loop coherence), honors the "identify" pillar on a fresh codebase,
+excises an ADR-0008 leftover. *Con* — small delta (a clean codebase yields little). *Consolidate* — ship the
+one safe removal + record the integrity signal.
+
+**Integrity signal (both repos now swept):** ADServe (iter #7) and ADHTML (iter #9) are both well-maintained —
+the only dead code across ~12k lines was ~8 lines total (an OpenAPI enum case + two macro diagnostics). The
+loop's value is now feature/hardening work, not cleanup.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
