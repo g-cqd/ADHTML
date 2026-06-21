@@ -66,9 +66,8 @@ func adPackage(env: String, url: String) -> Package.Dependency {
 }
 let adfoundationDependency = adPackage(env: "ADFOUNDATION_PATH", url: "https://github.com/g-cqd/ADFoundation.git")
 let adjsonDependency = adPackage(env: "ADJSON_PATH", url: "https://github.com/g-cqd/ADJSON.git")
-// The family's deterministic-testing toolkit (AsyncEventProbe, TestClock, gates, ConstrainedStack).
-// Used by test targets only; consumers of the library products never resolve it.
-let adtestkitDependency = adPackage(env: "ADTESTKIT_PATH", url: "https://github.com/g-cqd/ADTestKit.git")
+// ADTestKit (the deterministic-testing toolkit) is folded into the ADFoundation umbrella package; the
+// test targets reference it via `package: "ADFoundation"` (adfoundationDependency above).
 
 // Default graph (all Foundation-free): ADFoundation (ADFCore byte/ASCII/hash primitives), ADJSON
 // (ADJSONCore — the wire-state serializer's JSON emit + JSONMergePatch, RFC-0003/0007), swift-collections
@@ -76,10 +75,6 @@ let adtestkitDependency = adPackage(env: "ADTESTKIT_PATH", url: "https://github.
 var packageDependencies: [Package.Dependency] = [
     adfoundationDependency,
     adjsonDependency,
-    // ADTestKit is in the default graph now that the core + XSS test targets adopt it (property
-    // generators, allocation/round-trip oracles, constrained-stack no-recursion proofs). Test-only —
-    // library-product consumers never link it.
-    adtestkitDependency,
     .package(url: "https://github.com/swiftlang/swift-syntax.git", from: "603.0.0"),
     .package(url: "https://github.com/apple/swift-collections.git", from: "1.1.0")
 ]
@@ -168,12 +163,12 @@ let package = Package(
 
         .testTarget(
             name: "ADHTMLCoreTests",
-            dependencies: ["ADHTMLCore", .product(name: "ADTestKit", package: "ADTestKit")],
+            dependencies: ["ADHTMLCore", .product(name: "ADTestKit", package: "ADFoundation")],
             swiftSettings: testSettings),
         .testTarget(name: "ADHTMLTests", dependencies: ["ADHTML"], swiftSettings: testSettings),
         .testTarget(
             name: "ADHTMLXSSTests",
-            dependencies: ["ADHTMLCore", .product(name: "ADTestKit", package: "ADTestKit")],
+            dependencies: ["ADHTMLCore", .product(name: "ADTestKit", package: "ADFoundation")],
             swiftSettings: testSettings),
 
         // The element/attribute table generator (ADR-0009). Run manually (`swift run ADHTMLCodegen`);
@@ -234,7 +229,7 @@ if needsNIO {
     package.targets.append(
         .testTarget(
             name: "ADHTMLNIOTests",
-            dependencies: ["ADHTMLNIO", .product(name: "ADTestKit", package: "ADTestKit")],
+            dependencies: ["ADHTMLNIO", .product(name: "ADTestKit", package: "ADFoundation")],
             swiftSettings: testSettings))
 }
 if isActions {
@@ -255,7 +250,7 @@ if isActions {
     package.targets.append(
         .testTarget(
             name: "ADHTMLActionsTests",
-            dependencies: ["ADHTMLActions", .product(name: "ADTestKit", package: "ADTestKit")],
+            dependencies: ["ADHTMLActions", .product(name: "ADTestKit", package: "ADFoundation")],
             swiftSettings: testSettings))
 }
 if isAssets {
