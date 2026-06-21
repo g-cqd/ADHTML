@@ -56,6 +56,21 @@ public enum ADHTMLRenderContext {
         return CellArena().stateCell(scope: 0, key: key, default: defaultValue)
     }
 
+    /// A render-GLOBAL keyed signal — deduped by KEY ALONE (a reserved global scope), so the same key
+    /// resolves to ONE cell across EVERY component in the render. Use it for app-level shared state — a
+    /// search query, a theme, a selected tab — that several islands read/write WITHOUT threading a `Signal`
+    /// through every initializer (unlike ``state(key:default:)``, whose `(scope, key)` dedup gives each
+    /// component instance its own cell). It reaches the wire when an island scope or a serialized computed
+    /// references it (the data-leak guard still applies — an unreferenced shared cell is dropped).
+    public static func shared<Value: WireEncodable>(key: String, default defaultValue: Value) -> Signal<Value> {
+        let arena = current?.arena ?? CellArena()
+        return arena.stateCell(scope: globalScope, key: key, owner: globalScope, default: defaultValue)
+    }
+
+    /// The reserved ownership/dedup scope for ``shared(key:default:)``. `freshScope()` counts up from 0, so
+    /// this is never a real per-component scope.
+    static let globalScope: UInt64 = .max
+
     /// Resolve a `@Bound var x: Reactive<V> { … }` declaration to its registered computed handle. Within an
     /// active context it registers the `Reactive` expression as a client-recomputable computed cell (the
     /// `Reactive`→`WireExpr`→`Computed` path, so the browser re-evaluates it with no round-trip); outside one
