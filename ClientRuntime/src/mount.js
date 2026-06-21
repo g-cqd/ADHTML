@@ -10,6 +10,7 @@
 // hands a widget its root element and the one sanctioned network primitive, nothing more.
 
 import { request } from "./action";
+import { fetchJSON } from "./fetch";
 import { T } from "./tokens";
 
 /** name -> mount function. @type {Map<string, (root: Element, ctx: object) => unknown>} */
@@ -17,6 +18,20 @@ const registry = new Map();
 /** root -> its teardown fn (or null when mounted with none); a key's presence marks the root mounted.
  * @type {WeakMap<Element, (() => void) | null>} */
 const cleanups = new WeakMap();
+/** root -> its lazily-created AbortController, aborted on teardown so an unmounting component's in-flight
+ * `ctx.fetch` requests cancel (no leaked work, no state update after unmount). @type {WeakMap<Element, AbortController>} */
+const abortControllers = new WeakMap();
+
+/** The component's AbortController (created on first `ctx.fetch`); its signal is shared by every request the
+ * widget issues, and `runCleanups` aborts it when the root is removed. @param {Element} root */
+function controllerFor(root) {
+  let controller = abortControllers.get(root);
+  if (!controller) {
+    controller = new AbortController();
+    abortControllers.set(root, controller);
+  }
+  return controller;
+}
 /** @type {Document | undefined} */
 let activeDoc;
 
@@ -36,6 +51,11 @@ export function runCleanups(node) {
       }
     }
     cleanups.delete(root);
+    const controller = abortControllers.get(root);
+    if (controller) {
+      controller.abort();  // cancel the widget's in-flight ctx.fetch requests (no state update after unmount)
+      abortControllers.delete(root);
+    }
   }
 }
 
@@ -62,6 +82,11 @@ function mountRoot(root) {
           target: opts.target ? doc.getElementById(opts.target) : root,
         },
         doc),
+    /** A guarded JSON request against the app's own API (RFC-0008 `ctx.fetch`): the parsed value or `null`,
+     * never throws, and aborted when this component is torn down. Cross-origin is governed by the server's
+     * CORS, not a client block. @type {(url: string, opts?: object) => Promise<unknown | null>} */
+    fetch: (/** @type {string} */ fetchURL, /** @type {object} */ fetchOpts = {}) =>
+      fetchJSON(fetchURL, { ...fetchOpts, signal: controllerFor(root).signal }),
   };
   try {
     const teardown = fn(root, ctx);

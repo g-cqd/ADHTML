@@ -92,3 +92,35 @@ test("a returned teardown runs when the root is morphed away (cleanup on morph)"
   morph(document.querySelector("section"), `<span>gone</span>`);
   expect(torn).toBe(1);
 });
+
+test("ctx.fetch issues a guarded JSON request and returns the parsed value (not the morph lane)", async () => {
+  document.body.innerHTML = `<div data-0="JsonW"></div>`;
+  const calls = stubFetch(JSON.stringify({ count: 3 }));
+  let fetchFn = null;
+  mount("JsonW", (_root, ctx) => {
+    fetchFn = ctx.fetch;
+  });
+  mountAll(document);
+  const data = await fetchFn("/api/count");
+  expect(data).toEqual({ count: 3 });
+  expect(calls[0].init.headers.Accept).toBe("application/json");
+  expect(calls[0].init.headers["ADH-Request"]).toBeUndefined();  // JSON lane, not the signed morph endpoint
+});
+
+test("ctx.fetch is aborted when the component is torn down (no state update after unmount)", () => {
+  document.body.innerHTML = `<section><div data-0="AbortW"></div></section>`;
+  let signal = null;
+  globalThis.fetch = (_url, init) => {
+    signal = init.signal;
+    return new Promise(() => {});  // never resolves — the request stays in flight
+  };
+  let fetchFn = null;
+  mount("AbortW", (_root, ctx) => {
+    fetchFn = ctx.fetch;
+  });
+  mountAll(document);
+  void fetchFn("/api/slow");  // in flight; the signal is captured synchronously by the stub
+  expect(signal.aborted).toBe(false);
+  morph(document.querySelector("section"), `<span>gone</span>`);  // unmount → runCleanups aborts the controller
+  expect(signal.aborted).toBe(true);
+});
