@@ -322,6 +322,31 @@ small wins.
 
 ---
 
+## Iteration #12 — 2026-06-21
+
+**Trigger:** the one genuine, safe, *completable* win left (the meaty options — `ws.js` code-split, Tier-1
+`@Resource` macro — don't fit a safe single fire; spare-parts is blocked). `App(cors:)` makes the cross-port
+`ctx.fetch` pattern (web app → JSON API on another port, the spare-parts two-port shape) discoverable + one
+line, instead of a dev needing to know to hand-wire `middleware: [CORS(...)]`.
+
+**Assessment (×3):** *Pro* — real ergonomic + discoverability win for the architecture the loop has been
+building toward (`ctx.fetch` + cross-port CORS); additive + backward-compatible; verifiable structurally
+(`CompiledRoute.middleware` is `public`). *Con* — modest in size. *Consolidate* — add `cors:` (prepended
+OUTERMOST so it owns the preflight), test it wires CORS first + stays opt-in.
+
+**Done (ADServe, committed `630f54f`, local-only):**
+- `App(cors: CORS? = nil, …)` installs the `CORS` middleware outermost in one line — exactly
+  `[CORS(…)] + middleware`. Backward-compatible (default nil; the `middleware:` array still works).
+- **273 ADServe tests green** (+1: CORS wired first with the right origin, and strictly opt-in); hooks pass.
+- RFC-0008 §5 + phasing table updated (CORS sugar now built, not just wanted).
+
+**Backlog now:** the remaining items are all deliberate efforts, not loop-sized — `ws.js` client code-split
+(ADR, partly unverifiable here), the Tier-1 `@Resource`/`@Channel` macro+wire surface, and the per-route WS
+cross-origin allowlist (the one engine-threading item; ~7 touch points). The next fire should commit to one
+of these as a focused task.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**

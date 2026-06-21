@@ -126,8 +126,9 @@ the static parts); the client owns only the *dynamic* state it declared — pres
   (`:apiPort`) are *different origins*. A component fetching `/api/...` is cross-origin → governed by CORS.
   **Correction (verified iter #3):** ADServe **already ships a `CORS` middleware** (`Middleware.swift:111`)
   that decorates responses with `Allow-Origin` and owns the OPTIONS preflight (both covered by tests). So this
-  is not a missing surface — Phase 1 only wants ergonomic sugar (e.g. `App(cors:)`) over the existing
-  middleware, plus an explicit origin allowlist + credentials policy for the cross-port case.
+  is not a missing surface, and the `App(cors:)` sugar over it is now BUILT (iter #12): one discoverable line
+  installs `CORS` outermost. Remaining: an explicit origin allowlist + a credentials policy for the
+  cross-port-WITH-credentials case.
 - **Typed WebSocket channel — BUILT & hardened (iters #4–6, #8, #10).** The server side is implemented:
   `WebSocketHub` (a topic-keyed broadcast `actor` — concurrent, failure-isolated fan-out that auto-prunes a
   dropped peer); `Channel(_:on:topic:)` (a `WS` endpoint that auto-subscribes a connection to a hub topic and
@@ -206,7 +207,7 @@ Tier 2 (escape hatch) authors a client `setup` module bound by name to a `[data-
 
 | Phase | Item | Needs ADServe? |
 |---|---|---|
-| 1 | ✅ `ctx.fetch` — failure-safe JSON XHR + AbortController + abort-on-teardown (`src/fetch.js`, iter #3). Cross-origin governed by server CORS, not a client block. ADServe **CORS already exists** (`Middleware.swift`) — wants only `App(cors:)` sugar | exists |
+| 1 | ✅ `ctx.fetch` — failure-safe JSON XHR + AbortController + abort-on-teardown (`src/fetch.js`, iter #3). Cross-origin governed by server CORS, not a client block. ADServe **CORS + `App(cors:)` sugar built** (`Middleware.swift`, iter #12) | ✅ |
 | 2 | **Server ✅** (iters #4–6, #8, #10): `WebSocketHub` (broadcast + auto-prune) + `Channel` (subscribe-only + typed-inbound) + CSWSH origin gate. **Client pending:** `ws.js` (reconnect/backoff/heartbeat/size-cap) + `ctx.ws`, an opt-in module gated on a build-system code-split | server done |
 | 3 | Tier-1 **`Resource`** (fetch-on-trigger → value/isLoading/error cells) + new wire cell kind + the `.mount/.visible/.every/.on` triggers | partial |
 | 4 | Tier-1 **`Channel`** Swift surface (messages/status/send cells) + declarative reducer (`onChannel`) → cell mutations | yes |
