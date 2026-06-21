@@ -1003,6 +1003,38 @@ the spike as preserved evidence; the next step is to measure the PRODUCTION tran
 
 ---
 
+## Iteration #33 — 2026-06-21 (de-risk the rewrite: Network.framework RULED OUT, raw sockets confirmed)
+
+**Trigger:** #32's consolidate — before committing to a from-scratch rewrite, measure the PRODUCTION transport
+candidate. The obvious one is Apple's **`Network.framework`** (NWListener/NWConnection): it gives TLS, TCP
+options, and connection management for free, which the raw kqueue spike lacks. Is it as fast as the spike?
+
+**Found — no. Network.framework is SLOWER than NIO** (`Benchmarks/raw-spike/server-networkframework.swift`,
+3-way, oha `-c 64`):
+- raw-swift (raw sockets): **178.1k**, p50 0.35 ms
+- ADServe (NIO): 97.6k, p50 0.37 ms
+- **nw-swift (Network.framework): 89.9k, p50 0.81 ms** — slower than NIO, **2.3× the latency**, half the raw
+  throughput. Its NWConnection / dispatch-queue model adds real per-request overhead.
+
+So the "TLS for free" path does NOT deliver the win — **ruled out.** The fast transport is **raw sockets**.
+
+**Architectural consequence (the key output):** raw sockets give no TLS — but ADServe's canonical deployment is
+**proxy-fronted** (Caddy terminates TLS + adds `Date`), so a raw *plaintext* HTTP/1.1 engine needs no
+in-process TLS for that case. The shape: a from-scratch raw-Darwin engine as the **plaintext fast path**, the
+existing **NIO engine retained for direct-TLS / HTTP-2** (a feature path where the perf delta matters less),
+both under ADServe's HTTP semantics (routing DSL, security envelope, response model, static/path hardening, the
+275 tests). Production-grade = a robust parser + limits/timeouts/backpressure + a **kqueue reactor** (vs the
+spike's thread-per-connection) for connection scaling.
+
+**Assessment (×3):** *Pro* — measured the obvious-but-wrong path BEFORE building it (saved a Network.framework
+rewrite that would have shipped *slower* than today); the architecture is now evidence-shaped (raw + proxy-TLS,
+NIO fallback), not guessed. *Con* — still pre-build; the real engine (robust parser, kqueue reactor,
+integration) is the large multi-iteration effort ahead. *Consolidate* — two spikes now bound the design (raw =
+fast, Network.framework = no); next is the production raw engine, phased + benchmarked against the ~178–197k
+ceiling, starting from the proxy-fronted plaintext path.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
