@@ -904,6 +904,46 @@ gate; it's the durable guard that turns #28 from a one-off fix into a permanent 
 
 ---
 
+## Iteration #30 — 2026-06-21 (the comparative truth: ADServe vs Hummingbird → a real perf fix)
+
+**Trigger:** north star #1 is "most performant OUT THERE" — which needs COMPARATIVE evidence, deemed
+"network-blocked" all session. Re-measure that assumption (the loop's signature move). (Also re-checked
+spare-parts: still 29 uncommitted, blocked; and verified the ADHTMLMarkdown recursion is SAFE — `MarkdownString`
+is author-trusted with no untrusted-string interpolation, so the #28 DoS pattern was unique to the crawl.)
+
+**Re-measured — the network is OPEN for public repos (15th dissolved assumption):** `git ls-remote
+hummingbird` returns its HEAD; the earlier auth error was only for PRIVATE AD* deps (provided via local
+paths). So the comparative benchmark was never actually blocked.
+
+**Done — built it + it found a real fix (ADServe `4711618`+`a90eb99`):**
+- Fetched **Hummingbird 2.25** (the closest NIO peer), built a server with ADServeBench's exact routes, and
+  benchmarked both ALONE under the identical oha harness (default config, ≈core-count loops both). **Honest
+  result: ADServe trailed — `/plaintext` 87.7k vs Hummingbird's 117.5k (~34%).** ADServe is NOT yet the
+  fastest. (Used WebFetch for the HB API — the apple-docs MCP doesn't index third-party frameworks.)
+- **Localized via `sample` profiling under load:** the hot ADServe frames were `build_tree` (zlib Huffman
+  construction), `MIMEDatabase.isCompressible`, `_stringCompare*` — ADServe was **gzip-compressing a 13-byte
+  body**. The compression predicate gated on MIME + not-206 but had **no size floor**. Probe confirmed:
+  `Accept-Encoding: identity` → 106k vs gzip → 88k.
+- **Fixed:** a `gzip_min_length`-style size gate (`minimumCompressibleResponseBytes = 1400`, one MTU) — a
+  sub-MTU body is one packet either way, so compressing it only burns CPU and can enlarge it. `/plaintext`
+  recovered **88k → ~99–106k** (the identity ceiling), narrowing the HB gap **~34% → ~15%**. Verified
+  deterministically (a 13-byte gzip-accepting response now carries no `Content-Encoding`; a 3 KB body still
+  gzips) + a new regression test + **274 tests green**.
+
+**This is the most consequential #1 finding of the loop:** it turned "is ADServe the most performant?" from an
+untested claim into a measured answer (no — it trails Hummingbird), and the measurement immediately yielded a
+real, correct optimization. The **residual ~15% is the core per-request path** (per-request active-count
+atomics + response-head materialization vs HB's leaner handler) — now the explicit, well-directed #1 target.
+
+**Assessment (×3):** *Pro* — finally produced the comparative evidence #1's literal goal demands, and the act
+of measuring found + fixed a genuine, universally-correct inefficiency (compressing tiny bodies); the gap is
+now quantified + half-closed with a clear next step. *Con* — the comparison is default-vs-default (HB is leaner
+out of the box; a feature-matched run is fairer), co-located (both equally), and ADServe still trails. *Consolidate*
+— ship the fix + the honest comparison; the residual core-path gap + a Vapor leg + a feature-matched HB run are
+the named next #1 steps. Honesty over a flattering number.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -923,9 +963,12 @@ gate; it's the durable guard that turns #28 from a one-off fix into a permanent 
   knob) measured with **oha** → ~**87k req/s** (`/json` 89.3k), sub-ms p50, p99 ~4 ms, 100% success at 8 loops;
   **1→2 loops near-linear**; param routing ~3% over plaintext (`ADServe` `7ee712d`+`0d373a4`, tracked in
   `Benchmarks/loadtest-baseline.md`). Only the ordo-one *plugin* sampling is sandbox-blocked, so the micro-bench
-  `routing/*`/`percent/*`/`mime/*` tables still want a clean host / CI. **Next on #1:** drive load from a
-  SEPARATE host (co-located oha+server cap the 8-core box) for the true ceiling; then Hummingbird/Vapor under
-  the same harness for the comparative claim (currently network-blocked — SPM can't fetch deps offline).
+  `routing/*`/`percent/*`/`mime/*` tables still want a clean host / CI.
+- ✅ **COMPARATIVE BENCHMARK DONE (iter #30) — ADServe trails Hummingbird ~15%** (after the gzip fix; ~34%
+  before). Network is NOT blocked for public deps. ADServe `/plaintext` ~99–106k vs Hummingbird 2.25 ~117.5k.
+  The `gzip_min_length` fix (`4711618`) closed half the gap; the **residual ~15% is the core per-request path**
+  (per-request active-count atomics + response-head materialization) — the live #1 target. Next: profile/trim
+  that path; add a Vapor leg + a feature-matched HB run.
 - ✅ **RESOLVED (iter #26) — engine `loopCount` default:** `HTTPServer` now defaults `loopCount` to
   `defaultLoopCount = System.coreCount` (was hardcoded 2). Investigation cleared every risk (no rationale for
   2; every test pins `loopCount: 1` explicitly so nothing regressed; `System.coreCount` is cgroup-aware →
