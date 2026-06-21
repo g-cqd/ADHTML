@@ -680,6 +680,49 @@ the contract, record the green. Ship the e2e.
 
 ---
 
+## Iteration #24 — 2026-06-21 (north star #1 finally has live numbers: a runnable ADServe + first baseline)
+
+**Trigger:** fresh firing. Before deferring to the big DocC effort I flagged, re-measure the three north
+stars' "blocked/under-served" claims — the loop's proven throughline (now 13×: a "blocker" dissolved on
+measurement again this round).
+
+**Re-measured — three findings, two that dissolved redundant work, one that unblocked the top star:**
+- **#3 spare-parts:** still mid-`PersistenceADDB` refactor (29 uncommitted changes, the `ADSQL→ADDB` rename
+  in flight). Confirmed blocked — do not disturb.
+- **#2 ADHTML/Vue-maturity docs:** the *entire* DocC plan I was about to execute is **already done +
+  committed** (`859d68e`: 2 catalogs, 9 articles, 947 lines + the comment cleanup). I then ran the plan's
+  *deferred* headline check — `generate-documentation --warnings-as-errors` for both targets — and it builds
+  **green, zero warnings** (all symbol links + Topics resolve). And it's **already CI-gated** (the `docs-check`
+  job). So #2's docs are written ✓ committed ✓ build-verified ✓ AND never-rot-protected ✓. Nothing to add.
+- **#1 ADServe perf:** the ordo-one micro-bench genuinely needs the benchmark plugin's pipe/TTY orchestration
+  (sandbox-blocked) — BUT a Bun probe proved **port-binding + serving works here**. Only the *plugin* was
+  blocked, never servers. The live-load path was viable all along.
+
+**Done — built the missing piece + captured the first live numbers (north star #1):**
+- ADServe was **library-only — no runnable server**, so "most performant" had zero end-to-end evidence. Added
+  `Sources/ADServeBench` (ADSERVE_DEV-gated executable): a real server, TechEmpower-shaped routes through the
+  full engine (envelope, keep-alive, idle timeout, connection limiter). Doubles as the canonical "how to run a
+  server" example (a genuine gap). Plus `Benchmarks/loadtest.js` (dep-free Bun load generator) +
+  `loadtest-baseline.md`. ADServe commit `7ee712d`; `swift-format` strict clean; build green (221 s release).
+- **Baseline (the loop's "benchmark everything," finally answered for the server):** `/json` **74.9k req/s**,
+  `/plaintext` **71.2k**, `/users/{id}` **68.2k** — all **0 errors**, **sub-ms p50**, **p99 < 1.8 ms** over
+  357k requests. Param routing costs only ~9% over plaintext (the trie + one capture are cheap).
+- **Honest caveat, documented:** throughput plateaus from c=16 (62k→67k across a 16× concurrency range) — the
+  signature of a saturated single-process *client*, not the server (p99 stays ~1.6 ms on just 2 event loops).
+  These are a **client-limited LOWER BOUND**; the server has more to give. Next: an open-loop tool (oha/wrk2)
+  + a multi-process client to find the true ceiling, then Hummingbird/Vapor under the same harness for the
+  comparative "most performant" claim.
+
+**Assessment (×3):** *Pro* — fills a real gap (a server framework with no runnable server), produces the
+session's first live req/s + latency for the #1-ranked, most-under-served star, and leaves a committed,
+reproducible harness + baseline future iterations extend. *Con* — a single-client baseline isn't a
+"most-performant" *proof* (needs competitors + open-loop); the numbers are client-limited. *Consolidate* —
+ship the runnable server + harness + the honest lower-bound baseline now (durable, reusable), and name the
+open-loop + comparative work as the explicit next step. The biggest unfulfilled directive finally has a real
+answer.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -695,10 +738,13 @@ the contract, record the green. Ship the e2e.
 - Add `PathTraversalTests` cases for the directory-root exposure + NUL extension confusion (audit gap).
 
 **ADServe — performance (north star #1)**
-- Micro-bench harness CONFIRMED healthy (ordo-one `Benchmarks/ADServeSuite`, malloc-tracked; `list` works).
-  The sampling run is blocked in this sandbox (subprocess/TTY) — capture the `routing/*`, `percent/*`,
-  `mime/*` baseline on CI / a clean host and commit it as the tracked reference. A live-load test (req/s +
-  p99) also wants a load tool (none of wrk/bombardier/hey/oha installed here).
+- **Live-load baseline CAPTURED (iter #24):** `ADServeBench` (runnable server) + `Benchmarks/loadtest.js`
+  (Bun) → ~70k req/s, sub-ms p50, p99 < 1.8 ms, 0 errors (`ADServe` commit `7ee712d`, tracked in
+  `Benchmarks/loadtest-baseline.md`). Port-binding works here — only the ordo-one *plugin* sampling is
+  sandbox-blocked (subprocess/TTY), so the micro-bench `routing/*`/`percent/*`/`mime/*` tables still want a
+  clean host / CI to emit. **Next on #1:** open-loop client (oha/wrk2) + multi-process load to pass the
+  single-client plateau (~66k from c=16) and find the true ceiling; then Hummingbird/Vapor under the same
+  harness for the comparative "most performant" claim.
 - `pathMatchesExact` made allocation-free (iter #2). Next: scan other DSL hot paths for incidental
   allocations the malloc gate would catch.
 
