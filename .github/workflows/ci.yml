@@ -6,12 +6,12 @@
 # (the manifest default when <DEP>_PATH is unset), so the resolution-dependent legs gate on
 # AD_SWIFT_SIBLINGS_PUBLISHED.
 #
-# HUMAN REVIEW (see report): ADHTML's macro target needs `swift build/test --build-system native`
-# (the classic build system) to avoid the swiftbuild macro/test-link bug (ADR-0008). The reusable
-# workflow runs plain `swift build`/`swift test` (no `--build-system` input), so its macOS/Linux test
-# legs may hit that bug on the current toolchain. The package-unique jobs below keep `--build-system
-# native`. If the reusable legs fail on the macro link, either add a `build-system` input upstream or
-# fall back to a bespoke native build-test job for ADHTML.
+# ADHTML's macro target needs `swift build/test --build-system native` (the classic build system) to
+# avoid the swiftbuild macro/test-link bug (ADR-0008). RESOLVED: the reusable workflow now takes a
+# `build-system` input (ADBuildTools swift-quality.yml), and the `quality:` job below passes
+# `build-system: native`, so its macOS/Linux build/test/lint legs use the classic engine too. The
+# package-unique jobs below also keep `--build-system native`. The `swiftbuild-macro-canary` job is
+# the signal to drop all of this once the upstream toolchain bug is fixed.
 name: CI
 
 on:
@@ -45,6 +45,11 @@ jobs:
       sanitizers: "address thread"
       enable-coverage: true
       requires-published-siblings: true
+      # ADR-0008: the macro/test-link bug forces the classic engine on every build/test, so the
+      # reusable legs run under `--build-system native` too. Effective once siblings are published
+      # (the resolution-dependent legs are gated on AD_SWIFT_SIBLINGS_PUBLISHED). The
+      # `swiftbuild-macro-canary` job below flags when this can be dropped.
+      build-system: native
 
   linux:
     name: Build & test (Linux, Foundation-free core)
@@ -65,6 +70,47 @@ jobs:
         run: swift build --build-system native --target ADHTMLCore
       - name: Build & test full package
         run: swift test --build-system native
+
+  swiftbuild-macro-canary:
+    name: swiftbuild macro canary (ADR-0008)
+    needs: quality
+    # ADR-0008: every ADHTML build takes `--build-system native` because the default `swiftbuild`
+    # engine mislinks the `.macro` plugin (ADHTMLMacros) into TEST bundles on the pinned toolchain
+    # (undefined SwiftSyntax symbols at link time). This canary builds the test bundle under the
+    # DEFAULT (swiftbuild) engine and is GREEN only while the bug persists; it turns RED on purpose
+    # the day swiftbuild links macros correctly — the signal to drop `--build-system native`
+    # everywhere and close ADR-0008's build-system note. This is the "run both build systems in CI
+    # so the workaround can't silently rot" guard (mirrors the `sri` job's never-rot doctrine,
+    # inverted: it guards a workaround, not a feature). A resolution failure (unpublished siblings)
+    # also keeps it green — a real fix can only surface as a clean BUILD, so a false-green just
+    # retains the workaround (the safe direction). Filable upstream repro:
+    # docs/upstream/swiftbuild-macro-test-bundle-mislink.md.
+    if: github.event_name != 'pull_request'
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select latest Xcode
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Build the test bundle under the default (swiftbuild) engine
+        id: probe
+        continue-on-error: true
+        run: swift build --build-system swiftbuild --build-tests
+      - name: Assert the bug still requires the workaround
+        env:
+          OUTCOME: ${{ steps.probe.outcome }}
+        run: |
+          if [ "$OUTCOME" = "success" ]; then
+            echo "::error title=ADR-0008::swiftbuild built the ADHTML test bundle CLEAN — the macro/test-link bug appears FIXED. Drop '--build-system native' across Package.swift comments, ci.yml, and CONTRIBUTING.md, and mark ADR-0008's build-system note resolved."
+            {
+              echo "### 🟢 swiftbuild macro/test-link bug appears FIXED"
+              echo "\`swift build --build-system swiftbuild --build-tests\` succeeded on this toolchain."
+              echo ""
+              echo "**Action:** drop \`--build-system native\` from Package.swift comments, \`ci.yml\`, and \`CONTRIBUTING.md\`; mark ADR-0008's build-system note **resolved**."
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "swiftbuild test-bundle build still fails (expected — ADR-0008). '--build-system native' remains required."
+          echo "### 🔴 swiftbuild macro/test-link bug persists (expected) — \`--build-system native\` still required (ADR-0008)." >> "$GITHUB_STEP_SUMMARY"
 
   platforms:
     name: Build (${{ matrix.platform }})

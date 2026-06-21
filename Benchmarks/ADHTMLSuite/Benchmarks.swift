@@ -7,9 +7,12 @@ struct BenchCounter {
     @State var count = 0
 
     var body: some HTML {
-        Island("c", scope: [countSignal.id]) {
-            button { "+" }.on("click", Behavior.increment(countSignal))
-            span { String(count) }.bind(.text, to: countSignal.id)
+        // `@State var count` projects `$count` (a `Signal<Int>`); the prior `countSignal` accessor was
+        // renamed to the property-wrapper projection in the reactive refactor (the benchmark suite is
+        // built only by `swift package benchmark`, so it wasn't caught by the normal build/test).
+        Island("c", scope: [$count.id]) {
+            button { "+" }.on("click", Behavior.increment($count))
+            span { String(count) }.bind(.text, to: $count.id)
         }
     }
 }

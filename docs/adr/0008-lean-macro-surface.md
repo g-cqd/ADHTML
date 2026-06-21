@@ -69,3 +69,23 @@ system today** — the library it links builds clean. Only the consumer's **test
 link the umbrella** need `--build-system native` (or can stay on the Foundation-free `ADHTMLCore`, which
 carries no macro and builds tests clean under swiftbuild). This unblocks the RFC-0020 Tier-1 ergonomic
 jump for the app's source/runtime without waiting on the toolchain fix.
+
+### Tracking — so the workaround can't silently rot (2026-06-21)
+
+Two guards make sure `--build-system native` is dropped the day the toolchain is fixed, and that the bug
+is actually filed rather than living only in this ADR:
+
+- **CI canary** — the `swiftbuild-macro-canary` job (`.github/workflows/ci.yml`) builds the test bundle
+  under the **default `swiftbuild` engine** on every main/dispatch run. It is green only while the bug
+  persists and goes **red on purpose** when swiftbuild links the macro correctly — the signal to remove
+  `--build-system native` from `Package.swift`, `ci.yml`, and `CONTRIBUTING.md` and mark this note
+  resolved. (Same "gated code never rots" doctrine as the `sri` job, inverted to guard a workaround.)
+- **Filable upstream repro** — a minimal three-target reproduction + analysis is written up at
+  [`docs/upstream/swiftbuild-macro-test-bundle-mislink.md`](../upstream/swiftbuild-macro-test-bundle-mislink.md),
+  ready to file against `swiftlang/swift-package-manager`. Paste the issue URL here once filed.
+
+**Raised stakes (2026-06-21):** the current toolchain now emits *"`--build-system native` has been
+deprecated and will be removed in a future release"* on every build. The workaround engine is itself on
+a removal path, so this is no longer "wait indefinitely for a fix" — the swiftbuild macro/test-link bug
+**must** be filed and fixed upstream before `native` is removed, or ADHTML's test bundles lose their only
+working build path. Filing the repro above is now time-sensitive, not optional.
