@@ -1,4 +1,4 @@
-// Bundle each component-scoped ES module (Track 4 A3) — the bun half of the own-tooling boundary: bun owns
+// Bundle each component-scoped ES module (Track 4) — the bun half of the own-tooling boundary: bun owns
 // JS bundling + minification (large, build-time, security-sensitive); Swift owns CSS scoping (small,
 // render-time). Globs `components/*.js`, bundles + minifies each as a CONTENT-HASHED module, computes its
 // SRI (`sha256-<base64>`, PARITY-pinned to Swift `ADHTMLSRI.integrity(for:)`), and writes a `manifest.json`

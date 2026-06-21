@@ -34,7 +34,7 @@ public enum Swap: String, Sendable, Equatable {
 
 /// A client-issued request bound to a DOM event, whose response updates a region. Built by a verb factory
 /// (`.get`/`.post`/…) then refined with chainable modifiers (each returns a copy). Apply it to an element
-/// with ``HTMLElement/action(_:)``.
+/// with `.action(_:)`.
 public struct Action: Sendable, Equatable {
     /// The HTTP verb, lowercased — emitted as `data-adh-action`. One of ``Action/methods``.
     public let method: String

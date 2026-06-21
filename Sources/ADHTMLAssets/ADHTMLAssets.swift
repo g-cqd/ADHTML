@@ -1,6 +1,6 @@
 public import ADHTMLCore
 public import ADServeCore
-// ADHTMLAssets (gated `ADHTML_ASSETS`) — the component-scoped-asset SERVING bridge (Track 4 A3, ADR-0021).
+// ADHTMLAssets (gated `ADHTML_ASSETS`) — the component-scoped-asset SERVING bridge (Track 4, ADR-0021).
 // The core (ADHTMLCore) already scopes the CSS, records `.module` component names in the render's
 // `AssetSink`, and injects the deduped `<style>` + inline `<script>`s (nonce-stamped when a nonce is
 // supplied). This gated bridge adds the two things the core can't: it LOADS the bun-produced

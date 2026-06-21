@@ -16,10 +16,10 @@ public import SwiftSyntaxMacros
 /// the component's `@State` signal peers is legal — the assignment-with-`=` form cannot, because Swift
 /// forbids instance-member references in a stored-property initializer.
 ///
-/// Phase 1 (here) is the EXPLICIT form: the author writes the `Reactive<T>` expression themselves (already
-/// in the closed operator DSL), and the macro only wraps it in `ADHTMLRenderContext.bound(_:)`. The
-/// body-parse form (`@Bound var total: Int { a + b }`, rewriting bare identifiers → signal refs) is a
-/// deferred follow-up bounded by the same closed op set.
+/// The macro reads the author's already-`Reactive<T>` expression (written in the closed operator DSL) and
+/// wraps it in `ADHTMLRenderContext.bound(_:)`; the explicit `Reactive<T>` annotation is required. It does
+/// not rewrite a value-typed body such as `@Bound var total: Int { a + b }` (mapping bare identifiers →
+/// signal refs) — such a rewrite would be bounded by the same closed op set.
 public struct BoundMacro: PeerMacro {
     public static func expansion(
         of node: AttributeSyntax,

@@ -13,7 +13,7 @@ public struct Signal<Value: WireEncodable>: Sendable {
         self.stored = stored
     }
 
-    /// The current value. Reading it inside ``CellArena/computed(_:)`` records the dependency edge.
+    /// The current value. Reading it inside `CellArena.computed(_:)` records the dependency edge.
     public var value: Value {
         arena.recordRead(id)
         return stored

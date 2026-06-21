@@ -14,7 +14,7 @@ public struct Computed<Value: WireEncodable>: Sendable {
         self.stored = stored
     }
 
-    /// The evaluated value. Reading it inside another ``CellArena/computed(_:)`` records the edge.
+    /// The evaluated value. Reading it inside another `CellArena.computed(_:)` records the edge.
     public var value: Value {
         arena.recordRead(id)
         return stored

@@ -118,6 +118,16 @@ deliberately not adopted (they would raise the floor to the 2025 SDKs).
 
 Consumers of `ADHTML` / `ADHTMLCore` never resolve any gated dependency.
 
+## Documentation
+
+The API reference + guides ship as a **DocC** catalog (umbrella + engine): getting started, interactive
+components, derived state (`@Bound`), Markdown-in-builder, and component-scoped assets, plus the rendering and
+reactivity specs. Build it locally:
+
+```sh
+ADHTML_DEV=1 swift package --build-system native generate-documentation --target ADHTMLCore --target ADHTML
+```
+
 ## Design corpus
 
 The full research and decision record lives in [`docs/`](docs/README.md): **RFCs** (umbrella,

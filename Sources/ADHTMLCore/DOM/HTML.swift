@@ -5,7 +5,7 @@
 // (no recursion over a value tree) — see `Renderer`.
 
 /// A node that can lower itself into an ``HTMLProgram``. Conformers are `Sendable` value types; the
-/// lowering is static (monomorphized, zero `any`). Primitive nodes implement ``_render(_:into:)``
+/// lowering is static (monomorphized, zero `any`). Primitive nodes implement `_render(_:into:)`
 /// directly; composed views conform to ``Component`` instead and get it for free.
 public protocol HTML: Sendable {
     /// Emit this node's render tokens into `target` (a `DirectTarget` for one-pass byte output, or an

@@ -1,4 +1,4 @@
-// An example component-scoped ES module (Track 4 A3). The component declares `Script.module(name: "counter")`;
+// An example component-scoped ES module (Track 4). The component declares `Script.module(name: "counter")`;
 // this file is bundled + content-hashed + SRI-served, and registers a mount function by the component's name.
 // `ADH` is the runtime global; `ctx.action` (the only network primitive) reaches the signed RFC-0019 endpoint.
 

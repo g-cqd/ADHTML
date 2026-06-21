@@ -6,8 +6,8 @@
 // function, run when its root is morphed away (the React-effect pattern). The dispatch is lazy: one
 // `querySelectorAll` on a page with no components.
 //
-// `ctx` is the minimal secure core — `{ root, action }` — within the 4.5 KiB runtime budget. Richer
-// members (`data`/`signal`/`morph`/`onCleanup`) are a documented follow-up gated on budget headroom.
+// `ctx` is deliberately minimal — `{ root, action }` — keeping the runtime within its 4.5 KiB budget: it
+// hands a widget its root element and the one sanctioned network primitive, nothing more.
 
 import { request } from "./action";
 import { T } from "./tokens";
