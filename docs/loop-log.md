@@ -559,6 +559,32 @@ user lands the in-flight `PersistenceADDB` refactor.
 
 ---
 
+## Iteration #20 — 2026-06-21 (north star #3: web mutations + the iter-#18 fix, proven live)
+
+**Trigger:** #19 validated reads + one API mutation, but not the WEB form mutations (the no-JS path) — and,
+critically, not the **iter-#18 delete fix** at runtime. Re-measure the mutation paths.
+
+**Done (read-only live smoke — throwaway DB, unused ports, stopped + cleaned up):** drove the no-JS form
+flow, checking state via the API (deltas, since the count includes nested relation ids):
+- `POST /parts` (web create form) → **303 → `/parts/11`**; count **+1** — create works.
+- `POST /parts/11/delete` (**THE ITER-#18 FIX**) → **303 → `/parts`**; count **−1, back to baseline** — the
+  fixed `method="post" action="…/delete"` form **actually deletes the part end-to-end.** The bug I fixed by
+  inspection (#18) is now proven by execution.
+- `GET /parts/1` (detail) → **200**. `POST /parts/1/manufacturers` (web token add) → **303 → `/parts/1`**.
+
+→ The whole no-JS web mutation surface (create / delete / token add / detail) works live, and the iter-#18
+correctness fix is confirmed under real execution — not just by the unit test.
+
+**Assessment (×3):** *Pro* — closes the verification loop on #18 with executable proof; validates the no-JS
+PRG (post-redirect-get) flow the app's progressive-enhancement design depends on; safe (read-only, temp DB,
+cleaned up). *Con* — verification, not new code. *Consolidate* — exercise + record; leave nothing running.
+
+**#3 is now comprehensively validated:** builds + 18/18 unit tests + live SSR reads + live API + **live web
+mutations incl. the proven delete fix**. The app's implemented scope is sound end-to-end; any untested
+ADR/RFC requirements remain unblocked pending the user's `PersistenceADDB` refactor landing.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
