@@ -5,6 +5,12 @@ import Testing
 // THESE instead of hand-writing `<span class="pill">`, the live-search `data-adh-*` attributes, or the
 // button + behavior + active-state wiring. None know anything about a specific app.
 
+struct Part: Sendable {  // a sample row model — the Table knows nothing about it
+    let id: Int
+    let name: String
+    let status: String
+}
+
 @Component
 struct DensityHost {  // a host island that OWNS the selection signal the SegmentedControl drives
     @State var density = "comfortable"
@@ -44,5 +50,25 @@ struct GenericComponentsTests {
         #expect(html.contains("data-c:click"))  // .set(selection, to:) per segment
         #expect(html.contains("data-f"))  // active-state classToggle
         #expect(!html.contains("ADH.mount"))  // composed from primitives, no hand-written widget script
+    }
+
+    @Test func `Table renders typed columns that keep distinct cell types`() throws {
+        let parts = [Part(id: 1, name: "Bearing", status: "Active"), Part(id: 2, name: "Seal", status: "Obsolete")]
+        let html =
+            Table(parts) {
+                Column("Spare part") { (part: Part) in a { part.name }.href("/parts/\(part.id)") }
+                Column("Status") { (part: Part) in
+                    Pill(part.status, tone: part.status == "Active" ? .positive : .critical)
+                }
+            }
+            .render()
+
+        #expect(html.contains(#"<table class="table">"#))
+        #expect(html.contains("<th>Spare part</th>"))
+        #expect(html.contains("<th>Status</th>"))
+        // column 1 is a link, column 2 is a Pill — different cell types in the same table, no erasure.
+        #expect(html.contains(#"<a href="/parts/1">Bearing</a>"#))
+        #expect(html.contains(#"<span class="pill pill-positive">Active</span>"#))
+        #expect(html.contains(#"<span class="pill pill-critical">Obsolete</span>"#))
     }
 }
