@@ -1,8 +1,9 @@
 # RFC 0008 — Vue-style client components: component-issued XHR/WebSocket and client-reactive state
 
-- **Status**: Partially implemented. Phase 1 (`ctx.fetch`) and the **Phase-2 server** (`WebSocketHub` +
-  `Channel` + the CSWSH origin gate) are BUILT and hardened (see `docs/loop-log.md`); the client
-  (`ws.js`/`ctx.ws`) and the Tier-1 declarative Swift surface (`@Resource`/`@Channel`) remain.
+- **Status**: Phases 1 & 2 implemented. Phase 1 (`ctx.fetch` + `App(cors:)`) and **all of Phase 2** —
+  server (`WebSocketHub` + `Channel` + CSWSH gate) and client (`ctx.ws` + `ws.js`, opt-in code-split) — are
+  BUILT and hardened (see `docs/loop-log.md`). Remaining: the Tier-1 declarative Swift surface
+  (`@Resource`/`@Channel`) — the "no manual JS" data-source macros (Phase 3+).
 - **Date**: 2026-06-21
 - **Related**: RFC-0003 (reactivity/hydration/wire), RFC-0006 (client dynamic content — this RFC **evolves
   its stance**), ADR-0005 (islands / data-leak boundary), ADR-0006 (tiny generic JS runtime, no Swift→WASM),
@@ -208,7 +209,7 @@ Tier 2 (escape hatch) authors a client `setup` module bound by name to a `[data-
 | Phase | Item | Needs ADServe? |
 |---|---|---|
 | 1 | ✅ `ctx.fetch` — failure-safe JSON XHR + AbortController + abort-on-teardown (`src/fetch.js`, iter #3). Cross-origin governed by server CORS, not a client block. ADServe **CORS + `App(cors:)` sugar built** (`Middleware.swift`, iter #12) | ✅ |
-| 2 | **Server ✅** (iters #4–6, #8, #10): `WebSocketHub` (broadcast + auto-prune) + `Channel` (subscribe-only + typed-inbound) + CSWSH origin gate. **Client pending:** `ws.js` (reconnect/backoff/heartbeat/size-cap) + `ctx.ws`, an opt-in module gated on a build-system code-split | server done |
+| 2 | ✅ **Server** (iters #4–6, #8, #10): `WebSocketHub` (broadcast + auto-prune) + `Channel` (subscribe-only + typed-inbound) + CSWSH origin gate. ✅ **Client** (iter #15): `ctx.ws` + `src/ws.js` shipped as an OPT-IN code-split bundle (`adh-ws.min.js`, 369 B; core +43 B). `v2`: reconnect/backoff/heartbeat | ✅ |
 | 3 | Tier-1 **`Resource`** (fetch-on-trigger → value/isLoading/error cells) + new wire cell kind + the `.mount/.visible/.every/.on` triggers | partial |
 | 4 | Tier-1 **`Channel`** Swift surface (messages/status/send cells) + declarative reducer (`onChannel`) → cell mutations | yes |
 | 5 | Tier-2 reactive `ctx` (`ref/computed/effect/watch`, `onMounted/onUnmounted`) for bespoke widgets | no |

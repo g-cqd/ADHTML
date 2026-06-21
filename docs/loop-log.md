@@ -411,6 +411,36 @@ not autonomous loop fires. Continuing to force micro-changes past here trades in
 
 ---
 
+## Iteration #15 — 2026-06-21 (the deferred WS client — unblocked + shipped)
+
+**Trigger:** stop deferring. The user empowered me to "pick the safest, most SOTA way" and not ask, so rather
+than report "blocked" a third time, I MEASURED the real unknown: does a `ctx.ws` lazy-load stub fit the 86 B
+core headroom? It does — the core grew only **43 B** (5034 → 5077, still within 5 KiB), because the
+dynamic-URL `import()` minifies far smaller than I'd estimated and Bun leaves it un-bundled.
+
+**Done (ADHTML, committed `a7a4c91`, local-only) — RFC-0008 Phase-2 CLIENT, the last missing piece:**
+- `src/ws.js` — `open(url, signal, {onMessage, onStatus}) -> { send, close }`: a failure-safe managed
+  WebSocket (never throws — bad URL → inert handle, oversized frame dropped, non-JSON delivered raw, throwing
+  handler can't break the socket, send-after-close is a no-op), JSON in/out, closed on the component's
+  `AbortSignal`. Shipped as an **opt-in code-split bundle** `adh-ws.min.js` (**369 B gzip**, its own 2 KiB
+  gate) that the core lazy-loads only when a widget calls `ctx.ws` — zero bytes for pages that don't.
+- `src/mount.js` — `ctx` grows `{ root, action, fetch }` → `+ ws`. `build.js` — a second `Bun.build` emits
+  the opt-in bundle, core build untouched.
+- **81 ClientRuntime tests** (+6: status, JSON/raw/oversized inbound, gated send, abort-close, failure-safe,
+  inert-handle); strict `tsc` clean; **core 5077 B + adh-ws 369 B, both in budget.** RFC-0008 Status +
+  phasing table updated (Phase 2 ✅ end-to-end).
+
+**Assessment (×3):** *Pro* — closes the one genuine remaining client gap; the code-split is the minimal/SOTA
+resolution (core stays small, WS opt-in); fully unit-tested + budget-verified. *Con* — the browser lazy-load
+itself (a standard ESM dynamic import) isn't exercised by the unit suite — a real-env e2e is the final
+confidence step; reconnect/backoff is a v2. *Consolidate* — ship the verified core + module; document the one
+unverified-here edge honestly.
+
+**Lesson:** twice this session (#13 P1–P9, #14 DocC) my "gap" was already filled; here the "blocker" dissolved
+on measurement. Measure before deferring.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
