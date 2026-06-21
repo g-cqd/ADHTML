@@ -209,6 +209,33 @@ the one fix is provably safe. *Con* — small code delta (a clean codebase yield
 
 ---
 
+## Iteration #8 — 2026-06-21
+
+**Trigger:** client `ws.js` is still gated on the build-system code-split (its own ADR-sized change), and
+iter #7 was an audit — swing back to feature completion. Finish the `Channel` DSL with its **typed-inbound
+overload** (predictable, completable, reduces decode boilerplate, leverages the in-house ADJSON codec).
+
+**Assessment (×3):**
+- *Pro* — completes Channel (bidirectional); failure-safe decode; reuses ADJSON (no new dep beyond an import);
+  dedups the lifecycle; TDD-able deterministically.
+- *Con* — inbound (client→server) is the lower-frequency direction vs broadcast; WS-adjacent (4th WS-area
+  fire).
+- *Consolidate* — ship the overload + a shared `serveSubscribed` helper so the two forms don't duplicate the
+  subscribe/unsubscribe lifecycle.
+
+**Done (ADServe, committed `40cb976`, local-only):**
+- `Channel(_:on:topic:receiving:_:)` — decodes inbound text frames as `Inbound` (JSON via ADJSON), delivers
+  them with the connection. Failure-safe: a non-text/undecodable frame is `try?`-skipped, never thrown.
+- Refactor: both overloads route through a private `serveSubscribed(_:on:topic:_:)` (subscribe → serve →
+  awaited unsubscribe) — the lifecycle lives in one place (the prism's de-dup).
+- **271 ADServe tests green** (+1: decodes two valid frames in order, skips garbage + a binary frame);
+  pre-commit hooks pass (caught + fixed an `OrderedImports` slip).
+
+**`Channel` DSL is now complete** — subscribe-only (server push) + bidirectional typed. The WebSocket server
+story (iters #4–6, #8) is feature-complete; only the client (`ws.js`/`ctx.ws`, code-split-gated) remains.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -232,11 +259,12 @@ the one fix is provably safe. *Con* — small code delta (a clean codebase yield
   allocations the malloc gate would catch.
 
 **ADHTML — Vue maturity (north star #2)**
-- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). **Server WS COMPLETE** (iters #4–6): CSWSH gate +
-  `WebSocketHub` + `Channel` auto-subscribe DSL — a live-update app is ~3 lines server-side. Next CLIENT:
-  `ws.js` (managed WebSocket: reconnect/backoff/heartbeat/size-cap) + `ctx.ws` as an OPT-IN module (core at
-  4.92/5 KiB → needs a build-system code-split — the gating prerequisite). Deferred server sugar: `Channel`
-  typed-inbound overload + per-route cross-origin allowlist; `App(cors:)`; hub auto-prune on send failure.
+- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). **Server WS COMPLETE** (iters #4–6, #8): CSWSH gate +
+  `WebSocketHub` + `Channel` (subscribe-only + typed-inbound). Next CLIENT: `ws.js` + `ctx.ws` as an OPT-IN
+  module — **gated on a build-system code-split** (core at 4.92/5 KiB): `build.js` → a second `adh-ws` bundle
+  the core lazy-loads via `import(new URL("./adh-ws.js", import.meta.url))`, per-chunk budget, the test
+  resolving `./ws` from source. That split is the one structural prerequisite left (its own ADR). Smaller
+  deferred sugar: per-route cross-origin WS allowlist; `App(cors:)`; hub auto-prune on send failure.
 - Tier-1 declarative `@Resource`/`@Channel` Swift surface (RFC-0008 §4.2/§7) — the no-JS path — comes after
   the Tier-2 primitives (`ctx.fetch` done, `ctx.ws` next) land + prove out.
 - Boilerplate: the 7 verb-overload pairs in `ServerDSL.swift` are near-identical — a candidate for a macro
