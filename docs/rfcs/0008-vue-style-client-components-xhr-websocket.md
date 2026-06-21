@@ -1,6 +1,8 @@
 # RFC 0008 — Vue-style client components: component-issued XHR/WebSocket and client-reactive state
 
-- **Status**: Research / Draft (design-first; awaiting approval before implementation)
+- **Status**: Partially implemented. Phase 1 (`ctx.fetch`) and the **Phase-2 server** (`WebSocketHub` +
+  `Channel` + the CSWSH origin gate) are BUILT and hardened (see `docs/loop-log.md`); the client
+  (`ws.js`/`ctx.ws`) and the Tier-1 declarative Swift surface (`@Resource`/`@Channel`) remain.
 - **Date**: 2026-06-21
 - **Related**: RFC-0003 (reactivity/hydration/wire), RFC-0006 (client dynamic content — this RFC **evolves
   its stance**), ADR-0005 (islands / data-leak boundary), ADR-0006 (tiny generic JS runtime, no Swift→WASM),
@@ -126,10 +128,13 @@ the static parts); the client owns only the *dynamic* state it declared — pres
   that decorates responses with `Allow-Origin` and owns the OPTIONS preflight (both covered by tests). So this
   is not a missing surface — Phase 1 only wants ergonomic sugar (e.g. `App(cors:)`) over the existing
   middleware, plus an explicit origin allowlist + credentials policy for the cross-port case.
-- **Typed WebSocket channel.** `WS(_:)` exists but is raw. Add a component-facing **`Channel`** ergonomic: a
-  typed message contract (`Codable` in/out), an `origin`/auth check at upgrade, a broadcast/pub-sub helper for
-  live fan-out (one mutation → push to subscribed sockets), and back-pressure bounds. The frame shape reuses
-  RFC-0006's `patch`/`morph` vocabulary where it maps cleanly, plus typed JSON for app events.
+- **Typed WebSocket channel — BUILT & hardened (iters #4–6, #8, #10).** The server side is implemented:
+  `WebSocketHub` (a topic-keyed broadcast `actor` — concurrent, failure-isolated fan-out that auto-prunes a
+  dropped peer); `Channel(_:on:topic:)` (a `WS` endpoint that auto-subscribes a connection to a hub topic and
+  auto-unsubscribes on close) plus the bidirectional `Channel(_:on:topic:receiving:_:)` (inbound frames
+  decoded as a `Codable` type via ADJSON, failure-safe); and `webSocketOriginAllowed`, a same-origin **CSWSH**
+  gate enforced at upgrade (cross-origin handshakes rejected before any socket opens). Remaining: a per-route
+  cross-origin **allowlist** (the escape hatch for the cross-port case) + back-pressure bounds.
 - **Signed vs arbitrary.** Two network lanes stay distinct: (1) the **signed RFC-0019 morph** endpoint for
   HTML fragments (unchanged, CSRF-bound); (2) **component JSON XHR/WS** against the app's own API, guarded by
   CORS + CSRF (state-changing) + the API's existing auth. The runtime never invents a third, unmediated lane.
@@ -202,7 +207,7 @@ Tier 2 (escape hatch) authors a client `setup` module bound by name to a `[data-
 | Phase | Item | Needs ADServe? |
 |---|---|---|
 | 1 | ✅ `ctx.fetch` — failure-safe JSON XHR + AbortController + abort-on-teardown (`src/fetch.js`, iter #3). Cross-origin governed by server CORS, not a client block. ADServe **CORS already exists** (`Middleware.swift`) — wants only `App(cors:)` sugar | exists |
-| 2 | `ws.js` managed WebSocket (reconnect/backoff/heartbeat/size-cap) + `ctx.ws`; ADServe typed **`Channel`** (origin/auth check, broadcast helper) over existing `WS` | **yes** (Channel) |
+| 2 | **Server ✅** (iters #4–6, #8, #10): `WebSocketHub` (broadcast + auto-prune) + `Channel` (subscribe-only + typed-inbound) + CSWSH origin gate. **Client pending:** `ws.js` (reconnect/backoff/heartbeat/size-cap) + `ctx.ws`, an opt-in module gated on a build-system code-split | server done |
 | 3 | Tier-1 **`Resource`** (fetch-on-trigger → value/isLoading/error cells) + new wire cell kind + the `.mount/.visible/.every/.on` triggers | partial |
 | 4 | Tier-1 **`Channel`** Swift surface (messages/status/send cells) + declarative reducer (`onChannel`) → cell mutations | yes |
 | 5 | Tier-2 reactive `ctx` (`ref/computed/effect/watch`, `onMounted/onUnmounted`) for bespoke widgets | no |

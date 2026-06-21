@@ -287,6 +287,41 @@ With the CSWSH gate + Channel (subscribe-only + typed-inbound), the whole WebSoc
 
 ---
 
+## Iteration #11 — 2026-06-21 (perf recon → integrity fix)
+
+**Trigger:** north star #1 (perf), the most under-served goal. Targeted a *specific* classic hot-spot rather
+than a blind hunt: the per-response `Date` header.
+
+**Recon result (no safe win to force):** ADServe's response path is already excellent — there is **no
+per-response `Date` header by design** (the engine is proxy-fronted; the "fetch + Caddy" note at
+`HTTPServerRespond.swift:494` confirms Caddy adds it), `HTTPDate.format` is used only for static
+`Last-Modified` (not a hot path), and `commonHeaders` is a cached `envelope` + minimal per-request work. The
+two clean sweeps (iters #7, #9) already signaled this. The remaining code targets are each either ADR-sized
+(`ws.js` code-split — browser lazy-load unverifiable here), engine-threading-heavy (the WS cross-origin
+allowlist, ~7 touch points through the routing/bootstrap core), or marginal-with-awkward-tests (`App(cors:)`
+sugar — middleware is engine-applied, not visible to the route-table unit harness). Forcing one of those is
+not the "safest, most value" move.
+
+**Done (ADHTML, integrity fix — `docs/rfcs/0008-...md`):** RFC-0008 was written design-first ("awaiting
+approval before implementation"), but iters #4–6/#8/#10 *built* the Phase-2 server — the canonical spec now
+contradicted reality. Reconciled it: updated the **Status**, the **§5 WebSocket-channel** section (now
+"BUILT & hardened" with the as-built `WebSocketHub`/`Channel`/`webSocketOriginAllowed` API), and the **§10
+phasing table** (Phase 2 server ✅, client pending). The prism's coherency/consistency/integrity +
+"document everything".
+
+**Assessment (×3):** *Pro* — keeps the canonical design doc honest; safe (doc-only); the recon itself is a
+useful negative result (perf is already optimal). *Con* — a lighter, no-new-code fire. *Consolidate* — record
+the perf finding + reconcile the spec; do not manufacture a marginal code change to look busy.
+
+**Honest state of the loop:** after 11 iterations the obvious high-value *safe* code targets are done. The
+genuine remaining work is (a) the `ws.js` client code-split — ADR-sized, partially unverifiable in this
+sandbox, deserves a deliberate session; (b) spare-parts' ADR/RFC implementation — blocked on the user's
+in-flight `PersistenceADDB` refactor; (c) the Tier-1 declarative `@Resource`/`@Channel` Swift surface — a
+macro + wire-format effort. The next fires should pick one of these deliberately rather than chase diminishing
+small wins.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
