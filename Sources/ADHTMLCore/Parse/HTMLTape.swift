@@ -172,48 +172,7 @@ extension HTMLTape {
                     }
                     continue
                 }
-                let anStart = k
-                while k < n {
-                    let a = unsafe p[k]
-                    if isSpace(a) || a == eq || a == slash || a == gt { break }
-                    k &+= 1
-                }
-                let anLen = k - anStart
-                var avOff = 0
-                var avLen = 0
-                var avDecode = false
-                while k < n, isSpace(unsafe p[k]) { k &+= 1 }
-                if k < n, unsafe (p[k] == eq) {
-                    k &+= 1
-                    while k < n, isSpace(unsafe p[k]) { k &+= 1 }
-                    if k < n, unsafe (p[k] == dquote || p[k] == squote) {
-                        let q = unsafe p[k]
-                        k &+= 1
-                        avOff = k
-                        while k < n {
-                            let v = unsafe p[k]
-                            if v == q { break }
-                            if v == ampersand { avDecode = true }
-                            k &+= 1
-                        }
-                        avLen = k - avOff
-                        if k < n { k &+= 1 }  // closing quote
-                    } else {
-                        avOff = k
-                        while k < n {
-                            let v = unsafe p[k]
-                            if isSpace(v) || v == gt { break }
-                            if v == ampersand { avDecode = true }
-                            k &+= 1
-                        }
-                        avLen = k - avOff
-                    }
-                }
-                if anLen > 0 {
-                    emit(K.attrName, anStart, UInt64(anLen))
-                    emit(K.attrValue, avOff, (UInt64(avLen) << 1) | (avDecode ? 1 : 0))
-                    attrCount &+= 1
-                }
+                if unsafe scanAttribute(p, &k) { attrCount &+= 1 }
             }
 
             let nameField = UInt64(min(nameLen, K.maxNameLen)) << 15
@@ -225,6 +184,59 @@ extension HTMLTape {
                 return unsafe scanRawText(p, ns, nameLen, k, decode)
             }
             return k
+        }
+
+        // One attribute: `name`, then an optional `=value` (quoted or unquoted). Advances `k` past it
+        // and returns whether a (name, value) slot pair was emitted — a bare `=`/value with no name is
+        // consumed but dropped, matching the prior inline behavior.
+        private mutating func scanAttribute(_ p: UnsafePointer<UInt8>, _ k: inout Int) -> Bool {
+            let anStart = k
+            while k < n {
+                let a = unsafe p[k]
+                if isSpace(a) || a == eq || a == slash || a == gt { break }
+                k &+= 1
+            }
+            let anLen = k - anStart
+            let (avOff, avLen, avDecode) = unsafe scanAttributeValue(p, &k)
+            guard anLen > 0 else { return false }
+            emit(K.attrName, anStart, UInt64(anLen))
+            emit(K.attrValue, avOff, (UInt64(avLen) << 1) | (avDecode ? 1 : 0))
+            return true
+        }
+
+        // The optional `=value` following an attribute name. Returns (offset, length, needsEntityDecode),
+        // or (0, 0, false) when there is no `=`. Handles double/single-quoted and unquoted values; sets
+        // `decode` when an `&` appears (a possible entity reference).
+        private mutating func scanAttributeValue(
+            _ p: UnsafePointer<UInt8>, _ k: inout Int
+        ) -> (off: Int, len: Int, decode: Bool) {
+            while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+            guard k < n, unsafe (p[k] == eq) else { return (0, 0, false) }
+            k &+= 1
+            while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+            var avDecode = false
+            if k < n, unsafe (p[k] == dquote || p[k] == squote) {
+                let q = unsafe p[k]
+                k &+= 1
+                let avOff = k
+                while k < n {
+                    let v = unsafe p[k]
+                    if v == q { break }
+                    if v == ampersand { avDecode = true }
+                    k &+= 1
+                }
+                let avLen = k - avOff
+                if k < n { k &+= 1 }  // closing quote
+                return (avOff, avLen, avDecode)
+            }
+            let avOff = k
+            while k < n {
+                let v = unsafe p[k]
+                if isSpace(v) || v == gt { break }
+                if v == ampersand { avDecode = true }
+                k &+= 1
+            }
+            return (avOff, k - avOff, avDecode)
         }
 
         // Raw-text / RCDATA content runs verbatim to the matching end tag; markup inside is not parsed
