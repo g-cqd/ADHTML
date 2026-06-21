@@ -16,12 +16,28 @@ public enum ADHTMLRenderContext {
     public struct Context: Sendable {
         public let arena: CellArena
         public let scope: UInt64
+        /// The nearest enclosing island's render scope — where cells created here are OWNED (serialized),
+        /// even when `scope` (the per-instance dedup scope) belongs to a non-island helper component. So a
+        /// `@State`/`.show`/computed inside a plain `Component` nested in an island is hydrated by that
+        /// island instead of leaking out. `nil` outside any island (a cell there falls back to its own
+        /// `scope`, i.e. is dropped — it belongs in an island). An island sets this to its own `scope`.
+        public let islandScope: UInt64?
         public let assets: AssetSink?
 
-        public init(arena: CellArena, scope: UInt64, assets: AssetSink? = nil) {
+        public init(
+            arena: CellArena, scope: UInt64, islandScope: UInt64? = nil, assets: AssetSink? = nil
+        ) {
             self.arena = arena
             self.scope = scope
+            self.islandScope = islandScope
             self.assets = assets
+        }
+
+        /// This context promoted to an island boundary: its own `scope` becomes the ownership scope for
+        /// every cell created within (the island's body + any non-island descendants). The ``Component``
+        /// `_render` installs this for an `isIsland` component before evaluating its body.
+        public func asIsland() -> Context {
+            Context(arena: arena, scope: scope, islandScope: scope, assets: assets)
         }
     }
 
@@ -33,7 +49,9 @@ public enum ADHTMLRenderContext {
         -> Signal<Value>
     {
         if let context = current {
-            return context.arena.stateCell(scope: context.scope, key: key, default: defaultValue)
+            return context.arena.stateCell(
+                scope: context.scope, key: key, owner: context.islandScope ?? context.scope,
+                default: defaultValue)
         }
         return CellArena().stateCell(scope: 0, key: key, default: defaultValue)
     }
@@ -51,6 +69,8 @@ public enum ADHTMLRenderContext {
     /// `nil` when there is no active context, so a pure static render stays allocation-free.
     static func child() -> Context? {
         guard let parent = current else { return nil }
-        return Context(arena: parent.arena, scope: parent.arena.freshScope(), assets: parent.assets)
+        return Context(
+            arena: parent.arena, scope: parent.arena.freshScope(),
+            islandScope: parent.islandScope, assets: parent.assets)
     }
 }

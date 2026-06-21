@@ -45,45 +45,54 @@ extension Component {
 
     public static func _render<Target: RenderTarget>(_ html: Self, into target: inout Target) {
         // Pure static render (no hydration): render the body directly — zero reactive bookkeeping.
-        guard let context = ADHTMLRenderContext.child() else {
+        guard let base = ADHTMLRenderContext.child() else {
             Body._render(html.body, into: &target)
             return
         }
         // Reactive render: push a fresh per-instance scope so this instance's `@State` cells are
         // distinct from any sibling's. `body` is evaluated INSIDE the scope (where `@State`/computed
-        // reads register their cells); lowering the built value afterwards needs no context.
-        let built = ADHTMLRenderContext.$current.withValue(context) { html.body }
+        // reads register their cells); lowering the built value afterwards needs no context. An island
+        // additionally becomes the OWNERSHIP boundary for cells created in its subtree — so a `@State` /
+        // `.show` / computed in a non-island helper nested here is serialized by this island instead of
+        // leaking out (the reason a declarative nested widget needs no hand-written hydration script).
+        let context = isIsland ? base.asIsland() : base
+        // Evaluate the body AND lower it INSIDE this context, so a nested non-island helper component's
+        // `_render` inherits `islandScope` — its reactive cells are owned by THIS island instead of leaking
+        // out of every scope. (The body was previously lowered outside the context, which is why a `@State`
+        // in a nested plain `Component` was silently dropped and forced a hand-written hydration script.)
+        ADHTMLRenderContext.$current.withValue(context) {
+            let built = html.body
 
-        // Component-scoped assets (Track 4): record this type's style into the ambient sink (deduped) and
-        // stamp a `data-component`/`data-scope` mount root. Only when a sink is present — the hydratable
-        // path that injects the `<style>`; a sink-less render (static `render()`) keeps the no-asset bytes
-        // (the body is the no-JS/SSR fallback). The wrapper's `data-scope` is the CSS ancestor; mount.js
-        // (gated) dispatches over `data-component`.
-        var mountRoot: (name: String, scope: String)?
-        if Self.style != nil || Self.script != nil, let sink = context.assets {
-            let name = String(describing: Self.self)
-            let scope = ComponentAssets.record(style: Self.style, script: Self.script, typeName: name, into: sink)
-            mountRoot = (name, scope)
-        }
-        if let mountRoot {
-            target.openTagStart("<div")
-            target.attribute(name: WireToken.component, value: mountRoot.name, context: .attribute)
-            target.attribute(name: WireToken.scope, value: mountRoot.scope, context: .attribute)
-            target.openTagEnd()
-        }
+            // Component-scoped assets (Track 4): record this type's style into the ambient sink (deduped)
+            // and stamp a `data-component`/`data-scope` mount root. Only when a sink is present.
+            var mountRoot: (name: String, scope: String)?
+            if Self.style != nil || Self.script != nil, let sink = context.assets {
+                let name = String(describing: Self.self)
+                let scope = ComponentAssets.record(
+                    style: Self.style, script: Self.script, typeName: name, into: sink)
+                mountRoot = (name, scope)
+            }
+            if let mountRoot {
+                target.openTagStart("<div")
+                target.attribute(name: WireToken.component, value: mountRoot.name, context: .attribute)
+                target.attribute(name: WireToken.scope, value: mountRoot.scope, context: .attribute)
+                target.openTagEnd()
+            }
 
-        if isIsland {
-            // An interactive `@Component` becomes a hydration island automatically. The scope is INFERRED
-            // from the cells this instance created (the data-leak boundary, computed by the engine — not a
-            // hand-written `scope:` allowlist). The cells are known after body-eval, before lowering.
-            let scope = context.arena.cells(inScope: context.scope)
-            target.islandOpen(id: IslandID("c\(context.scope)"), on: hydration, scope: scope, connect: nil, key: nil)
-            Body._render(built, into: &target)
-            target.islandClose()
-        } else {
-            Body._render(built, into: &target)
-        }
+            if isIsland {
+                // An interactive `@Component` auto-wraps as an island. The seed `scope` snapshot here is the
+                // cells known BEFORE lowering; the hydration scan re-derives the island's full scope from the
+                // arena AFTER lowering (so it includes cells created by nested non-island helpers).
+                target.islandOpen(
+                    id: IslandID("c\(context.scope)"), on: hydration,
+                    scope: context.arena.cells(inScope: context.scope), connect: nil, key: nil)
+                Body._render(built, into: &target)
+                target.islandClose()
+            } else {
+                Body._render(built, into: &target)
+            }
 
-        if mountRoot != nil { target.closeTag("</div>") }
+            if mountRoot != nil { target.closeTag("</div>") }
+        }
     }
 }

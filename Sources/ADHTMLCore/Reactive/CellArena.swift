@@ -104,9 +104,13 @@ public final class CellArena: Sendable {
     /// read within a render registers the cell; later reads of the same property return the same handle
     /// (a stable ``CellID``) rather than registering a duplicate — so `@State var count` referenced by
     /// both an event behavior and a binding resolves to ONE cell.
-    public func stateCell<Value: WireEncodable>(scope: UInt64, key: String, default defaultValue: Value)
-        -> Signal<Value>
-    {
+    /// `scope` keys the dedup (per component instance); `owner` is the island scope the cell is serialized
+    /// under (defaults to `scope`). They differ when a `@State` lives in a non-island helper nested in an
+    /// island: dedup stays per-instance, but ownership bubbles to the island so the cell is hydrated, not
+    /// dropped.
+    public func stateCell<Value: WireEncodable>(
+        scope: UInt64, key: String, owner: UInt64? = nil, default defaultValue: Value
+    ) -> Signal<Value> {
         let composite = StateKey(scope: scope, key: key)
         let id = state.withLock { lock -> CellID in
             if let existing = lock.stateKeys[composite] { return existing }
@@ -114,7 +118,7 @@ public final class CellArena: Sendable {
             lock.nextIndex += 1
             lock.cells.append(Cell(id: id, kind: .signal, value: defaultValue.wireValue))
             lock.stateKeys[composite] = id
-            lock.scopeCells[scope, default: []].append(id)
+            lock.scopeCells[owner ?? scope, default: []].append(id)
             return id
         }
         return Signal(arena: self, id: id, stored: defaultValue)
@@ -127,9 +131,22 @@ public final class CellArena: Sendable {
     /// ``InteractiveComponent`` (the data-leak boundary, computed instead of hand-listed as `scope:`).
     func cells(inScope scope: UInt64) -> [CellID] { state.withLock { $0.scopeCells[scope] ?? [] } }
 
+    /// The COMPLETE scope for a `@Component` island (id `c<scope>`), re-derived from the arena AFTER the
+    /// whole render — so it includes cells created by nested non-island helper components (resolved during
+    /// lowering, i.e. after the `islandOpen` snapshot was taken). Returns `nil` when the id is not a
+    /// `c<digits>` auto-island, or that scope holds no cells, so an explicit / `Region` / store island keeps
+    /// its hand-listed scope untouched.
+    func derivedIslandScope(forID id: IslandID) -> [CellID]? {
+        guard id.raw.hasPrefix("c"), let scope = UInt64(id.raw.dropFirst()) else { return nil }
+        let owned = cells(inScope: scope)
+        return owned.isEmpty ? nil : owned
+    }
+
     private func register(_ kind: Cell.Kind, value: WireValue) -> CellID {
-        // Attribute the cell to the component currently rendering (if any), so its island can infer scope.
-        let scope = ADHTMLRenderContext.current?.scope
+        // Attribute the cell to the nearest enclosing ISLAND scope (so a computed / `.show` / signal created
+        // inside a non-island helper bubbles to the island that hydrates it), falling back to the component's
+        // own scope outside any island.
+        let scope = ADHTMLRenderContext.current.map { $0.islandScope ?? $0.scope }
         return state.withLock { lock -> CellID in
             let id = CellID(lock.nextIndex)
             lock.nextIndex += 1

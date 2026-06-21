@@ -40,7 +40,9 @@ extension HTML {
                     depth += 1
                 case .islandOpen(let id, let on, let scope, _, _):
                     depth += 1
-                    islands.append(WireIsland(id: id, on: on, scope: scope))
+                    // Re-derive a `@Component` island's scope now (post-render) so it includes cells from
+                    // nested non-island helpers; an explicit/Region island keeps its hand-listed `scope`.
+                    islands.append(WireIsland(id: id, on: on, scope: arena.derivedIslandScope(forID: id) ?? scope))
                 case .voidTagEnd, .closeTag, .islandClose:
                     depth -= 1
                 default:

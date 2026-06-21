@@ -69,7 +69,9 @@ extension HTML {
         var islands: [WireIsland] = []
         for op in program.ops {
             if case .islandOpen(let id, let on, let scope, _, _) = op {
-                islands.append(WireIsland(id: id, on: on, scope: scope))
+                // Re-derive a `@Component` island's scope post-render (includes nested non-island helper
+                // cells); an explicit/Region island keeps its hand-listed `scope`.
+                islands.append(WireIsland(id: id, on: on, scope: arena.derivedIslandScope(forID: id) ?? scope))
             }
         }
 
