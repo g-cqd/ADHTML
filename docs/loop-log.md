@@ -760,6 +760,43 @@ the engine-default finding; the separate-host + comparative work stays the named
 
 ---
 
+## Iteration #26 — 2026-06-21 (the #25 finding, investigated → a real engine perf fix: loopCount default)
+
+**Trigger:** #25 flagged `HTTPServer`'s `loopCount: 2` default as "maybe deliberate" and moved on — a deferral
+without investigating *why*. Re-measure that assumption (the loop's whole throughline): is 2 deliberate, or
+an oversight?
+
+**Investigated — it's an oversight, and safe to fix:**
+- The `= 2` default carries **no rationale comment** (every other tuned default — `maxBodyBytes`,
+  `maxConnections` — documents its reasoning). `System.coreCount` is used **nowhere** in the engine, though
+  it's the NIO / Hummingbird / Vapor convention for sizing a `MultiThreadedEventLoopGroup`.
+- **Nothing depends on the default of 2:** every test constructs `HTTPServer` with `loopCount: 1` *explicitly*
+  (deterministic single-loop testing). So changing the default can't regress the suite.
+- **The container footgun is already handled:** `NIOCore.System.coreCount` is cgroup-aware — it honors Linux
+  v1/v2 CPU quotas + cpuset before falling back to `_SC_NPROCESSORS_ONLN`. A constrained container gets its
+  *quota*, not the host core count. That removes the one real objection to defaulting to coreCount.
+
+**Done — changed the engine default (ADServe commit `a0d1a76`):**
+- `HTTPServer` now defaults `loopCount` to a new `public static let defaultLoopCount = System.coreCount`
+  (mirrors the existing `defaultMaxConnections` pattern; self-documenting doc comment with the cgroup note).
+  The `ADServeBench` default + `loadtest-baseline.md` updated to match.
+- **Verified end-to-end:** all **273 tests green** (no regression — the explicit `loopCount: 1` in tests is
+  untouched); out-of-box `swift run ADServeBench` now serves **86.1k req/s** (was ~72k at the old default
+  of 2) — a **~19% throughput gain with zero app-side tuning**, p50 0.54 ms, p99 4.2 ms, 100% success.
+
+**This is the first engine-level perf *fix* of the loop (not just a measurement)** — and it's exactly what
+the runnable bench from #24–25 was for: it surfaced a real default that under-utilized multicore, on the
+#1-ranked star. Boilerplate reduced too (apps no longer must hand-tune `loopCount:` for sane multicore perf).
+
+**Assessment (×3):** *Pro* — a concrete, verified ~19% out-of-box win on the top star; matches the
+swift-server convention; cgroup-safe; removes app boilerplate; 273 tests prove no regression. *Con* — it's a
+public-default behavior change (more event-loop threads by default), though that's the intended, conventional
+behavior and is quota-bounded. *Consolidate* — the investigation cleared every risk (no test dependence,
+cgroup-aware, documented), so ship the fix; the separate-host true-ceiling + comparative benchmarks remain #1's
+next steps.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -782,11 +819,10 @@ the engine-default finding; the separate-host + comparative work stays the named
   `routing/*`/`percent/*`/`mime/*` tables still want a clean host / CI. **Next on #1:** drive load from a
   SEPARATE host (co-located oha+server cap the 8-core box) for the true ceiling; then Hummingbird/Vapor under
   the same harness for the comparative claim (currently network-blocked — SPM can't fetch deps offline).
-- **FINDING — engine `loopCount` default (iter #25):** `HTTPServer.init` defaults `loopCount: 2`, which leaves
-  ~17% throughput unused on an 8-core host (72.6k vs 85–87k at 4–8 loops). An app that constructs `HTTPServer`
-  without setting it only uses 2 loops. Reconsider defaulting to `System.coreCount` (the NIO
-  `MultiThreadedEventLoopGroup` convention) — or document why 2 is the conservative default. A question to raise,
-  not a unilateral change.
+- ✅ **RESOLVED (iter #26) — engine `loopCount` default:** `HTTPServer` now defaults `loopCount` to
+  `defaultLoopCount = System.coreCount` (was hardcoded 2). Investigation cleared every risk (no rationale for
+  2; every test pins `loopCount: 1` explicitly so nothing regressed; `System.coreCount` is cgroup-aware →
+  container-safe). Out-of-box throughput 72k → **86.1k** (~19%), 273 tests green (`ADServe` `a0d1a76`).
 - `pathMatchesExact` made allocation-free (iter #2). Next: scan other DSL hot paths for incidental
   allocations the malloc gate would catch.
 
