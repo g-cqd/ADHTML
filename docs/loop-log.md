@@ -379,6 +379,38 @@ do not invent a change to look busy when the framework already has the capabilit
 
 ---
 
+## Iteration #14 — 2026-06-21 (grounded finding: the framework goals are substantially met)
+
+**Trigger:** the prism's least-served dimension — "suggest improvement: CI" — then "document everything".
+
+**Findings (both already done — verified):**
+- **ADServe CI is excellent + complete.** `.github/workflows/ci.yml`: a reusable `quality` job (format + lint +
+  test under **ASan + TSan** + coverage), a `mime-codegen-drift` guard, a `fuzz` job (the untrusted-byte
+  parsers), and a `benchmark` job. The one open item — `benchmark` is `continue-on-error` pending a committed
+  baseline — is blocked by the SAME sandbox limit as iter #2 (the ordo-one sampling run can't generate a
+  baseline here). No safe CI gap to fill.
+- **ADHTML already has full user docs.** Two DocC catalogs, **947 lines across 9 articles** (`GettingStarted`,
+  `InteractiveComponents`, `DerivedState`, `MarkdownInBuilder`, `ComponentScopedAssets`, `Reactivity`,
+  `RenderingModel` + both landings) — substantive, matching the original plan. Not a stub; not a gap.
+
+**Meta-finding (the honest one):** this is the THIRD consecutive iteration where my hypothesized gap was
+already filled — iter #12 ≈ (CORS existed), iter #13 (P1–P9 primitives exist), iter #14 (DocC exists). The
+repeated pattern is itself the conclusion: **ADHTML + ADServe substantially meet the framework north stars.**
+- **#1 (most performant server):** ADServe is fast + allocation-tracked + ASan/TSan-clean + fuzzed + cleanly
+  swept. Optimal within what's verifiable here.
+- **#2 (ADHTML as mature as Vue):** parity-primitive vocabulary (P1–P9), the RFC-0008 XHR/WS server,
+  `ctx.fetch`, full DocC docs, 253 + 75 tests. Substantially met. Only the WS *client* (`ws.js`/`ctx.ws`)
+  remains — blocked on a budget decision (the stub exceeds the 86 B core headroom).
+- **#3 (spare-parts ADRs/RFCs):** the app's framework requirements (RFCs 0019–0022) are met; the app's own
+  code is blocked on the in-flight `PersistenceADDB` refactor.
+
+**Assessment (×3):** *Pro* — records grounded truth; avoids manufacturing churn on a mature codebase. *Con* —
+no new code (correctly — there's nothing safe + unfilled to add). *Consolidate* — report completion honestly;
+the next real moves (`ws.js` budget call, spare-parts settling) are **deliberate, user-involved** decisions,
+not autonomous loop fires. Continuing to force micro-changes past here trades integrity for motion.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
