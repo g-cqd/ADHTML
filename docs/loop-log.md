@@ -642,6 +642,44 @@ for that the server benchmark couldn't (sandbox-blocked, #2); confirms hydration
 
 ---
 
+## Iteration #23 — 2026-06-21 (the last browser-only gap: `ctx.ws` lazy-load + WS round-trip, e2e-proven)
+
+**Trigger:** #22 proved the runtime in a real browser — but its e2e covered hydration/morph/SSE/v2, **not**
+`ctx.ws`. The WS client (#15–16) is the one path the unit suite *structurally cannot* reach: it lazy-loads the
+opt-in `adh-ws.min.js` via `import(new URL("./adh-ws.min.js", import.meta.url).href)`, which only resolves +
+fetches + executes in a real module loader. #15 itself flagged "its browser lazy-load isn't verifiable in this
+sandbox" — re-measure that assumption, the throughline of this whole loop.
+
+**Found:** it *is* verifiable — Playwright + Chromium run here (#22). So I built the missing fixture: a
+`data-0="WsWidget"` widget whose `ctx.ws` opens a socket against a Bun `/ws-echo` endpoint that pushes one
+frame on open + echoes a sent frame. Two real findings surfaced while wiring it:
+- A page with **no `adh-state` script** makes `hydrate()` return early (runtime.js:278) → `mountAll` never
+  runs → `activeDoc` stays unset → even a late `ADH.mount` can't mount. The fixture needs an (empty) state
+  block. (Documents a real contract: the mount bridge rides on hydrate.)
+- The fixture first sent `{ping:1}` **synchronously while still `CONNECTING`** — and the echo never came,
+  because `ws.js` `send()` is a **deliberate no-op off `readyState===1`** (it never buffers; no unbounded
+  queue, no ambiguous replay-on-reconnect). That's the correct minimal-secure contract — *the test* was wrong.
+  Fixed the fixture to send on `onStatus("open")`, honoring the runtime's documented contract.
+
+**Done — added `e2e/ws.spec.js` + the `/ws` fixture; full browser e2e now 8/8 PASS in 1.7 s.**
+- New: `ctx.ws` lazy-loads `adh-ws.min.js`, connects, receives the server's open frame (JSON-parsed), sends
+  `{ping:1}`, receives the echo — the complete RFC-0008 Phase 2 client round-trip, in a real engine.
+- Regression-clean: the other 7 (#22) still green; 84/84 unit, typecheck clean, bundles in budget (core 5077 B
+  / adh-ws 464 B gzip). Re-benchmarked: 6.0 µs/island hydrate, 4.45 µs/click.
+
+**This closes the WS-client validation loop (north star #2):** #15 shipped it, #16 hardened reconnect, #22
+proved the runtime broadly, and #23 proves the *one path #15 said it couldn't* — lazy-load + live socket — end
+to end. The client side of RFC-0008's XHR+WebSocket ask is now built, hardened, AND browser-verified.
+
+**Assessment (×3):** *Pro* — closes the single structurally-unverified path in the whole client; the
+contract findings (hydrate-gates-mount, send-only-when-open) are real documentation value; ninth time a
+"can't verify here" assumption dissolved on measurement. *Con* — verification + a test fixture, not new
+shipping code; the runtime itself was already correct (the bug was in my fixture). *Consolidate* — the
+no-op-while-connecting behavior is *right* (minimal, failure-safe); keep the runtime, fix the test to honor
+the contract, record the green. Ship the e2e.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**

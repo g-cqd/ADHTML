@@ -127,11 +127,41 @@ function escapeHtml(value) {
   return value.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 }
 
+// ctx.ws fixture: a Track-4 widget (`data-0="WsWidget"`) that, on mount, opens a managed WebSocket via
+// `ctx.ws` — which LAZY-LOADS the opt-in `/adh-ws.min.js` code-split bundle (the browser-only path the unit
+// suite can't reach). The server pushes one frame on open + echoes a sent frame, so the e2e proves the full
+// round-trip: lazy-load → connect → receive (JSON-parsed) → send. Results land on `window.__ws*`.
+const WS_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>ws</title></head><body>
+  <div data-0="WsWidget"></div>
+  <script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[],"islands":[]}</script>
+  <script type="module" src="/adh-runtime.min.js"></script>
+  <script type="module">
+    window.__wsMsgs = []; window.__wsStatus = [];
+    globalThis.ADH.mount("WsWidget", (root, ctx) => {
+      let sock;
+      ctx.ws("ws://" + location.host + "/ws-echo", {
+        // Send only once the socket is OPEN — the runtime's send() is a deliberate no-op while CONNECTING
+        // (it never buffers, by design). onStatus("open") fires after the handle resolves, so sock is set.
+        onStatus: (s) => { window.__wsStatus.push(s); if (s === "open") sock.send({ ping: 1 }); },
+        onMessage: (m) => window.__wsMsgs.push(JSON.stringify(m)),
+      }).then((s) => { sock = s; });
+    });
+  </script>
+</body></html>`;
+
 Bun.serve({
   port: PORT,
-  fetch(req) {
+  fetch(req, server) {
     const url = new URL(req.url);
     const path = url.pathname;
+    if (path === "/ws-echo") {
+      // The ctx.ws e2e connects here; upgrade to a WebSocket (the `websocket` handler pushes + echoes).
+      if (server.upgrade(req)) return undefined;
+      return new Response("expected a WebSocket upgrade", { status: 426 });
+    }
+    if (path === "/ws") {
+      return new Response(WS_PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
     if (path === "/") {
       return new Response(PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
     }
@@ -171,7 +201,19 @@ Bun.serve({
     if (path === "/adh-runtime.min.js") {
       return new Response(Bun.file("adh-runtime.min.js"), { headers: { "content-type": "text/javascript" } });
     }
+    if (path === "/adh-ws.min.js") {
+      // The opt-in code-split bundle ctx.ws lazy-loads as a sibling (mirrors the app's served convention).
+      return new Response(Bun.file("adh-ws.min.js"), { headers: { "content-type": "text/javascript" } });
+    }
     return new Response("not found", { status: 404 });
+  },
+  websocket: {
+    open(ws) {
+      ws.send(JSON.stringify({ from: "server", event: "open" }));  // push a frame the moment the socket opens
+    },
+    message(ws, message) {
+      ws.send(message);  // echo what the client sends (proves ctx.ws → send round-trips)
+    },
   },
 });
 
