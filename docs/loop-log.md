@@ -498,6 +498,38 @@ ask — is built + hardened. RFC-0008 is, in substance, COMPLETE.
 
 ---
 
+## Iteration #18 — 2026-06-21 (north star #3: a real spare-parts bug, fixed)
+
+**Trigger:** re-measure the stale "spare-parts blocked" assumption (#15's lesson). It paid off: despite 26
+uncommitted changes mid-`PersistenceADDB` refactor, the app now **builds** (10.9 s) and its tests run — so #3
+is reachable read-only.
+
+**Found (a genuine bug, via the app's own failing test):** `ViewKitTests → actionWiring` failed — the
+rendered list page lacked `action="/parts/1/delete"`. Root cause: `PartsListView.swift:146` emitted the
+row-delete form as `method="delete"` `action="/parts/1"`. But **HTML forms support only GET/POST** —
+`method="delete"` silently degrades to GET — and the URL didn't match the route I set in iter #1
+(`POST /parts/{id}/delete`). So the no-JS row delete was broken. (The token-field deletes already used
+`POST …/delete` correctly; only the row delete was left inconsistent by the refactor.)
+
+**Done (spare-parts, working tree only — NOT committed):** one-line fix —
+`method="delete" action="/parts/1"` → `method="post" action="/parts/1/delete"`, matching the route + valid
+HTML + the test. **Now 18/18 app tests pass** (was 17/18). Verified there is no other `method="delete"` in
+ViewKit.
+
+**Why not committed:** spare-parts is the user's active WIP (mid-refactor, untracked `ViewKit/`). Committing
+one file would fragment the refactor — the fix lives in the working tree for the user to land with their
+refactor commit (the same discipline as iter #1's `Routes.swift`).
+
+**Assessment (×3):** *Pro* — advances the one untouched north star with a real, test-confirmed bug fix; safe
+(obviously-correct 1-liner, matches the established route + valid HTML). *Con* — left uncommitted (correct —
+respects the user's in-flight refactor). *Consolidate* — fix + verify + document; don't commit into the
+user's WIP.
+
+**#15's lesson, four-for-four:** the WS "budget blocker" (#15), the reconnect "untestable timing" (#16), and
+now the spare-parts "blocked" assumption all dissolved on measurement. Re-measure before deferring.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
