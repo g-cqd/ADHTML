@@ -944,6 +944,31 @@ the named next #1 steps. Honesty over a flattering number.
 
 ---
 
+## Iteration #31 — 2026-06-21 (user-requested: a 5-way cross-stack benchmark — ADServe is LAST)
+
+**Trigger:** the user asked to set up an Erlang server + another known-fast server and compare with Hummingbird.
+Installed Erlang (OTP) + Go (brew), wrote four tiny servers with ADServeBench's exact routes — Bun (`Bun.serve`
+`routes`), Go `net/http`, Erlang raw `gen_tcp` with `{packet, http_bin}` + process-per-connection, plus the
+existing Hummingbird — and benchmarked all five ALONE under the same oha (`-z 5s -c 64`, best-of-2).
+
+**Result (/plaintext req/s, ADServe with the iter-#30 gzip fix):**
+`Bun 203.8k > Go 162.9k > Erlang 142.9k > Hummingbird 114.7k > ADServe 102.4k`.
+
+**Honest read — ADServe is the SLOWEST of the five** (tracked in `ADServe/Benchmarks/loadtest-baseline.md`,
+commit `7d0f23b`). Two gaps: (1) **within Swift/NIO** ADServe trails Hummingbird ~11% — same runtime, so it's
+purely ADServe's heavier per-request path (the closeable #1 target); (2) **cross-language** Go/Erlang/Bun are
+1.4–2.0× faster — partly the comparison shape (raw `gen_tcp`, Bun's precompiled `routes`, Go's decade-tuned
+stdlib) and partly real runtime cost (Swift ARC + the NIO `ChannelHandler` pipeline vs goroutines / BEAM
+processes / Bun's Zig core). Closing to Hummingbird is realistic; matching Bun/Go is much deeper (or a ceiling).
+
+**Assessment (×3):** *Pro* — answers the user's question with real data + the strongest possible context (4
+peers across 4 runtimes); makes #1's true standing unambiguous + the within-Swift gap the concrete target.
+*Con* — humbling (ADServe is last), and the cross-language legs aren't perfectly feature-matched (raw vs
+framework). *Consolidate* — report it straight; the honest standing is more useful than a flattering subset.
+The external servers are throwaway (recipes in the baseline doc); nothing competitor-related enters the repos.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
