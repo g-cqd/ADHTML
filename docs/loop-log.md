@@ -723,6 +723,43 @@ answer.
 
 ---
 
+## Iteration #25 — 2026-06-21 (the true ceiling: open-loop oha + event-loop scaling + an engine-default finding)
+
+**Trigger:** #24's baseline was a single-client *lower bound* ("the server has more to give"). Find the real
+ceiling — the explicit #24 next-step. Comparative-vs-Hummingbird is network-blocked (SPM can't fetch deps
+offline), so the dep-free path is removing the client bottleneck.
+
+**Re-measured — #24's own conclusion was half-wrong (14th correction-on-measurement):**
+- **Bun multi-client (loopCount=2):** aggregate rps stays FLAT across 1→6 parallel clients (70k→70k→68k→62k).
+  So the server was **saturated at ~70k on 2 loops** — server-bound, *not* client-bound as #24 inferred from
+  the single-client plateau. The decline at 4–6 clients is CPU contention (clients stealing the server's cores).
+- Added an **`ADSERVE_BENCH_LOOPS` knob** (the perf-critical event-loop count; engine `HTTPServer` default is
+  2) so scaling is measurable. Rebuilt incrementally (6.9 s).
+- A Bun loop-sweep showed a FLAT peak (~70–73k) across 2/4/8 loops — a co-located artifact: heavy JS client +
+  server compete for 8 cores. So installed **oha** (Rust, open-loop, low client overhead — the SOTA tool) to
+  free cores for the server.
+
+**Done — clean oha scaling + per-route numbers (ADServe commit `0d373a4`):**
+- **Event-loop scaling (/plaintext, 64 conn):** 1→**36.7k**, 2→**72.6k**, 4→**81.3k**, 8→**85.1k** req/s.
+  **1→2 loops is near-linear** (the accept/serve path parallelizes cleanly); 2→8 diminishes — a co-located
+  artifact (oha + server share 8 cores), not a server limit.
+- **Per route @ 8 loops:** `/json` **89.3k**, `/plaintext` **87.6k**, `/users/{id}` **84.7k** req/s — sub-ms
+  p50, p99 ~4 ms, **100% success**. Param routing costs only **~3%** (Bun's overhead had inflated it to 9%).
+- oha sees ~87k where the Bun client capped at ~70k — the JS load generator *was* part of #24's ceiling.
+
+**Finding (the "identify" pillar):** the engine's `HTTPServer` default **`loopCount: 2` leaves ~17%
+throughput unused** on an 8-core host (72.6k vs 85–87k at 4–8 loops). An app constructing `HTTPServer`
+without setting `loopCount` only uses 2 loops. Flagged for follow-up — may be a deliberate conservative
+default for low-core/containerized targets, so it's a question to raise, not a unilateral change.
+
+**Assessment (×3):** *Pro* — found the real ~87k ceiling + proved clean 1→2 scaling; the `loopCount` knob is a
+genuine bench improvement; surfaced a concrete engine-default question; adopted the SOTA open-loop tool for
+rigorous tails. *Con* — the multicore plateau is still co-located-capped (true ceiling needs a separate load
+host); comparative numbers remain network-blocked. *Consolidate* — ship the knob + oha-measured baseline +
+the engine-default finding; the separate-host + comparative work stays the named next step for #1.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -738,13 +775,18 @@ answer.
 - Add `PathTraversalTests` cases for the directory-root exposure + NUL extension confusion (audit gap).
 
 **ADServe — performance (north star #1)**
-- **Live-load baseline CAPTURED (iter #24):** `ADServeBench` (runnable server) + `Benchmarks/loadtest.js`
-  (Bun) → ~70k req/s, sub-ms p50, p99 < 1.8 ms, 0 errors (`ADServe` commit `7ee712d`, tracked in
-  `Benchmarks/loadtest-baseline.md`). Port-binding works here — only the ordo-one *plugin* sampling is
-  sandbox-blocked (subprocess/TTY), so the micro-bench `routing/*`/`percent/*`/`mime/*` tables still want a
-  clean host / CI to emit. **Next on #1:** open-loop client (oha/wrk2) + multi-process load to pass the
-  single-client plateau (~66k from c=16) and find the true ceiling; then Hummingbird/Vapor under the same
-  harness for the comparative "most performant" claim.
+- **Live-load baseline + scaling CAPTURED (iters #24–25):** `ADServeBench` (runnable server, `ADSERVE_BENCH_LOOPS`
+  knob) measured with **oha** → ~**87k req/s** (`/json` 89.3k), sub-ms p50, p99 ~4 ms, 100% success at 8 loops;
+  **1→2 loops near-linear**; param routing ~3% over plaintext (`ADServe` `7ee712d`+`0d373a4`, tracked in
+  `Benchmarks/loadtest-baseline.md`). Only the ordo-one *plugin* sampling is sandbox-blocked, so the micro-bench
+  `routing/*`/`percent/*`/`mime/*` tables still want a clean host / CI. **Next on #1:** drive load from a
+  SEPARATE host (co-located oha+server cap the 8-core box) for the true ceiling; then Hummingbird/Vapor under
+  the same harness for the comparative claim (currently network-blocked — SPM can't fetch deps offline).
+- **FINDING — engine `loopCount` default (iter #25):** `HTTPServer.init` defaults `loopCount: 2`, which leaves
+  ~17% throughput unused on an 8-core host (72.6k vs 85–87k at 4–8 loops). An app that constructs `HTTPServer`
+  without setting it only uses 2 loops. Reconsider defaulting to `System.coreCount` (the NIO
+  `MultiThreadedEventLoopGroup` convention) — or document why 2 is the conservative default. A question to raise,
+  not a unilateral change.
 - `pathMatchesExact` made allocation-free (iter #2). Next: scan other DSL hot paths for incidental
   allocations the malloc gate would catch.
 
