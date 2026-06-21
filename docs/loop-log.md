@@ -41,6 +41,36 @@ mine to commit. My app change (`Routes.swift` route-shape fixes + probe removal)
 
 ---
 
+## Iteration #2 — 2026-06-21
+
+**Trigger:** north star #1 (perf) + the "benchmark everything" mandate → establish a baseline. Recon found
+ADServe **already has** an ordo-one suite (`Benchmarks/ADServeSuite`, malloc-tracked, gated `ADSERVE_DEV=1`)
+covering `routing/*`. Sharper finding: **iteration #1's `pathMatchesExact` allocated up to 2 Strings per
+exact-match comparison** (`String(requestPath) + "/"`) — a self-inflicted regression on the exact-match hot
+path the `routing/exact hit` benchmark guards via `.mallocCountTotal`.
+
+**Assessment (×3):**
+- *Pro* — fixing it serves perf/memory-efficiency, self-corrects my own regression, reuses the existing
+  harness (zero new infra).
+- *Con* — the zero-alloc rewrite must be exactly equivalent across trailing-slash edges; the benchmark
+  runner is finicky in this sandbox.
+- *Consolidate* — rewrite allocation-free, prove equivalence with the 260 tests, document the harness +
+  command; don't burn the fire fighting the sampling runner.
+
+**Done (ADServe, committed `6f2b881`, local-only):**
+- `pathMatchesExact` now normalizes **down** — trims one trailing slash via zero-copy `Substring` slicing
+  (`dropLast`/`[...]`), preserving a lone `"/"`. **Allocation-free**, O(1) trim + O(path) compare, no
+  recursion, empty-safe. Equivalent equality to the prior append-up version; **260 tests green**.
+
+**Benchmark status:** harness is healthy — `swift package benchmark list` enumerates all benches
+(`routing/exact hit`, `routing/param {1,2,3}-capture`, `catch-all`, `miss`, `405`, `mime/*`, `percent/*`,
+`cookies/*`, `form/*`). The **sampling run emits no tables in this sandbox** (subprocess/TTY limitation,
+independent of the jemalloc version-mismatch warning — `BENCHMARK_DISABLE_JEMALLOC=true` didn't help).
+→ Capture numbers on a clean host/CI: `ADSERVE_DEV=1 swift package benchmark --filter routing`. The
+allocation-freedom is meanwhile guaranteed *by construction* (no `String(_:)`/`+`, only slicing).
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -56,8 +86,12 @@ mine to commit. My app change (`Routes.swift` route-shape fixes + probe removal)
 - Add `PathTraversalTests` cases for the directory-root exposure + NUL extension confusion (audit gap).
 
 **ADServe — performance (north star #1)**
-- No perf baseline exists yet ("benchmark everything"). Need a load harness (wrk / bombardier / `swift-nio`
-  bench) + a tracked baseline (req/s, p50/p99, allocations) so each iteration can prove non-regression.
+- Micro-bench harness CONFIRMED healthy (ordo-one `Benchmarks/ADServeSuite`, malloc-tracked; `list` works).
+  The sampling run is blocked in this sandbox (subprocess/TTY) — capture the `routing/*`, `percent/*`,
+  `mime/*` baseline on CI / a clean host and commit it as the tracked reference. A live-load test (req/s +
+  p99) also wants a load tool (none of wrk/bombardier/hey/oha installed here).
+- `pathMatchesExact` made allocation-free (iter #2). Next: scan other DSL hot paths for incidental
+  allocations the malloc gate would catch.
 
 **ADHTML — Vue maturity (north star #2)**
 - RFC-0008 Phase 1 is the next build: generalize `action.js`'s `request()` into a JSON transport +
