@@ -29,14 +29,14 @@ struct Counter {
     @State var count = 0
     var body: some HTML {
         div {
-            button { "+" }.on(.click, Behavior.increment(countSignal))
-            span { String(count) }.bind(.text, to: countSignal)
+            button { "+" }.on(.click, .increment($count))
+            span { String(count) }.bind(.text, to: $count)
         }
     }
 }
 ```
 
-`@State` makes `Counter` an island automatically: the macro adds the `countSignal` handle, infers the
+`@State` makes `Counter` an island automatically: the macro adds the `$count` handle, infers the
 hydration scope from the cells the component touches, and wraps the body in island markup. The server renders
 `<span>0</span>` for no-JS clients; the runtime resumes the button + binding when the page loads.
 
@@ -56,10 +56,11 @@ hydration scope from the cells the component touches, and wraps the body in isla
 - <doc:MarkdownInBuilder>
 - <doc:ComponentScopedAssets>
 
-### Authoring macros
+### Authoring
+
+`@State` is a property wrapper (`count` is the value, `$count` is the projected signal); the rest are macros.
 
 - ``Component()``
-- ``State()``
 - ``Bound()``
 - ``attr(_:)``
 

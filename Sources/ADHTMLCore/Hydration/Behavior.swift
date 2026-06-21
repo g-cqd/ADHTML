@@ -101,6 +101,37 @@ public enum Behavior {
     }
 }
 
+// MARK: - leading-dot call-site factories — `.on(.click, .increment($qty))` (ADR-0015)
+
+/// The same closed behaviors as ``Behavior``, surfaced on ``BehaviorInvocation`` so a call site can use the
+/// leading-dot form: `.on(.click, .increment($qty))` rather than `.on(.click, Behavior.increment($qty))`.
+extension BehaviorInvocation {
+    /// Set `signal` to a constant value.
+    public static func set<Value: WireEncodable>(_ signal: Signal<Value>, to value: Value) -> BehaviorInvocation {
+        Behavior.set(signal, to: value)
+    }
+    /// Toggle a boolean signal.
+    public static func toggle(_ signal: Signal<Bool>) -> BehaviorInvocation { Behavior.toggle(signal) }
+    /// Add `step` to an integer signal.
+    public static func increment(_ signal: Signal<Int>, by step: Int = 1) -> BehaviorInvocation {
+        Behavior.increment(signal, by: step)
+    }
+    /// Set a string signal from the triggering element's `value`.
+    public static func setFromValue(_ signal: Signal<String>) -> BehaviorInvocation {
+        Behavior.setFromValue(signal)
+    }
+    /// Append the current text of `query` to `tokens` and clear `query`.
+    public static func commit(_ tokens: Signal<[String]>, from query: Signal<String>) -> BehaviorInvocation {
+        Behavior.commit(tokens, from: query)
+    }
+    /// Remove the last element of a string array.
+    public static func removeLast(_ tokens: Signal<[String]>) -> BehaviorInvocation { Behavior.removeLast(tokens) }
+    /// Append the triggering element's text to `tokens` and clear `query`.
+    public static func commitValue(_ tokens: Signal<[String]>, clearing query: Signal<String>) -> BehaviorInvocation {
+        Behavior.commitValue(tokens, clearing: query)
+    }
+}
+
 extension WireValue {
     /// A scalar wire value as a single attribute token. Arrays/null are not valid behavior params.
     var scalarToken: String {

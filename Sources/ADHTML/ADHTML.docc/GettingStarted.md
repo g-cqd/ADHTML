@@ -18,8 +18,8 @@ Then depend on a product:
 ])
 ```
 
-- **`ADHTML`** — the umbrella you usually want: the engine, the `@Component` / `@State` / `@Bound` macros,
-  `#attr`, and `Page`.
+- **`ADHTML`** — the umbrella you usually want: the engine, the `@Component` / `@Bound` macros, the `@State`
+  property wrapper, `#attr`, and `Page`.
 - **`ADHTMLCore`** — the Foundation-free engine on its own (DOM DSL, renderer, escaping, reactivity), if you
   want no macros.
 
@@ -80,8 +80,8 @@ struct LikeButton {
     @State var likes = 0
     var body: some HTML {
         div {
-            button { "♥" }.on(.click, Behavior.increment(likesSignal))
-            span { String(likes) }.bind(.text, to: likesSignal)
+            button { "♥" }.on(.click, .increment($likes))
+            span { String(likes) }.bind(.text, to: $likes)
         }
     }
 }

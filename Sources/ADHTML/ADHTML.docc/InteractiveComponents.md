@@ -11,7 +11,7 @@ and views; the engine handles SSR, the island boundary, and the wire.
 
 ## State
 
-`@State var count = 0` keeps `count` as the server-render default and adds a peer **`countSignal`** — the
+`@State var count = 0` keeps `count` as the server-render default and adds a peer **`$count`** — the
 `Signal` handle that bindings and behaviors target. Provide an explicit type or a literal
 initializer so the signal type is known:
 
@@ -21,16 +21,16 @@ initializer so the signal type is known:
 @State var open: Bool = false  // Signal<Bool>
 ```
 
-One piece of state is the value (`count`), and the handle is `<name>Signal` (`countSignal`).
+One piece of state is the value (`count`), and the handle is `<name>Signal` (`$count`).
 
 ## Events: `.on`
 
 Wire a closed, typed client `Behavior` to a typed `DOMEvent`:
 
 ```swift
-button { "+" }.on(.click, Behavior.increment(countSignal))
-button { "Toggle" }.on(.click, Behavior.toggle(openSignal))
-input().on(.input, Behavior.setFromValue(querySignal))
+button { "+" }.on(.click, .increment($count))
+button { "Toggle" }.on(.click, .toggle($open))
+input().on(.input, .setFromValue($query))
 ```
 
 The behavior set is a closed Swift `enum` (increment, toggle, set, …), so an event→state binding is checked
@@ -43,9 +43,9 @@ Bind a cell to an element's text, value, or class. The `BindTarget` is `.text` /
 `.class`:
 
 ```swift
-span { String(count) }.bind(.text, to: countSignal)
-input().bind(.value, to: labelSignal)
-div { }.bind(.class, to: themeSignal)
+span { String(count) }.bind(.text, to: $count)
+input().bind(.value, to: $label)
+div { }.bind(.class, to: $theme)
 ```
 
 `.bind` accepts a `Signal`, a `Computed`, a `Reactive` expression
@@ -54,7 +54,7 @@ div { }.bind(.class, to: themeSignal)
 ## Two-way binding: `.model`
 
 ```swift
-input().model(nameSignal)   // typing updates the signal; a signal change updates the field
+input().model($name)   // typing updates the signal; a signal change updates the field
 ```
 
 Emits the initial `value` (no flash) and wires both directions for `<input>` / `<textarea>`.
@@ -62,9 +62,9 @@ Emits the initial `value` (no flash) and wires both directions for `<input>` / `
 ## Conditional class, visibility, and mounting
 
 ```swift
-button { "Buy" }.classToggle("active", when: inStockSignal)   // merges; never clobbers static class
-div { … }.show(when: openSignal)                              // toggles display; stays in the DOM
-When(openSignal) { aside { "Details" } }                      // mounts/unmounts (v-if-style)
+button { "Buy" }.classToggle("active", when: $inStock)   // merges; never clobbers static class
+div { … }.show(when: $open)                              // toggles display; stays in the DOM
+When($open) { aside { "Details" } }                      // mounts/unmounts (v-if-style)
 ```
 
 `classToggle` and `show` paint the initial state into the server HTML, so there is no hydration flash;
@@ -74,12 +74,12 @@ When(openSignal) { aside { "Details" } }                      // mounts/unmounts
 
 ```swift
 input()
-    .on(.keydown, Behavior.commitValue(itemsSignal))
+    .on(.keydown, Behavior.commitValue($items))
     .keys("Enter")              // fire only for these event.key values
     .preventDefault()
     .keymap([                   // map several keys to different behaviors on one element
-        ("ArrowDown", Behavior.listMove(cursorSignal, by: 1)),
-        ("Enter", Behavior.commit(itemsSignal)),
+        ("ArrowDown", Behavior.listMove($cursor, by: 1)),
+        ("Enter", Behavior.commit($items)),
     ])
 ```
 

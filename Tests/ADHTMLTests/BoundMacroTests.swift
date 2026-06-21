@@ -11,7 +11,7 @@ import Testing
 @Component
 struct BoundDouble {
     @State var count = 3
-    @Bound var doubled: Reactive<Int> { countSignal.reactive * 2 }  // peer: doubledComputed: Computed<Int>
+    @Bound var doubled: Reactive<Int> { $count.reactive * 2 }  // peer: doubledComputed: Computed<Int>
 
     var body: some HTML {
         span { String(count) }.bind(.text, to: doubledComputed)

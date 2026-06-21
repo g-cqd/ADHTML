@@ -11,9 +11,9 @@ struct AddToCart {
 
     var body: some HTML {
         div {
-            button { "−" }.on(.click, Behavior.increment(quantitySignal, by: -1))
-            span { String(quantity) }.bind(.text, to: quantitySignal)
-            button { "+" }.on(.click, Behavior.increment(quantitySignal))
+            button { "−" }.on(.click, Behavior.increment($quantity, by: -1))
+            span { String(quantity) }.bind(.text, to: $quantity)
+            button { "+" }.on(.click, Behavior.increment($quantity))
         }
         .class("add-to-cart")
         .data("product", productID)

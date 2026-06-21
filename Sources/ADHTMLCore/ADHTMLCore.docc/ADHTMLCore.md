@@ -68,9 +68,11 @@ native stack.
 
 ### Reactive state
 
+- ``State``
 - ``Signal``
 - ``Computed``
 - ``Reactive``
+- ``ReactiveReadable``
 - ``WireExpr``
 - ``BinaryOp``
 - ``UnaryOp``

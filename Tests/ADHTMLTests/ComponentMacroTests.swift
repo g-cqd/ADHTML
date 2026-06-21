@@ -13,8 +13,8 @@ struct MacroCounter {
 
     var body: some HTML {
         div {
-            button { "+" }.on(.click, Behavior.increment(countSignal))
-            span { String(count) }.bind(.text, to: countSignal)
+            button { "+" }.on(.click, Behavior.increment($count))
+            span { String(count) }.bind(.text, to: $count)
         }
     }
 }
@@ -26,8 +26,8 @@ struct MacroToggle {
 
     var body: some HTML {
         button { label }
-            .on(.click, Behavior.toggle(isOnSignal))
-            .bind(.class, to: labelSignal)
+            .on(.click, Behavior.toggle($isOn))
+            .bind(.class, to: $label)
     }
 }
 
@@ -43,7 +43,7 @@ struct ComponentMacroTests {
         #expect(html.contains(#"<span data-e:text="0">0</span>"#))
         #expect(html.contains(#"<script type="application/adh-state+json" id="adh-state">"#))
 
-        // The three `countSignal` reads dedup to one cell, registered in the passed arena.
+        // The three `$count` reads dedup to one cell, registered in the passed arena.
         #expect(arena.cells.count == 1)
         #expect(arena.cells[0].value == .int(0))
     }

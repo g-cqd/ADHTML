@@ -4,21 +4,21 @@ Declare a value computed from `@State` that re-evaluates in the browser — no s
 
 ## Overview
 
-`@Bound` declares a **client-recomputable** derived value. You write the formula once as a
-`Reactive` expression over your signals; the engine evaluates it server-side for the initial
-HTML *and* serializes it as a `WireExpr` the client re-evaluates whenever a dependency changes.
-The derived value stays live in-browser with no fetch.
+`@Bound` declares a **client-recomputable** derived value. You write the formula once over your `$state`
+projections (with a value-typed annotation like `: Bool`); the engine evaluates it server-side for the
+initial HTML *and* serializes it as a `WireExpr` the client re-evaluates whenever a dependency changes. The
+derived value stays live in-browser with no fetch.
 
 ```swift
 @Component
 struct ProductRow {
     @State var qty = 0
-    @Bound var inCart: Reactive<Bool> { qtySignal.reactive > 0 }
+    @Bound var inCart: Bool { $qty > 0 }
 
     var body: some HTML {
         div {
-            button { "+" }.on(.click, Behavior.increment(qtySignal))
-            span { String(qty) }.bind(.text, to: qtySignal)
+            button { "+" }.on(.click, .increment($qty))
+            span { String(qty) }.bind(.text, to: $qty)
             button { "Remove" }.show(when: inCartComputed)   // appears once qty > 0, live
         }
     }
@@ -37,22 +37,22 @@ When(inCartComputed) { … }
 button { … }.classToggle("hot", when: isHotComputed)
 ```
 
-`inCart` itself stays a plain computed property returning the raw `Reactive<Bool>`; `inCartComputed` is the
+`inCart` itself is a plain computed property returning the server value (`Bool`); `inCartComputed` is the
 cell registered in the render arena.
 
 ## The expression DSL
 
-The right-hand side is a `Reactive` value built from `.reactive` on your `@State` signals and
-the closed operator set — arithmetic, comparisons, boolean logic, and string/collection helpers:
+The body is an expression over your `$state` projections using the closed operator set — comparisons,
+arithmetic, boolean logic, and string concatenation:
 
 ```swift
-@Bound var total: Reactive<Int>    { applesSignal.reactive + orangesSignal.reactive }
-@Bound var doubled: Reactive<Int>  { countSignal.reactive * 2 }
-@Bound var visible: Reactive<Bool> { (qtySignal.reactive > 0) && !hiddenSignal.reactive }
+@Bound var total: Int    { $apples + $oranges }
+@Bound var doubled: Int  { $count * 2 }
+@Bound var visible: Bool { $qty > 0 && !$hidden }
 ```
 
-String values compose too — a string literal is itself a `Reactive<String>`, so
-`greetingSignal.reactive + "!"` concatenates on the client.
+String concatenation works too: `@Bound var greeting: String { $name + "!" }`. (The value type goes on the
+left — `$count + 1`, not `1 + $count` — so the operators never collide with ordinary `Int`/`String` arithmetic.)
 
 Every operator has a mirror in the client evaluator, so the server value and the in-browser recompute always
 agree. The full operator set and the serialized wire format are covered by the `ADHTMLCore` reactivity
@@ -61,10 +61,11 @@ reference.
 ## Why the getter form
 
 `@Bound` is written as a **getter** — `{ … }`, not `= …`. A derived value inherently references the
-component's `@State` signal peers (`qtySignal`), and Swift forbids referencing an instance member in a
-*stored-property* initializer. The getter runs when accessed, where `self` and the ambient render context
-exist, so the reference is legal. The explicit `Reactive<T>` annotation is required (the value type `T` is
-otherwise unknowable, and the macro needs it to emit `Computed<T>`).
+component's `$state` projections, and Swift forbids referencing an instance member in a *stored-property*
+initializer. The getter runs when accessed, where `self` and the ambient render context exist, so the
+reference is legal. An explicit type annotation is required (the value type `T` is otherwise unknowable, and
+the macro needs it to emit `Computed<T>`): the value-typed form (`: Bool`) — where the macro rewrites each
+`$state` reference into its reactive operand — or the explicit `: Reactive<T>` form, taken verbatim.
 
 ## Bound-only components
 

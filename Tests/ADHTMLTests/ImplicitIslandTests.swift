@@ -18,8 +18,8 @@ struct LazyCounter {
 
     var body: some HTML {
         div {
-            button { "+" }.on(.click, Behavior.increment(nSignal))
-            span { String(n) }.bind(.text, to: nSignal)
+            button { "+" }.on(.click, Behavior.increment($n))
+            span { String(n) }.bind(.text, to: $n)
         }
     }
 }
@@ -28,11 +28,11 @@ struct LazyCounter {
 struct Sum {
     @State var a = 2
     @State var b = 3
-    var total: Reactive<Int> { aSignal.reactive + bSignal.reactive }  // a plain computed property
+    var total: Reactive<Int> { $a.reactive + $b.reactive }  // a plain computed property
 
     var body: some HTML {
         div {
-            button { "+" }.on(.click, Behavior.increment(aSignal))
+            button { "+" }.on(.click, Behavior.increment($a))
             output { String(a + b) }.bind(.text, to: total)
         }
     }

@@ -3,23 +3,22 @@ public import SwiftSyntax
 internal import SwiftSyntaxBuilder
 public import SwiftSyntaxMacros
 
-/// `@Bound var inCart: Reactive<Bool> { qtySignal.reactive > 0 }` — a client-recomputable value derived
-/// from `@State` (RFC-0005 §3.5, ADR-0015 Phase D). It adds a peer `inCartComputed: Computed<Bool>` that
-/// resolves the author's `Reactive` expression to a REGISTERED computed cell through the ambient
-/// `ADHTMLRenderContext`. The cell serializes its formula as a `WireExpr`, so the browser re-evaluates it
-/// reactively with no server round-trip (the proven `Reactive`→`WireExpr`→`Computed` path). The handle
-/// (`<name>Computed`) is what `.bind(_:to:)`, `.show(when:)`, `When(_:)`, … target.
+/// `@Bound var inCart: Bool { $qty > 0 }` — a client-recomputable value derived from `@State` (RFC-0005
+/// §3.5, ADR-0015). It adds a peer `inCartComputed: Computed<Bool>` that resolves the author's expression to
+/// a REGISTERED computed cell through the ambient `ADHTMLRenderContext`. The cell serializes its formula as a
+/// `WireExpr`, so the browser re-evaluates it reactively with no server round-trip (the proven
+/// `Reactive`→`WireExpr`→`Computed` path). The handle (`<name>Computed`) is what `.bind(_:to:)`,
+/// `.show(when:)`, `When(_:)`, … target.
 ///
-/// It is a peer (not an accessor) macro, mirroring ``StateMacro``: the original property stays — a plain
-/// computed property returning the raw `Reactive<T>` — and `<name>Computed` is the registered handle. The
-/// derivation runs INSIDE the property getter (where `self` and the ambient context exist), so referencing
-/// the component's `@State` signal peers is legal — the assignment-with-`=` form cannot, because Swift
-/// forbids instance-member references in a stored-property initializer.
+/// It is a peer (not an accessor) macro: the original property stays — a plain computed property — and
+/// `<name>Computed` is the registered handle. The derivation runs INSIDE the property getter (where `self`
+/// and the ambient context exist), so referencing the component's `$state` projections is legal.
 ///
-/// The macro reads the author's already-`Reactive<T>` expression (written in the closed operator DSL) and
-/// wraps it in `ADHTMLRenderContext.bound(_:)`; the explicit `Reactive<T>` annotation is required. It does
-/// not rewrite a value-typed body such as `@Bound var total: Int { a + b }` (mapping bare identifiers →
-/// signal refs) — such a rewrite would be bounded by the same closed op set.
+/// Two annotation forms:
+///   • a VALUE type (`: Bool` / `: Int` / …) — the macro rewrites each `$state` reference in the getter into
+///     its `.reactive` operand (`$qty` → `$qty.reactive`), so the formula is built from the closed operator
+///     DSL while the original getter type-checks via the value-returning operators (`ReactiveReadable`);
+///   • the explicit `: Reactive<T>` form — taken verbatim (the author already wrote the reactive operand).
 public struct BoundMacro: PeerMacro {
     public static func expansion(
         of node: AttributeSyntax,
@@ -37,43 +36,66 @@ public struct BoundMacro: PeerMacro {
         }
 
         let name = identifier.text
-        guard let computedType = boundComputedType(binding) else {
+        guard let computed = boundComputed(binding) else {
             context.diagnose(Diagnostic(node: binding, message: ADHTMLDiagnostic.boundNeedsReactiveType(name)))
             return []
         }
-        guard let reactiveExpr = boundReactiveExpression(binding) else {
+        guard let expression = boundReactiveExpression(binding) else {
             context.diagnose(Diagnostic(node: binding, message: ADHTMLDiagnostic.boundNeedsExpression(name)))
             return []
         }
 
+        // The value-typed form maps each `$state` projection to its reactive operand so the SAME expression
+        // builds the wire formula; the explicit `Reactive<T>` form is already in operand terms.
+        let operand =
+            computed.rewriteProjections
+            ? ExprSyntax(ProjectionRewriter().rewrite(expression)) ?? expression
+            : expression
+
         // Mirror the original property's access level so external code can reach a `public` computed handle.
         let access = accessModifier(varDecl)
         let accessor: DeclSyntax = """
-            \(raw: access)var \(raw: name)Computed: \(raw: computedType) {
-                ADHTMLRenderContext.bound(\(reactiveExpr.trimmed))
+            \(raw: access)var \(raw: name)Computed: \(raw: computed.type) {
+                ADHTMLRenderContext.bound(\(operand.trimmed))
             }
             """
         return [accessor]
     }
 }
 
-/// The peer's `Computed<V>` type, derived from the required `: Reactive<V>` annotation by swapping the base
-/// name and reusing the generic clause verbatim (`Reactive<Bool>` → `Computed<Bool>`). `nil` when the
-/// annotation is missing or is not a `Reactive<…>` — the only shape this phase accepts (the value `V` is
-/// otherwise unknowable, since a computed property's type cannot be inferred).
-private func boundComputedType(_ binding: PatternBindingSyntax) -> String? {
-    guard let identifierType = binding.typeAnnotation?.type.as(IdentifierTypeSyntax.self),
-        identifierType.name.text == "Reactive",
-        let generics = identifierType.genericArgumentClause
-    else {
-        return nil
+/// Rewrites each `$state` projection reference (a `$`-prefixed identifier) into its `.reactive` operand, so a
+/// value-typed `@Bound` body (`$qty > 0`) becomes the formula-building expression (`$qty.reactive > 0`).
+private final class ProjectionRewriter: SyntaxRewriter {
+    override func visit(_ node: DeclReferenceExprSyntax) -> ExprSyntax {
+        guard node.baseName.text.hasPrefix("$") else { return ExprSyntax(node) }
+        // Build `$x.reactive` from the bare (trivia-stripped) reference, then re-attach the original
+        // surrounding trivia so the operand's spacing in the enclosing expression is preserved (otherwise
+        // `$qty > 0` would become `$qty.reactive> 0`, a parse error).
+        let replacement: ExprSyntax = "\(node.trimmed).reactive"
+        return
+            replacement
+            .with(\.leadingTrivia, node.leadingTrivia)
+            .with(\.trailingTrivia, node.trailingTrivia)
     }
-    return "Computed\(generics.trimmedDescription)"
 }
 
-/// The author's `Reactive<T>` expression: the getter's single return expression (`{ expr }` / `{ return
-/// expr }` / `get { … }`) — the form that can reference the component's `@State` signal peers — or, for an
-/// instance-free reactive, the `= expr` initializer. `nil` when neither is present.
+/// The peer's `Computed<…>` type + whether to rewrite `$state` projections. For `: Reactive<V>` the type is
+/// `Computed<V>` (verbatim operand, no rewrite); for any other (value) annotation `T` the type is
+/// `Computed<T>` and the getter's `$state` references are rewritten. `nil` when there is no annotation (the
+/// value `V` is otherwise unknowable — a computed property's type cannot be inferred).
+private func boundComputed(_ binding: PatternBindingSyntax) -> (type: String, rewriteProjections: Bool)? {
+    guard let annotation = binding.typeAnnotation?.type else { return nil }
+    if let identifierType = annotation.as(IdentifierTypeSyntax.self),
+        identifierType.name.text == "Reactive",
+        let generics = identifierType.genericArgumentClause
+    {
+        return ("Computed\(generics.trimmedDescription)", false)
+    }
+    return ("Computed<\(annotation.trimmedDescription)>", true)
+}
+
+/// The author's derived expression: the getter's single return expression (`{ expr }` / `{ return expr }` /
+/// `get { … }`) — the form that can reference the component's `$state` projections. `nil` when absent.
 private func boundReactiveExpression(_ binding: PatternBindingSyntax) -> ExprSyntax? {
     if let initializer = binding.initializer?.value { return initializer }
     guard let accessors = binding.accessorBlock?.accessors else { return nil }

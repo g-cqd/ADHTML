@@ -25,8 +25,8 @@ enum ADHTMLDiagnostic: DiagnosticMessage {
             case .boundRequiresVar:
                 "@Bound must be applied to a single 'var' deriving a Reactive value"
             case .boundNeedsReactiveType(let name):
-                "@Bound var \(name) needs an explicit `: Reactive<T>` annotation "
-                    + "(e.g. `@Bound var \(name): Reactive<Bool> { … }`) so its Computed type is known"
+                "@Bound var \(name) needs an explicit type annotation "
+                    + "(e.g. `@Bound var \(name): Bool { … }`) so its Computed type is known"
             case .boundNeedsExpression(let name):
                 "@Bound var \(name) needs a Reactive expression — a getter `{ <expr> }` referencing the "
                     + "component's @State signals (the assignment `= <expr>` form cannot reference instance members)"
