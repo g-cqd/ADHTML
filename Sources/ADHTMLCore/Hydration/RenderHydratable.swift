@@ -10,15 +10,21 @@ extension HTML {
     /// ``Renderer/defaultMaxDepth``) and throws ``WireError/encoding(_:)`` on adversarial nesting rather
     /// than emitting unbounded output — the failure-safe contract (the iterative emit can't crash the
     /// stack, but the ceiling bounds pathological work).
+    /// `nonce` (an optional CSP nonce) is STAMPED on the injected `<style>`/inline-`<script>` — the gated
+    /// `ADHTMLAssets` bridge supplies it from `CSPNonceKey`; `nil` keeps the core nonce-free (the default, so
+    /// non-CSP pages + the no-JS fallback render byte-identically). `assets` lets a caller provide its own
+    /// ``AssetSink`` to INSPECT after the render (the gated bridge reads `.entries`' `module` names to append
+    /// `<script src integrity nonce>` tags); `nil` uses a throwaway sink internally (the common path).
     public consuming func renderHydratable(
-        arena: CellArena, maxDepth: Int = Renderer.defaultMaxDepth
+        arena: CellArena, maxDepth: Int = Renderer.defaultMaxDepth,
+        nonce: String? = nil, assets: AssetSink? = nil
     ) throws(WireError) -> [UInt8] {
         // Install `arena` as the ambient context for the whole lowering pass, so a top-level
         // `@State`-bearing component registers its cells in THIS arena (and thus into the wire state),
         // and each nested component claims a fresh scope. `node` is a copy of the consumed `self`.
         var program = HTMLProgram()
         let node = self
-        let assets = AssetSink()
+        let assets = assets ?? AssetSink()
         let root = ADHTMLRenderContext.Context(arena: arena, scope: arena.freshScope(), assets: assets)
         ADHTMLRenderContext.$current.withValue(root) {
             Self._render(node, into: &program)
@@ -50,11 +56,12 @@ extension HTML {
 
         let state = try WireSerializer.scriptBytes(cells: arena.cells, islands: islands)
         var out = sink.bytes
-        // Component-scoped assets (Track 4): inject the deduped `<style>` + inline `<script>`s BEFORE the
-        // state script — present in the initial response (no async load), so no-JS clients get the scoped
-        // styling (no FOUC) and the mount scripts register before the runtime drives the bridge.
-        out.append(contentsOf: assets.styleTag())
-        out.append(contentsOf: assets.scriptTag())
+        // Component-scoped assets (Track 4): inject the deduped `<style>` + inline `<script>`s (nonce-stamped
+        // when the gated bridge supplies one) BEFORE the state script — present in the initial response (no
+        // async load), so no-JS clients get the scoped styling (no FOUC) and the mount scripts register
+        // before the runtime drives the bridge. Module `<script src>`s are appended by the gated bridge.
+        out.append(contentsOf: assets.styleTag(nonce: nonce))
+        out.append(contentsOf: assets.scriptTag(nonce: nonce))
         out.append(contentsOf: Self.scriptOpen)
         out.append(contentsOf: state)
         out.append(contentsOf: Self.scriptClose)

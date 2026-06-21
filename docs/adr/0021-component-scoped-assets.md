@@ -1,6 +1,6 @@
 # ADR 0021 — Component-scoped CSS & JS (the declarative-first escape hatch)
 
-- **Status**: Accepted (phased: A1 + A2 landed; A3 module-serving in progress)
+- **Status**: Accepted (A1 + A2 + A3 landed; the live NIO/Playwright e2e is the app-migration milestone)
 - **Date**: 2026-06-21
 - **Related**: ADR-0003 (escape-by-default), ADR-0005 (islands), ADR-0006 (tiny JS runtime), ADR-0011
   (ADFCore/SRI reuse), ADR-0012 (ADServe integration), ADR-0019 (wire-token vocabulary), RFC-0006
@@ -73,16 +73,26 @@ trade for zero churn on the hot render path.
 - `Script.inline(StaticString)` → a `<script>` injected after the `<style>`, before the state script (so the
   mount fn registers before the runtime drives the bridge). `Script.module(name:)` → A3.
 
-### A3 — module bundling + serving (the gated bridge)
+### A3 — module bundling + serving (the gated bridge) — landed
 
-- `build-components.js` (bun): glob `ClientRuntime/components/*.js`, bundle each as a content-hashed ES module
-  + a `manifest.json` (`name → {file, integrity, bytes}`); SRI = `sha256-<base64>` via `Bun.CryptoHasher`,
-  PARITY-pinned to `ADHTMLSRI.integrity(for:)` (the same standard padded base64 of SHA-256).
-- Gated `ADHTMLAssets` bridge (`ADHTML_ASSETS`; deps `ADHTMLCore` + `ADHTMLNIO` + `ADHTMLSRI` + ADServe;
-  `needsNIO = isNIO || isActions || isAssets`): loads the manifest, injects `<script type=module src integrity
-  nonce>` (nonce from `CSPNonceKey`), and serves `/assets` via ADServe `Static` (content-hashed, ETag/304,
-  precompressed). The core stays I/O-free + nonce-free; the bridge stamps the nonce. `.inline` scripts get a
-  `<script nonce>` (no SRI — they are part of the HTML, covered by CSP).
+- `build-components.js` (bun): globs `ClientRuntime/components/*.js`, bundles each as a content-hashed ES
+  module + a `manifest.json` (`name → {file, integrity, bytes}`); SRI = `sha256-<base64>` via
+  `Bun.CryptoHasher`, PARITY-pinned to `ADHTMLSRI.integrity(for:)` (the same standard padded base64 of
+  SHA-256) — proven by a ClientRuntime test asserting the SAME known answer ADHTMLSRITests pins.
+- The core exposes the seam the bridge needs WITHOUT I/O: `renderHydratable(arena:nonce:assets:)` takes an
+  optional CSP `nonce` (stamped on the injected `<style>`/inline-`<script>`; `nil` keeps the core nonce-free,
+  byte-identical) and an optional caller-provided `AssetSink` (so the bridge can read the page's `.module`
+  names afterward). The core never touches the manifest or generates a nonce.
+- Gated `ADHTMLAssets` bridge (`ADHTML_ASSETS`; deps `ADHTMLCore` + `ADHTMLNIO` + ADServeCore;
+  `needsNIO = isNIO || isActions || isAssets`): an `AssetManifest` model (decodes the bun manifest) + a
+  `ResponseContent.adhtmlAssets(_:manifest:nonce:assetPath:)` that renders nonce-stamped, then APPENDS a
+  `<script type=module src=/assets/<file> integrity=<sri> nonce=<nonce>>` per `.module` component (a module
+  absent from the manifest is skipped). Module scripts are `defer`red, so appending them after the inline
+  state script is correct (the mount bridge late-mounts). The bridge TRUSTS the manifest's build-time SRI —
+  no swift-crypto runtime dep. Serve with ADServe `Static("/assets", root:)`; mint + read the nonce via the
+  `CSPNonce` middleware / `CSPNonceKey`. `.inline` scripts get a `<script nonce>` (no SRI — part of the HTML,
+  covered by CSP). The live loopback proof (a served page mounts a module under a strict CSP) is the
+  NIO/Playwright e2e in the app-migration milestone.
 
 ## Guardrails
 

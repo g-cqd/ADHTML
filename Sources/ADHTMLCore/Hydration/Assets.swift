@@ -94,27 +94,43 @@ public final class AssetSink: Sendable {
         state.withLock { state in state.order.compactMap { state.byScope[$0] } }
     }
 
-    /// The deduped `<style>…</style>` block for all recorded CSS, or empty when none — injected verbatim
-    /// (already scoped + escape-free; CSS is trusted `StaticString`). The gated bridge re-emits with a nonce.
-    public func styleTag() -> [UInt8] {
+    /// The deduped `<style>…</style>` block for all recorded CSS, or empty when none — the CSS is verbatim
+    /// (already scoped + escape-free; trusted `StaticString`). `nonce` (the gated bridge's `CSPNonceKey`
+    /// value) is stamped on the tag for a strict CSP; `nil` keeps it nonce-free.
+    public func styleTag(nonce: String? = nil) -> [UInt8] {
         let css = entries.flatMap(\.css)
         guard !css.isEmpty else { return [] }
-        var out = Array("<style>".utf8)
+        var out = Self.openingTag("<style", nonce: nonce)
         out.append(contentsOf: css)
         out.append(contentsOf: Array("</style>".utf8))
         return out
     }
 
     /// The deduped inline `<script>…</script>` blocks for all recorded `.inline` scripts (one per type), or
-    /// empty when none. Trusted `StaticString` (escape-free). The gated bridge re-emits each with a nonce;
-    /// `.module` scripts are served separately (this covers only inline JS).
-    public func scriptTag() -> [UInt8] {
+    /// empty when none. Trusted `StaticString` (escape-free). `nonce` is stamped for a strict CSP; `.module`
+    /// scripts are served separately (this covers only inline JS).
+    public func scriptTag(nonce: String? = nil) -> [UInt8] {
         var out: [UInt8] = []
         for entry in entries where !entry.inlineScript.isEmpty {
-            out.append(contentsOf: Array("<script>".utf8))
+            out.append(contentsOf: Self.openingTag("<script", nonce: nonce))
             out.append(contentsOf: entry.inlineScript)
             out.append(contentsOf: Array("</script>".utf8))
         }
+        return out
+    }
+
+    /// `<style` / `<script` with an optional escaped `nonce="…"`, closed with `>`. The nonce routes through
+    /// the attribute escaper (defense-in-depth; a CSP nonce is hex/base64, already attribute-safe).
+    private static func openingTag(_ tag: StaticString, nonce: String?) -> [UInt8] {
+        var out = tag.withUTF8Buffer { unsafe Array($0) }
+        if let nonce {
+            out.append(contentsOf: Array(" nonce=\"".utf8))
+            var sink = ArraySink()
+            Escaper.write(nonce, context: .attribute, into: &sink)
+            out.append(contentsOf: sink.bytes)
+            out.append(0x22)  // closing quote
+        }
+        out.append(0x3E)  // >
         return out
     }
 }

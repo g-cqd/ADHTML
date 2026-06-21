@@ -52,7 +52,12 @@ let isFuzz = Context.environment["ADHTML_FUZZ"] != nil
 // re-render + no-JS PRG. It builds on the NIO bridge (`.adhtmlFragment`/`ctx.view`) and the ADServe routing
 // + HMAC surface, so enabling it implies the NIO graph (`needsNIO`).
 let isActions = Context.environment["ADHTML_ACTIONS"] != nil
-let needsNIO = isNIO || isActions
+// Tier-2 component-scoped assets (Track 4 / ADR-0021): the gated SERVING bridge — the `manifest.json` load,
+// the `<script type=module src integrity nonce>` injection (nonce from `CSPNonceKey`), and the ADServe
+// `Static("/assets")` wiring. The core asset surface (`ScopedStyle`/`Script`/`CSSScoper`/the injection) is
+// unconditional in ADHTMLCore; only the serving bridge is gated. Builds on the NIO bridge → `needsNIO`.
+let isAssets = Context.environment["ADHTML_ASSETS"] != nil
+let needsNIO = isNIO || isActions || isAssets
 
 // AD* siblings resolve from a local checkout when `<DEP>_PATH` is set, else the published `main`.
 func adPackage(env: String, url: String) -> Package.Dependency {
@@ -251,6 +256,28 @@ if isActions {
         .testTarget(
             name: "ADHTMLActionsTests",
             dependencies: ["ADHTMLActions", .product(name: "ADTestKit", package: "ADTestKit")],
+            swiftSettings: testSettings))
+}
+if isAssets {
+    // Track 4 component-scoped assets — the gated SERVING bridge (ADR-0021). Loads the bun-produced
+    // `manifest.json`, injects `<script type=module src integrity nonce>` for a page's `.module`
+    // components, and pairs with ADServe `Static("/assets")`. SRI is computed at BUILD time by bun
+    // (parity-pinned to `ADHTMLSRI` by the ClientRuntime test), so the bridge trusts the manifest's
+    // integrity — no swift-crypto runtime dep here. Builds on the NIO bridge for `ResponseContent` +
+    // `CSPNonceKey`.
+    package.products.append(.library(name: "ADHTMLAssets", targets: ["ADHTMLAssets"]))
+    package.targets.append(
+        .target(
+            name: "ADHTMLAssets",
+            dependencies: [
+                "ADHTMLCore", "ADHTMLNIO",
+                .product(name: "ADServeCore", package: "ADServe")
+            ],
+            swiftSettings: strictSettings))
+    package.targets.append(
+        .testTarget(
+            name: "ADHTMLAssetsTests",
+            dependencies: ["ADHTMLAssets"],
             swiftSettings: testSettings))
 }
 if isMarkdown {
