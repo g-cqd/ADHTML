@@ -969,6 +969,40 @@ The external servers are throwaway (recipes in the baseline doc); nothing compet
 
 ---
 
+## Iteration #32 — 2026-06-21 (the breakthrough: SwiftNIO IS the bottleneck — raw Swift is ~2× faster)
+
+**Part A — a dead end, honestly closed.** Chased the within-Swift gap by micro-optimizing the per-request
+response path: `commonHeaders` rebuilt the envelope's backing array + re-hashed every field name into a fresh
+index map on EVERY response, so I made it COW-copy the prebuilt `envelope` instead. Correct + 275 tests green
+— but an A/B with a realistic 7-header envelope showed **93.2k vs 93.7k, pure noise**. The per-request header
+construction is NOT the bottleneck. **Reverted** (no measured benefit + it reordered response headers). Kept
+only the useful `ADSERVE_BENCH_ENVELOPE` bench knob (`47c8d55`).
+
+**Part B — the user's hypothesis, tested + CONFIRMED.** The user: *"the reason we're slower is swiftnio, we
+should go from scratch"* + *"forget about linux."* Built a from-scratch **raw-Darwin-socket** HTTP/1.1 server
+(`ADServe/Benchmarks/raw-spike`, ~80 lines, no NIO: thread-per-connection, blocking I/O, hand-rolled request
+parse, `TCP_NODELAY`). Result (best-of-5, oha `-c 64`):
+
+`Bun 203.8k > **raw-swift 196.8k** > Go 162.9k > Erlang 142.9k > Hummingbird(NIO) 114.7k > ADServe(NIO) 94.6k`.
+
+**The raw Swift server is ~2.08× faster than NIO-ADServe and ~1.7× faster than NIO-Hummingbird — second
+overall, behind only Bun.** Both NIO servers sit at the bottom; raw Swift vaults to the top. So **Swift/ARC is
+NOT the floor — the NIO `ChannelHandler` pipeline is ~half the throughput** on this micro-workload. The user
+was right. (`ADServe` commit with the spike + finding in `loadtest-baseline.md`.)
+
+**Caveats (honest):** tiny-response keep-alive is the BEST case for raw (TLS / HTTP-2 / large bodies shrink the
+gap); the spike has no TLS, no robust parsing/limits/timeouts. A production from-scratch transport must
+re-provide what ADServe needs — and **TLS must never be hand-rolled** (Darwin → `Network.framework`).
+
+**Assessment (×3):** *Pro* — a decisive, measured answer to the #1 north star: the path to "most performant" is
+a Darwin-only from-scratch transport (~2× headroom proven), NOT micro-tuning NIO (a dead end, A/B-confirmed).
+*Con* — it's a major architectural commitment; the spike is a happy-path best-case; re-providing NIO's TLS /
+HTTP-2 / robustness / cross-platform is real work (mitigated: Linux is now out of scope). *Consolidate* — ship
+the spike as preserved evidence; the next step is to measure the PRODUCTION transport candidate
+(`Network.framework`, which gives TLS + perf) before building it out — measure before committing the rewrite.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
