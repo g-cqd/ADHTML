@@ -49,3 +49,30 @@ if (gzipped.length > BUDGET_BYTES) {
   process.exit(1);
 }
 console.log(`OK: within the ${BUDGET_BYTES / 1024} KiB gzip budget`);
+
+// The opt-in `adh-ws` module (RFC-0008 `ctx.ws`). The core lazy-loads it (a dynamic `import(new URL(...))`
+// that Bun leaves un-bundled) ONLY when a widget calls `ctx.ws`, so it lives OUTSIDE the core budget — a
+// page that never opens a socket pays zero bytes for it. Its own gate keeps it from bloating silently. Same
+// minify + token-inline pipeline as the core.
+const WS_BUDGET_BYTES = 2048;  // 2 KiB
+const wsResult = await Bun.build({
+  entrypoints: ["./src/ws.js"],
+  minify: true,
+  target: "browser",
+  plugins: [inlineTokens],
+});
+if (!wsResult.success) {
+  for (const message of wsResult.logs) console.error(message);
+  process.exit(1);
+}
+const wsCode = await wsResult.outputs[0].text();
+await Bun.write("./adh-ws.min.js", wsCode);
+const wsGzipped = Bun.gzipSync(new TextEncoder().encode(wsCode));
+console.log(
+  `adh-ws.min.js:      ${wsCode.length} B raw, ${wsGzipped.length} B (${(wsGzipped.length / 1024).toFixed(2)} KiB) gzipped`,
+);
+if (wsGzipped.length > WS_BUDGET_BYTES) {
+  console.error(`FAIL: adh-ws exceeds the ${WS_BUDGET_BYTES / 1024} KiB gzip budget`);
+  process.exit(1);
+}
+console.log(`OK: adh-ws within the ${WS_BUDGET_BYTES / 1024} KiB gzip budget`);

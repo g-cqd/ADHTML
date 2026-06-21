@@ -87,6 +87,12 @@ function mountRoot(root) {
      * CORS, not a client block. @type {(url: string, opts?: object) => Promise<unknown | null>} */
     fetch: (/** @type {string} */ fetchURL, /** @type {object} */ fetchOpts = {}) =>
       fetchJSON(fetchURL, { ...fetchOpts, signal: controllerFor(root).signal }),
+    /** A managed WebSocket against the app's own API (RFC-0008 `ctx.ws`), lazy-loaded from the opt-in
+     * `adh-ws` module so it stays OUT of the ≤5 KiB core; closed when this component is torn down.
+     * @type {(url: string, opts?: object) => Promise<{ send(m: unknown): void, close(): void }>} */
+    ws: (/** @type {string} */ wsURL, /** @type {object} */ wsOpts = {}) =>
+      import(new URL("./adh-ws.min.js", import.meta.url).href).then((m) =>
+        m.open(wsURL, controllerFor(root).signal, wsOpts)),
   };
   try {
     const teardown = fn(root, ctx);
