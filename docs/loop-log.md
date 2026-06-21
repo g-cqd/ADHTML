@@ -347,6 +347,38 @@ of these as a focused task.
 
 ---
 
+## Iteration #13 — 2026-06-21 (grounded finding: ADHTML is prototype-parity-complete)
+
+**Trigger:** re-evaluate the stale "spare-parts blocked" assumption + advance north star #3. The app is STILL
+mid-`PersistenceADDB`-refactor (heavy uncommitted WIP) so its code stays off-limits — but it carries new
+untracked **RFCs 0019–0022**, the app's *requirements on the framework*. RFC-0021 specifies 9 ADHTML
+primitives (P1–P9) for exact prototype parity and assumes "+2–3 KiB" of runtime (≈7 KiB), which seemed to
+conflict with ADHTML's 5 KiB ADR-0006 budget.
+
+**Finding (the hypothesis was WRONG — verified, grounded):** ADHTML *already implements the entire P1–P9
+vocabulary, in the 4.92 KiB budget*. Verified by markers + types + tests:
+- P1 `.model` / P2 `.classToggle` (`data-adh-class`) / P6 `.show`+`When` (`data-adh-show`/`-if`) / P7 boost
+  (`Boost.swift`, `Link`) / P8 store (`AppStore.swift`) — present.
+- P3 client list (`data-adh-each`, `ForEach.swift`, `ClientListTests`); P4 keyboard/behavior vocab
+  (`listMove`/`setFromValue`/`removeLast`/`keydown`/`data-adh-keys`, `EventVocabTests`); P5 extended
+  expressions (`.filter`/`highlight`/`contains`); P9 `TokenField.swift` — all present + parity-tested.
+- The closed-vocabulary + build-time token-mangling fit all nine in ~5 KiB; **the budget "conflict" doesn't
+  exist.**
+
+**Verification (all green across the 12 prior iterations):** ADHTML Swift **253**, ClientRuntime JS **75**,
+ADServe **273**.
+
+**Revised north-star-#2 assessment:** ADHTML's client is *prototype-parity-complete* (RFC-0021 P1–P9, tested,
+in budget) AND now carries the RFC-0008 XHR/WS layer (server done iters #4–6/#8/#10/#12; `ctx.fetch` iter #3).
+"As mature as Vue" is substantially met at the framework level. The only genuinely-missing client piece is
+the RFC-0008 WebSocket CLIENT (`ws.js`/`ctx.ws`), still code-split-gated.
+
+**Assessment (×3):** *Pro* — corrects a wrong mental model with grounded evidence; records that #2 is largely
+achieved; pure verification (no risk). *Con* — a finding, not new code. *Consolidate* — record it honestly;
+do not invent a change to look busy when the framework already has the capability.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
