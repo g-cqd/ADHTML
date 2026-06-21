@@ -10,11 +10,13 @@
 // full ~2200-entry named table) are deferred; the tree-construction stage layers on top.
 
 // swiftlint:disable type_body_length file_length
-// TODO(WS3): `Machine.step` is a single ~320-line WHATWG state-machine switch which — with the entity
-// decoder — pushes `Machine`'s body (558) and this file (578) past the size gate. Splitting cleanly
-// means widening the file-private `Machine` to internal and relocating handlers into sibling
-// extensions, too invasive to fold into the gate-enforcing flip while the tokenizer is under active
-// change. Grandfathered as a tracked exception — the gate is enforcing for every other file.
+// GRANDFATHERED EXCEPTION (tracked). `HTMLTokenizer` is the WHATWG reference tokenizer used only as a
+// differential oracle (HTMLTapeTests / HTMLTapeRobustnessTests) and the dev ADHTMLPerfProbe — the
+// SHIPPING parse path is `HTMLTape`, not this. `Machine.step` (cyclomatic ~51, body ~291) plus the
+// entity decoder push `Machine` (~556) and this file (~576) past the size gates (the cyclomatic and
+// function-body gates on `step` are suppressed at its definition below). The clean fix is to RELOCATE
+// this oracle out of the gated library (a test-support target, or behind ADHTML_DEV): that removes
+// ~671 lines of unused public surface AND all of these violations at once — deferred, not lost.
 public enum HTMLTokenizer {
     public static func tokenize(_ html: String) -> [HTMLToken] {
         let machine = Machine(html)

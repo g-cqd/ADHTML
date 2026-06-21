@@ -15,7 +15,6 @@ this repo:
 ```sh
 export ADFOUNDATION_PATH=../ADFoundation
 export ADJSON_PATH=../ADJSON
-export ADCONCURRENCY_PATH=../ADConcurrency   # pulled transitively by ADJSON
 ```
 
 ## One-time setup

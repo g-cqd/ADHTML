@@ -91,7 +91,6 @@ resolves them from `github.com/g-cqd`):
 ```sh
 export ADFOUNDATION_PATH=../ADFoundation
 export ADJSON_PATH=../ADJSON
-export ADCONCURRENCY_PATH=../ADConcurrency
 swift build --build-system native
 swift test  --build-system native
 ```

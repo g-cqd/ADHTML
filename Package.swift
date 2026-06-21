@@ -45,7 +45,6 @@ let testSettings: [SwiftSetting] =
 let isDev = Context.environment["ADHTML_DEV"] != nil
 let isNIO = Context.environment["ADHTML_NIO"] != nil
 let isMarkdown = Context.environment["ADHTML_MARKDOWN"] != nil
-let isObs = Context.environment["ADHTML_OBS"] != nil
 let isSRI = Context.environment["ADHTML_SRI"] != nil
 let isFuzz = Context.environment["ADHTML_FUZZ"] != nil
 // Tier-2 server-action closures (RFC-0020 Track 3): the signed `POST /_adh/act/<id>` dispatch + Region
@@ -98,11 +97,6 @@ if needsNIO {
 }
 if isMarkdown {
     packageDependencies.append(.package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0"))
-}
-if isObs {
-    packageDependencies.append(.package(url: "https://github.com/apple/swift-log.git", from: "1.5.0"))
-    packageDependencies.append(.package(url: "https://github.com/apple/swift-metrics.git", from: "2.4.0"))
-    packageDependencies.append(.package(url: "https://github.com/apple/swift-distributed-tracing.git", from: "1.1.0"))
 }
 if isSRI {
     packageDependencies.append(.package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"))
@@ -297,19 +291,6 @@ if isSRI {
             swiftSettings: strictSettings))
     package.targets.append(
         .testTarget(name: "ADHTMLSRITests", dependencies: ["ADHTMLSRI"], swiftSettings: testSettings))
-}
-if isObs {
-    package.products.append(.library(name: "ADHTMLObservability", targets: ["ADHTMLObservability"]))
-    package.targets.append(
-        .target(
-            name: "ADHTMLObservability",
-            dependencies: [
-                "ADHTMLCore",
-                .product(name: "Logging", package: "swift-log"),
-                .product(name: "Metrics", package: "swift-metrics"),
-                .product(name: "Tracing", package: "swift-distributed-tracing")
-            ],
-            swiftSettings: strictSettings))
 }
 if isFuzz {
     // `-parse-as-library` (libFuzzer supplies `main`) + `-sanitize=fuzzer`. Linux-only capability of
