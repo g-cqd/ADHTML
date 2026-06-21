@@ -127,6 +127,32 @@ WebSocket Hijacking (CSWSH), which CORS does not cover (the upgrade isn't a CORS
 
 ---
 
+## Iteration #5 — 2026-06-21
+
+**Trigger:** WS momentum (iter #4 made the server WS *safe*) → the highest-value Phase-2 piece is live
+**broadcast/fan-out** — the Vue-defining "an edit on one client appears on the others". Swift `actor`s make
+it data-race-free, so it's a safe single-fire slice.
+
+**Assessment (×3):**
+- *Pro* — highest north-star-#2 value (live updates); an `actor` gives free concurrency safety; concurrent +
+  failure-isolated sends (no head-of-line blocking, a dropped peer can't break the rest); reusable primitive.
+- *Con* — author owns the subscribe/unsubscribe lifecycle (auto-prune deferred); broadcast-without-a-typed-
+  `Channel`-wrapper yet (the sugar layers on later).
+- *Consolidate* — ship the `WebSocketHub` broadcast actor + tests; the `Channel` auto-subscribe DSL is next.
+
+**Done (ADServe, committed `1b63648`, local-only):**
+- `WebSocketHub` actor (`WebSocket.swift`) — `subscribe`/`unsubscribe`/`broadcast(_:to:)`/`subscriberCount`,
+  topic-keyed. Sends run concurrently via `withTaskGroup` and are `try?`-isolated; the subscriber set is
+  snapshotted before the fan-out (a concurrent (un)subscribe can't invalidate it); monotonic `&+` token.
+- **268 ADServe tests green** (+4: topic isolation, unsubscribe-stops-delivery, failure isolation,
+  unknown-topic no-op); pre-commit hooks pass.
+
+**Phase-2 server foundation now complete:** CSWSH gate (iter #4) + `WebSocketHub` broadcast (iter #5). The
+remaining server piece is the `Channel` DSL that *wraps* `WS` + the origin allowlist + auto-subscribe to a
+hub; then the client `ws.js`/`ctx.ws`.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -150,11 +176,12 @@ WebSocket Hijacking (CSWSH), which CORS does not cover (the upgrade isn't a CORS
   allocations the malloc gate would catch.
 
 **ADHTML — Vue maturity (north star #2)**
-- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). Server WS now CSWSH-safe (iter #4). Next: Phase 2 client —
-  `ws.js` (managed WebSocket: reconnect/backoff/heartbeat/size-cap) + `ctx.ws`, shipped as an OPT-IN module
-  (the core is at 4.92/5 KiB → needs a build-system code-split). The typed `Channel` ergonomic over `WS`
-  should REUSE `webSocketOriginAllowed` and add a per-route allowlist (the cross-origin escape hatch) +
-  Codable messages + a broadcast helper. Also `App(cors:)` sugar so the web↔api cross-port fetch is one line.
+- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). Server WS: CSWSH-safe (iter #4) + `WebSocketHub` broadcast
+  (iter #5). Next server: the **`Channel` DSL** — wraps `WS`, REUSES `webSocketOriginAllowed`, adds a
+  per-route cross-origin allowlist + `Codable` messages + auto-subscribe/unsubscribe to a `WebSocketHub`.
+  Next client: `ws.js` (managed WebSocket: reconnect/backoff/heartbeat/size-cap) + `ctx.ws` as an OPT-IN
+  module (core at 4.92/5 KiB → build-system code-split). Also `App(cors:)` sugar for the cross-port fetch;
+  auto-prune a hub connection on send failure.
 - Tier-1 declarative `@Resource`/`@Channel` Swift surface (RFC-0008 §4.2/§7) — the no-JS path — comes after
   the Tier-2 primitives (`ctx.fetch` done, `ctx.ws` next) land + prove out.
 - Boilerplate: the 7 verb-overload pairs in `ServerDSL.swift` are near-identical — a candidate for a macro
