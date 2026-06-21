@@ -262,6 +262,31 @@ loop's value is now feature/hardening work, not cleanup.
 
 ---
 
+## Iteration #10 — 2026-06-21
+
+**Trigger:** iter #9's own recommendation — close the `WebSocketHub` reliability gap (a half-open/dropped peer
+whose inbound stream hasn't ended stays subscribed forever, drawing a doomed send on every broadcast).
+
+**Assessment (×3):**
+- *Pro* — closes a real memory/CPU leak; failure-safe + memory-safe + reliability (prism core); self-contained;
+  verifiable with the existing mocks; concurrency-safe via actor isolation + monotonic tokens.
+- *Con* — `broadcast` gains a token-collect + prune step (slightly more than the prior 5-liner).
+- *Consolidate* — collect the tokens whose send threw, prune them after the fan-out; the snapshot + monotonic
+  tokens make the post-await prune race-free.
+
+**Done (ADServe, committed `3164ea5`, local-only):**
+- `WebSocketHub.broadcast` now PRUNES a subscriber whose `sendText` throws — reclaiming a dead peer instead
+  of re-attempting a doomed send forever. Still failure-isolated (a throwing send never blocks the others).
+  Race-free: pruning only the snapshot's failed (old) tokens can't drop a subscriber that (re)joined during
+  the await.
+- **272 ADServe tests green** (+1: a failing peer is pruned on its first broadcast, not re-attempted later);
+  pre-commit hooks pass.
+
+**`WebSocketHub` is now reliability-complete:** concurrency-safe (actor) + failure-isolated + auto-pruning.
+With the CSWSH gate + Channel (subscribe-only + typed-inbound), the whole WebSocket *server* is hardened.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
@@ -285,12 +310,15 @@ loop's value is now feature/hardening work, not cleanup.
   allocations the malloc gate would catch.
 
 **ADHTML — Vue maturity (north star #2)**
-- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). **Server WS COMPLETE** (iters #4–6, #8): CSWSH gate +
-  `WebSocketHub` + `Channel` (subscribe-only + typed-inbound). Next CLIENT: `ws.js` + `ctx.ws` as an OPT-IN
-  module — **gated on a build-system code-split** (core at 4.92/5 KiB): `build.js` → a second `adh-ws` bundle
-  the core lazy-loads via `import(new URL("./adh-ws.js", import.meta.url))`, per-chunk budget, the test
-  resolving `./ws` from source. That split is the one structural prerequisite left (its own ADR). Smaller
-  deferred sugar: per-route cross-origin WS allowlist; `App(cors:)`; hub auto-prune on send failure.
+- RFC-0008 Phase 1 `ctx.fetch` DONE (iter #3). **Server WS HARDENED + COMPLETE** (iters #4–6, #8, #10): CSWSH
+  gate + `WebSocketHub` (broadcast + auto-prune) + `Channel` (subscribe-only + typed-inbound). Only the CLIENT
+  remains: `ws.js` + `ctx.ws` as an OPT-IN module, **gated on a build-system code-split** (core at 4.92/5 KiB):
+  `build.js` → a second `adh-ws` bundle the core lazy-loads via `import(new URL("./adh-ws.js", import.meta.url))`,
+  per-chunk budget, the test resolving `./ws` from source. ADR-sized; its browser lazy-load isn't verifiable
+  in this sandbox. Smaller deferred sugar: per-route cross-origin WS allowlist; `App(cors:)`.
+- **North star #1 (perf) is now the prime under-served target** — touched only once (iter #2, the
+  `pathMatchesExact` alloc). The malloc-tracked ordo-one harness is healthy but the sampling run is
+  sandbox-blocked; a hot-path allocation hunt is still reason-verifiable by inspection.
 - Tier-1 declarative `@Resource`/`@Channel` Swift surface (RFC-0008 §4.2/§7) — the no-JS path — comes after
   the Tier-2 primitives (`ctx.fetch` done, `ctx.ws` next) land + prove out.
 - Boilerplate: the 7 verb-overload pairs in `ServerDSL.swift` are near-identical — a candidate for a macro
