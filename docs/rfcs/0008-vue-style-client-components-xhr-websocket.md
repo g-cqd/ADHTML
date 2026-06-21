@@ -209,7 +209,7 @@ Tier 2 (escape hatch) authors a client `setup` module bound by name to a `[data-
 | Phase | Item | Needs ADServe? |
 |---|---|---|
 | 1 | ✅ `ctx.fetch` — failure-safe JSON XHR + AbortController + abort-on-teardown (`src/fetch.js`, iter #3). Cross-origin governed by server CORS, not a client block. ADServe **CORS + `App(cors:)` sugar built** (`Middleware.swift`, iter #12) | ✅ |
-| 2 | ✅ **Server** (iters #4–6, #8, #10): `WebSocketHub` (broadcast + auto-prune) + `Channel` (subscribe-only + typed-inbound) + CSWSH origin gate. ✅ **Client** (iter #15): `ctx.ws` + `src/ws.js` shipped as an OPT-IN code-split bundle (`adh-ws.min.js`, 369 B; core +43 B). `v2`: reconnect/backoff/heartbeat | ✅ |
+| 2 | ✅ **Server** (iters #4–6, #8, #10): `WebSocketHub` (broadcast + auto-prune) + `Channel` (subscribe-only + typed-inbound) + CSWSH origin gate. ✅ **Client** (iters #15–16): `ctx.ws` + `src/ws.js` shipped as an OPT-IN code-split bundle (`adh-ws.min.js`, 464 B; core +43 B) with **auto-reconnect** (capped backoff + jitter). `v3`: heartbeat/ping | ✅ |
 | 3 | Tier-1 **`Resource`** (fetch-on-trigger → value/isLoading/error cells) + new wire cell kind + the `.mount/.visible/.every/.on` triggers | partial |
 | 4 | Tier-1 **`Channel`** Swift surface (messages/status/send cells) + declarative reducer (`onChannel`) → cell mutations | yes |
 | 5 | Tier-2 reactive `ctx` (`ref/computed/effect/watch`, `onMounted/onUnmounted`) for bespoke widgets | no |

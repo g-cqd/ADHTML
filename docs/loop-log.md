@@ -441,6 +441,33 @@ on measurement. Measure before deferring.
 
 ---
 
+## Iteration #16 — 2026-06-21 (ws.js v2: auto-reconnect)
+
+**Trigger:** apply #15's lesson + harden what I shipped. The v1 WS client (#15) had no reconnect — fragile
+for "live updates" (one blip drops the socket forever). Add reconnect (the natural v2), in the same opt-in
+module, deterministically testable.
+
+**Done (ADHTML, committed `a4b92ef`, local-only):**
+- `ws.js` v2 — an UNEXPECTED drop reconnects with capped exponential backoff (250 ms → 30 s ceiling) +
+  50–100% jitter; a clean open resets the backoff. A deliberate `close()`/abort sets a `stopped` flag that
+  suppresses reconnect; a malformed-URL construction throw gives up (no retry storm). `setTimeout`-driven —
+  no recursion.
+- **The code-split pays off:** all of it lands in `adh-ws.min.js` (369 → 464 B gzip, still < 2 KiB) — the
+  core runtime is **byte-for-byte unchanged** (5077 B). Robustness for free, core-wise.
+- **84 ClientRuntime tests** (+3, deterministic via a captured-`setTimeout` mock — no real waiting):
+  reconnect-on-drop with a bounded delay, no-reconnect-on-deliberate-close, backoff-grows. Strict `tsc` clean.
+
+**Assessment (×3):** *Pro* — production-robust WS client; zero core cost (opt-in); reconnect's footguns
+(retry-on-deliberate-close, retry-storm-on-bad-URL) are explicitly guarded + tested. *Con* — heartbeat/ping
+(detecting a half-open socket faster) is still a v3. *Consolidate* — ship reconnect; document heartbeat as
+the next robustness step.
+
+**Status:** RFC-0008 Phase 2 is now not just complete but *hardened* end-to-end (server: CSWSH + hub +
+auto-prune + Channel; client: ctx.ws + reconnect). The remaining RFC-0008 work is Phase 3 — the Tier-1
+declarative `@Resource`/`@Channel` "no-manual-JS" Swift surface.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
