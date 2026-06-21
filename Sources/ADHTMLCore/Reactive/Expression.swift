@@ -154,6 +154,17 @@ public func == <V: WireEncodable & Equatable>(lhs: Reactive<V>, rhs: Reactive<V>
 public func != <V: WireEncodable & Equatable>(lhs: Reactive<V>, rhs: Reactive<V>) -> Reactive<Bool> {
     Reactive(.binary(.neq, lhs.expr, rhs.expr), lhs.value != rhs.value)
 }
+
+// Compare a string reactive to a runtime CONSTANT (not a literal) — `selection.reactive == optionValue`.
+// The constant becomes a `.string` operand; the concrete `Reactive` left operand keeps these from polluting
+// plain `String ==`. Generic widgets (e.g. `SegmentedControl`) need this for a per-row/per-option value.
+public func == (lhs: Reactive<String>, rhs: String) -> Reactive<Bool> {
+    Reactive(.binary(.eq, lhs.expr, .string(rhs)), lhs.value == rhs)
+}
+public func != (lhs: Reactive<String>, rhs: String) -> Reactive<Bool> {
+    Reactive(.binary(.neq, lhs.expr, .string(rhs)), lhs.value != rhs)
+}
+
 public func < <V: WireEncodable & Comparable>(lhs: Reactive<V>, rhs: Reactive<V>) -> Reactive<Bool> {
     Reactive(.binary(.lt, lhs.expr, rhs.expr), lhs.value < rhs.value)
 }
