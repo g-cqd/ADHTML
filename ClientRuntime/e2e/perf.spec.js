@@ -20,5 +20,5 @@ test("hydrate + interaction of 500 islands is fast in a real browser (native DOM
 
   // Functional sanity: the burst of delegated clicks drove c0's bound node via closest() delegation
   // (the clicks landed on a nested <span>, so closest() had to walk up to the c element).
-  await expect(page.locator('[b="c0"] output')).toHaveText(String(clicks));
+  await expect(page.locator('[data-b="c0"] output')).toHaveText(String(clicks));
 });

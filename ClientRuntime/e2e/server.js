@@ -5,10 +5,10 @@
 // `Bun.serve`; the runtime is read from the committed `adh-runtime.min.js`.
 
 const STATE = JSON.stringify({
-  data-v: 1,
+  v: 1,
   cells: [
-    { $: "sig", data-v: 0 },
-    { $: "sig", data-v: 0 },
+    { $: "sig", v: 0 },
+    { $: "sig", v: 0 },
   ],
   islands: [
     { id: "counter", on: "load", scope: [0] },
@@ -56,7 +56,7 @@ const PERF_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>perf<
   window.__hydrateMs = performance.now() - t0;
 
   // Interaction latency: dispatch CLICKS clicks at a nested element inside c0's button.
-  const hit = document.querySelector('[b="c0"] .hit');
+  const hit = document.querySelector('[data-b="c0"] .hit');
   const CLICKS = 2000;
   const t1 = performance.now();
   for (let i = 0; i < CLICKS; i++) hit.dispatchEvent(new MouseEvent("click", { bubbles: true }));
@@ -73,7 +73,7 @@ const PORT = Number(process.env.PORT ?? 3000);
 // network + real EventSource paths the happy-dom unit tests can't. The islands are in the inline state so
 // the delegated listener treats them as wired.
 const ACTIONS_STATE = JSON.stringify({
-  data-v: 1,
+  v: 1,
   cells: [],
   islands: [
     { id: "search-isle", on: "load", scope: [] },
@@ -91,6 +91,17 @@ const ACTIONS_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>ac
   </div>
   <script type="application/adh-state+json" id="adh-state">${ACTIONS_STATE}</script>
   <script type="module" src="/adh-runtime.min.js"></script>
+</body></html>`;
+
+// The `$state` authoring fixture — VERBATIM bytes of the Swift `CartRow` (`@State var qty` + `@Bound var
+// inCart: Bool { $qty > 0 }`, `.increment`/`.set`, `.bind`, `When(inCartComputed)`). Pinned byte-for-byte
+// by the Swift test `cartRow emits the exact wire the browser e2e drives` (Tests/ADHTMLTests/
+// V2IntegrationTests.swift). cell 0 = qty signal; cell 1 = the `@Bound` computed `qty > 0` (formula `e`
+// the runtime re-evaluates client-side); `<template data-h="1">` mounts Remove when that computed is true.
+// `\\u003e` keeps the serializer's inline-script-safe escape of `>` intact in the served bytes.
+const CART_PAGE = `<!doctype html><html><head><meta charset="utf-8"><title>cart</title></head><body>
+<div data-a data-b="c1" data-c="load"><div><button data-c:click="a#0#-1">−</button><span data-e:text="0">0</span><button data-c:click="a#0#1">+</button><template data-h="1"><button data-c:click="c#0#0">Remove</button></template></div></div><script type="application/adh-state+json" id="adh-state">{"v":1,"cells":[{"$":"sig","v":0},{"$":"cmp","d":[0],"v":false,"e":{"o":"\\u003e","l":{"c":0},"r":{"i":0}}}],"islands":[{"id":"c1","on":"load","scope":[0,1]}]}</script>
+<script type="module" src="/adh-runtime.min.js"></script>
 </body></html>`;
 
 /** Minimal HTML-escape for the reflected query (the fixture mirrors the server's escape-by-default). */
@@ -111,6 +122,9 @@ Bun.serve({
     }
     if (path === "/actions") {
       return new Response(ACTIONS_PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
+    }
+    if (path === "/cart") {
+      return new Response(CART_PAGE, { headers: { "content-type": "text/html; charset=utf-8" } });
     }
     if (path === "/rows") {
       // Fragment: filtered rows reflecting the query (the morph target's new children).
