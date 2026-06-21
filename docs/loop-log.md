@@ -614,6 +614,34 @@ static assets + the interactive morph fragment. The app's no-JS AND runtime-enha
 
 ---
 
+## Iteration #22 — 2026-06-21 (the browser e2e — the deepest layer, green + benchmarked)
+
+**Trigger:** re-measure the one layer I'd assumed unverifiable all session — the runtime's actual DOM behavior
+in a real browser (the unit tests note the glue is "browser-validated, Playwright e2e").
+
+**Found:** Playwright **is** set up and Chromium **is** installed — the layer is runnable here. (Eighth time a
+"can't verify / blocked" assumption dissolved on measurement.)
+
+**Done — ran the full browser e2e (Chromium, headless): 7/7 PASS in 2.0 s.**
+- Hydration (load islands + lazy `visible` via IntersectionObserver); delegated click → bound node.
+- Actions: live-search fetches a fragment + morphs the target; `Island(connect:)` subscribes to **SSE** and
+  morphs on a pushed frame (the declarative live-update path from #17 — now browser-proven).
+- Morph + rewire: a morphed-in editable field hydrates and stays two-way live across a search-morph.
+- v2 authoring: `$state` + `@Bound` hydrate, bind, recompute derived state IN-BROWSER (no round-trip).
+- **Benchmark (finally a real number — the loop's "benchmark everything"):** real-browser hydrate of 500
+  islands in **3.2 ms (6.4 µs/island)**; 2000 delegated click round-trips in **8.4 ms (4.20 µs/click)** —
+  native-DOM fast.
+
+**This validates north star #2 at the deepest level:** the ADHTML runtime hydrates, binds, morphs, fetches,
+SSE-streams, and recomputes derived state correctly + fast in a real browser. Combined with the unit (84) +
+live-server (#19–21) layers, the runtime is proven end-to-end.
+
+**Assessment (×3):** *Pro* — the deepest validation (real browser); produces the perf numbers the loop asked
+for that the server benchmark couldn't (sandbox-blocked, #2); confirms hydration/morph/SSE/v2 all work. *Con*
+— verification, not new code. *Consolidate* — run it, record the green + the numbers.
+
+---
+
 ## Carry-forward backlog (the "identify" pillar — fuel for later iterations)
 
 **ADServe — security / robustness**
