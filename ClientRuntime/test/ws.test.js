@@ -10,9 +10,22 @@ beforeAll(async () => {
 });
 
 const realWS = globalThis.WebSocket;
+const realSetTimeout = globalThis.setTimeout;
 afterEach(() => {
   globalThis.WebSocket = realWS;
+  globalThis.setTimeout = realSetTimeout;
 });
+
+/** Capture scheduled reconnect timers instead of waiting — `scheduled[i].fn()` fires one on demand. */
+let scheduled = [];
+function mockTimers() {
+  scheduled = [];
+  // @ts-expect-error — test double for setTimeout
+  globalThis.setTimeout = (fn, delay) => {
+    scheduled.push({ fn, delay });
+    return 0;
+  };
+}
 
 /** A controllable mock WebSocket; the test simulates the server via `fireOpen`/`fireMessage`. */
 class MockWS {
@@ -37,6 +50,10 @@ class MockWS {
   }
   fireMessage(data) {
     this.onmessage?.({ data });
+  }
+  fireClose() {
+    this.readyState = 3;
+    this.onclose?.({});
   }
 }
 
@@ -110,4 +127,38 @@ test("a malformed URL yields an inert handle and never throws", () => {
     handle.send("x");
     handle.close();
   }).not.toThrow();
+});
+
+test("reconnects after an unexpected drop, with a bounded backoff delay", () => {
+  useMock();
+  mockTimers();
+  open("wss://x");
+  const first = MockWS.last;
+  first.fireClose();  // the server dropped the connection
+  expect(scheduled.length).toBe(1);
+  expect(scheduled[0].delay).toBeGreaterThan(0);
+  expect(scheduled[0].delay).toBeLessThanOrEqual(30000);
+  scheduled[0].fn();  // fire the reconnect timer
+  expect(MockWS.last).not.toBe(first);  // a fresh socket was opened
+});
+
+test("a deliberate close() suppresses reconnection", () => {
+  useMock();
+  mockTimers();
+  const handle = open("wss://x");
+  handle.close();  // sets `stopped`; the socket's onclose must NOT schedule a retry
+  expect(scheduled.length).toBe(0);
+});
+
+test("backoff grows across repeated failures (capped)", () => {
+  useMock();
+  mockTimers();
+  open("wss://x");
+  MockWS.last.fireClose();  // attempt 1 → delay in [125, 250]
+  const d1 = scheduled[0].delay;
+  scheduled[0].fn();  // reconnect (no clean open between)
+  MockWS.last.fireClose();  // attempt 2 → delay in [250, 500]
+  const d2 = scheduled[1].delay;
+  expect(d2).toBeGreaterThan(d1 * 0.9);  // the range shifted up (jitter-safe margin)
+  expect(d2).toBeLessThanOrEqual(30000);
 });
