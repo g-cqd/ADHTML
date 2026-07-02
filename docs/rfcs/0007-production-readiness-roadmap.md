@@ -23,7 +23,7 @@ Two repos, two stale-doc traps, and a much better reality than either README imp
   precompressed/symlink-jail; allow-list already includes `js`/`mjs`/`wasm`), and `CSPNonce` (128-bit per
   request + `strictHydrationPolicy`). The async seam ADHTML needs lives in the `.stream`/`.sse` body
   closures. **`docs/integration/adserve-requirements.md` is stale** and is corrected alongside this RFC.
-- **The real critical path is small and unblocked:** the **`ADHTMLNIO` bridge** — a thin forwarder from
+- **The real critical path is small and unblocked:** the **`ADHTMLServe` bridge** (né `ADHTMLNIO`) — a thin forwarder from
   ADHTML's `AsyncHTMLByteSink` to ADServe's `ResponseBodyWriter` (both `write(_ [UInt8]) async throws`,
   shaped 1:1 *on purpose*) plus a few `ResponseContent` conveniences. ADServe needs **no change** to
   support it. Once it lands, the full two-tier model **plus live SSE `patch`/`morph`** works end to end.
@@ -46,7 +46,7 @@ all of it and sequences it into milestones with a definition of done.
 | `.css` / `.scriptJSON` escape contexts | ⚠️ fail-safe stubs (over-escape; not unsafe) |
 | Reactive cells: object/array values | ❌ scalars only |
 | Stable `CellID` (hash of render-scope path) | ❌ Phase-1 = creation index |
-| `ADHTMLNIO` ADServe bridge | ❌ empty placeholder (the critical path) |
+| `ADHTMLServe` ADServe bridge | ❌ empty placeholder (the critical path) |
 | `ADHTMLMarkdown`, `ADHTMLObservability` | ❌ empty placeholders |
 | DSL ergonomics (RFC-0005): implicit islands, `@Bound`, scope inference, … | ◻️ planned (enums + typed events done) |
 
@@ -67,9 +67,9 @@ all of it and sequences it into milestones with a definition of done.
 | `Package.resolved` pinning of AD* siblings | ⚠️ planned (only apple/swift-server pinned) |
 | ADHTML-aware code | ❌ none (by design — the bridge is ADHTML-side) |
 
-## 3. Critical path — the `ADHTMLNIO` bridge (now unblocked)
+## 3. Critical path — the `ADHTMLServe` bridge (now unblocked)
 
-A new gated target (`ADHTML_NIO`) `ADHTMLNIO` depending on `ADHTMLCore` + `ADServeCore`:
+A new gated target (`ADHTML_SERVE`) `ADHTMLServe` depending on `ADHTMLCore` + `ADServeCore`:
 
 1. **Sink adapter.** Wrap an ADServe `ResponseBodyWriter` as an ADHTML `AsyncHTMLByteSink` — a direct
    forwarder (`write(_ [UInt8])` ⇄ `write(_ [UInt8])`; `flush()` ⇄ `flush()`). Buffers from
@@ -94,7 +94,7 @@ Depends on **stable `CellID`** (§4) for reliable SSE morph targeting across ren
 
 | Item | Why | Effort |
 |---|---|---|
-| **`ADHTMLNIO` bridge** (§3) | the integration; unlocks live updates | M |
+| **`ADHTMLServe` bridge** (§3) | the integration; unlocks live updates | M |
 | **Stable `CellID`** (XXH64 of render-scope path, RFC-0003 §2) | SSE morph/patch must target cells across renders | M |
 | **`.css` + `.scriptJSON` dedicated encoders** | finish escape-by-default (today: fail-safe stubs) | S–M |
 | **Object/array-valued reactive cells** | real app state (lists, records) | M |
@@ -141,7 +141,7 @@ Depends on **stable `CellID`** (§4) for reliable SSE morph targeting across ren
 
 | Milestone | Contents | Outcome |
 |---|---|---|
-| **M1 — Wire it together (live end-to-end)** | `ADHTMLNIO` bridge (§3) + stable `CellID` + CSP wiring + cross-repo integration tests | A real ADHTML app served by ADServe with **live SSE updates** — the headline unblock |
+| **M1 — Wire it together (live end-to-end)** | `ADHTMLServe` bridge (§3) + stable `CellID` + CSP wiring + cross-repo integration tests | A real ADHTML app served by ADServe with **live SSE updates** — the headline unblock |
 | **M2 — SwiftUI-grade authoring** | RFC-0005: implicit islands, `@Bound` + wider expr, scope inference, reactive interpolation, doc/head, slots; ship `Examples/Storefront` | Apps written with no `Island`/`scope`/`.id` ceremony |
 | **M3 — Dynamic + networked + extensible** | RFC-0006 phases 1–2 (show/hide, custom behaviors, mount hooks) + hypermedia actions (ADServe-ready) + async UX | Real dynamic/async UIs + sanctioned author JS |
 | **M4 — Completeness & hardening** | `.css`/`.scriptJSON` encoders, object/array cells, observability both sides, perf (Span escaper + baselines), fuzz/e2e in CI, a11y guidance, ADServe health route + mTLS | Feature-complete, observable, benchmarked |

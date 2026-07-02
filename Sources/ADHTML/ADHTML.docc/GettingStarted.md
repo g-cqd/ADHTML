@@ -35,7 +35,7 @@ never resolve their dependencies. Set the variable when resolving/building to op
 
 | Product | Gate | What it adds |
 |---|---|---|
-| `ADHTMLNIO` | `ADHTML_NIO` | the ADServe transport bridge (`.adhtml` / `.adhtmlStream` / SSE) |
+| `ADHTMLServe` | `ADHTML_SERVE` (legacy alias: `ADHTML_NIO`) | the ADServe transport bridge (`.adhtml` / `.adhtmlStream` / SSE) |
 | `ADHTMLMarkdown` | `ADHTML_MARKDOWN` | `Markdown` in a component body — see <doc:MarkdownInBuilder> |
 | `ADHTMLAssets` | `ADHTML_ASSETS` | serving component-scoped JS modules — see <doc:ComponentScopedAssets> |
 | `ADHTMLActions` | `ADHTML_ACTIONS` | signed server-action closures (`@Action` / `@Actions`) |

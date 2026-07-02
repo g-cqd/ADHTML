@@ -115,7 +115,7 @@ on bundle, cold-start, TTI, and DOM-access cost — ADR-0006.
 ## 5. Products & packaging (ADR-0010)
 
 Mirrors `ADJSON` exactly: a lean Foundation-free `ADHTMLCore` + an `ADHTML` umbrella + a `.macro`
-`ADHTMLMacros`, with `ADHTMLNIO` / `ADHTMLMarkdown` / `ADHTMLSRI` / `ADHTMLObservability` /
+`ADHTMLMacros`, with `ADHTMLServe` (né `ADHTMLNIO`) / `ADHTMLMarkdown` / `ADHTMLSRI` / `ADHTMLObservability` /
 `ADHTMLFuzz` **env-gated** so the default `swift build` graph stays minimal (core deps:
 `OrderedCollections` + `ADFCore`; the macro target adds swift-syntax). Floor macOS 15 / iOS 18
 (stdlib `Mutex`); adopt `Span` (back-deploys); defer `InlineArray`/`UTF8Span` (2025 SDK).
@@ -144,7 +144,7 @@ ADHTML is designed against an explicit lens, mapped here to where it is satisfie
 ADHTML is the view adapter the spare-parts SSR/hypermedia stack sequences in: it renders read models
 to HTML the same way the JSON API (RFC-0006 there) renders them to JSON — two adapters over the same
 services. It depends on ADServe's `ResponseContent`; the streaming/SSE/static-asset transport it wants
-is ADServe's ADR-0046 work, behind which the `ADHTMLNIO` adapter is sequenced (ADR-0012). Until that
+is ADServe's ADR-0046 work, behind which the `ADHTMLServe` adapter is sequenced (ADR-0012). Until that
 lands, server-rendered pages/fragments already work via buffered `.raw(text/html)`.
 
 ## 8. Scope, non-goals, risks

@@ -83,8 +83,8 @@ trade for zero churn on the hot render path.
   optional CSP `nonce` (stamped on the injected `<style>`/inline-`<script>`; `nil` keeps the core nonce-free,
   byte-identical) and an optional caller-provided `AssetSink` (so the bridge can read the page's `.module`
   names afterward). The core never touches the manifest or generates a nonce.
-- Gated `ADHTMLAssets` bridge (`ADHTML_ASSETS`; deps `ADHTMLCore` + `ADHTMLNIO` + ADServeCore;
-  `needsNIO = isNIO || isActions || isAssets`): an `AssetManifest` model (decodes the bun manifest) + a
+- Gated `ADHTMLAssets` bridge (`ADHTML_ASSETS`; deps `ADHTMLCore` + `ADHTMLServe` + ADServeCore;
+  `needsServe = isServe || isActions || isAssets`): an `AssetManifest` model (decodes the bun manifest) + a
   `ResponseContent.adhtmlAssets(_:manifest:nonce:assetPath:)` that renders nonce-stamped, then APPENDS a
   `<script type=module src=/assets/<file> integrity=<sri> nonce=<nonce>>` per `.module` component (a module
   absent from the manifest is skipped). Module scripts are `defer`red, so appending them after the inline

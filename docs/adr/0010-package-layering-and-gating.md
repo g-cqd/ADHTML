@@ -17,7 +17,8 @@ Mirror `ADJSON`'s manifest exactly:
   Default core deps: `OrderedCollections` (deterministic attributes) + `ADFCore`. The macro target adds
   swift-syntax (603.0.0+).
 - **Gated** (env-flag, appended only when set, so default resolution never fetches them):
-  `ADHTMLNIO` (`ADHTML_NIO`: NIOCore byte sink + ADServe bridge; pulls `ADJSON` for the wire too),
+  `ADHTMLServe` (`ADHTML_SERVE`, legacy alias `ADHTML_NIO`; formerly named `ADHTMLNIO` — a misnomer,
+  it imports no NIO: the ADServe response bridge; pulls `ADJSON` for the wire too),
   `ADHTMLMarkdown` (`ADHTML_MARKDOWN`: swift-markdown, a C dep, with our own HTML renderer),
   `ADHTMLSRI` (`ADHTML_SRI`: swift-crypto SHA-256 — for Subresource Integrity **only**),
   `ADHTMLObservability` (`ADHTML_OBS`: swift-log/metrics/distributed-tracing — most speculative),

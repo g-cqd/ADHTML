@@ -79,7 +79,7 @@ is not a core dependency yet.
   String` / `-> [UInt8]` are the fragment/test entry points (`consuming`).
 - **Streaming** `AsyncHTMLByteSink { mutating func write(_ bytes: ArraySlice<UInt8>) async throws }` —
   Elementary-shaped, so a chunk flushes `<head>`/early markup while the body renders (TTFB win). The
-  NIO adapter (`ADHTMLNIO`, gated) writes into a `ByteBuffer` drawn from `ADFCore.ByteBufferPool` and
+  ADServe adapter (`ADHTMLServe`, gated; NIO only transitively via ADServe) writes into a `ByteBuffer` drawn from `ADFCore.ByteBufferPool` and
   honors channel writability for back-pressure (ADR-0012). `AsyncForEach` streams read-model rows so a
   large page never fully materializes.
 

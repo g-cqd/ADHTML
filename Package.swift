@@ -40,23 +40,27 @@ let benchSettings: [SwiftSetting] =
 let testSettings: [SwiftSetting] =
     strictSettings + timingWarningFlags + [.unsafeFlags(["-enable-actor-data-race-checks"])]
 
-// Dev / opt-in gates, mirroring ADJSON's `_DEV` / `_NIO` / `_FUZZ` model so consumers of the default
+// Dev / opt-in gates, mirroring ADJSON's `_DEV` / `_FUZZ` model so consumers of the default
 // products never resolve the heavier or host-coupling dependencies (ADR-0010).
 let isDev = Context.environment["ADHTML_DEV"] != nil
-let isNIO = Context.environment["ADHTML_NIO"] != nil
+// The ADServe response-bridge gate. Renamed ADHTML_NIO → ADHTML_SERVE (the target it gates imports
+// no NIO — it is the ADServe response bridge; NIO only ever arrived transitively through ADServe,
+// which is itself migrating off NIO). The old name stays accepted as a BACK-COMPAT ALIAS so
+// existing scripts/CI invocations keep working; drop it once nothing sets ADHTML_NIO anymore.
+let isServe = Context.environment["ADHTML_SERVE"] != nil || Context.environment["ADHTML_NIO"] != nil
 let isMarkdown = Context.environment["ADHTML_MARKDOWN"] != nil
 let isSRI = Context.environment["ADHTML_SRI"] != nil
 let isFuzz = Context.environment["ADHTML_FUZZ"] != nil
 // Tier-2 server-action closures (RFC-0020 Track 3): the signed `POST /_adh/act/<id>` dispatch + Region
-// re-render + no-JS PRG. It builds on the NIO bridge (`.adhtmlFragment`/`ctx.view`) and the ADServe routing
-// + HMAC surface, so enabling it implies the NIO graph (`needsNIO`).
+// re-render + no-JS PRG. It builds on the serve bridge (`.adhtmlFragment`/`ctx.view`) and the ADServe
+// routing + HMAC surface, so enabling it implies the ADServe graph (`needsServe`).
 let isActions = Context.environment["ADHTML_ACTIONS"] != nil
 // Tier-2 component-scoped assets (Track 4 / ADR-0021): the gated SERVING bridge — the `manifest.json` load,
 // the `<script type=module src integrity nonce>` injection (nonce from `CSPNonceKey`), and the ADServe
 // `Static("/assets")` wiring. The core asset surface (`ScopedStyle`/`Script`/`CSSScoper`/the injection) is
-// unconditional in ADHTMLCore; only the serving bridge is gated. Builds on the NIO bridge → `needsNIO`.
+// unconditional in ADHTMLCore; only the serving bridge is gated. Builds on the serve bridge → `needsServe`.
 let isAssets = Context.environment["ADHTML_ASSETS"] != nil
-let needsNIO = isNIO || isActions || isAssets
+let needsServe = isServe || isActions || isAssets
 
 // AD* siblings resolve from a local checkout when `<DEP>_PATH` is set, else the published `main`.
 func adPackage(env: String, url: String) -> Package.Dependency {
@@ -86,14 +90,15 @@ if isDev {
     packageDependencies.append(.package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.0.0"))
     packageDependencies.append(.package(url: "https://github.com/ordo-one/benchmark", from: "1.4.0"))
 }
-if needsNIO {
+if needsServe {
     // The ADServe response bridge (ADR-0012, RFC-0007 §3). ADServe already ships the transport
-    // primitives (.html/.stream/.sse/Static/CSPNonce); ADHTMLNIO forwards ADHTML's AsyncHTMLByteSink to
-    // ADServe's ResponseBodyWriter (both `[UInt8]`, shaped 1:1). Resolves from ADSERVE_PATH locally.
-    // Also required by ADHTMLActions (Track 3) — hence `needsNIO`.
+    // primitives (.html/.stream/.sse/Static/CSPNonce); ADHTMLServe forwards ADHTML's AsyncHTMLByteSink
+    // to ADServe's ResponseBodyWriter (both `[UInt8]`, shaped 1:1). Resolves from ADSERVE_PATH locally.
+    // Also required by ADHTMLActions (Track 3) — hence `needsServe`. (NIO enters this graph only
+    // transitively through ADServe, and ADServe's own de-NIO migration is in flight.)
     packageDependencies.append(adPackage(env: "ADSERVE_PATH", url: "https://github.com/g-cqd/ADServe.git"))
-    // ADTestKit (AsyncEventProbe …) backs ADHTMLNIOTests; it now lives in the default graph (above), so
-    // the NIO block no longer appends it.
+    // ADTestKit (AsyncEventProbe …) backs ADHTMLServeTests; it now lives in the default graph (above),
+    // so the serve block no longer appends it.
 }
 if isMarkdown {
     packageDependencies.append(.package(url: "https://github.com/swiftlang/swift-markdown.git", from: "0.4.0"))
@@ -239,14 +244,16 @@ let package = Package(
 
 // --- Gated targets/products (each mirrors ADJSON's append-after-construction pattern) ---
 
-if needsNIO {
+if needsServe {
     // The ADServe response bridge: forward ADHTML's rendered bytes into ADServe's `ResponseContent`
-    // (.html / .stream). Depends only on ADHTMLCore + ADServeCore (ADServe brings NIO transitively).
-    // Built whenever the NIO graph is needed (explicit ADHTML_NIO, or ADHTMLActions depends on it).
-    package.products.append(.library(name: "ADHTMLNIO", targets: ["ADHTMLNIO"]))
+    // (.html / .stream). Depends only on ADHTMLCore + ADServeCore — it imports no NIO itself (NIO is
+    // transitive via ADServe while ADServe's de-NIO migration completes; the target's former name,
+    // ADHTMLNIO, was a misnomer). Built whenever the ADServe graph is needed (explicit ADHTML_SERVE
+    // — or the ADHTML_NIO back-compat alias — or ADHTMLActions/ADHTMLAssets depend on it).
+    package.products.append(.library(name: "ADHTMLServe", targets: ["ADHTMLServe"]))
     package.targets.append(
         .target(
-            name: "ADHTMLNIO",
+            name: "ADHTMLServe",
             dependencies: [
                 "ADHTMLCore",
                 .product(name: "ADServeCore", package: "ADServe"),
@@ -257,13 +264,13 @@ if needsNIO {
             swiftSettings: strictSettings))
     package.targets.append(
         .testTarget(
-            name: "ADHTMLNIOTests",
-            dependencies: ["ADHTMLNIO", .product(name: "ADTestKit", package: "ADFoundation")],
+            name: "ADHTMLServeTests",
+            dependencies: ["ADHTMLServe", .product(name: "ADTestKit", package: "ADFoundation")],
             swiftSettings: testSettings))
 }
 if isActions {
     // Tier-2 server-action closures (RFC-0020 Track 3): the signed `POST /_adh/act/<id>` dispatch + Region
-    // re-render + no-JS PRG. Builds on the NIO bridge (`.adhtmlFragment`/`ctx.view`) + the ADServe routing
+    // re-render + no-JS PRG. Builds on the serve bridge (`.adhtmlFragment`/`ctx.view`) + the ADServe routing
     // (`POST`/`RouteNode`) + the shared `ADServeCore.HMACSigner`. The `@Endpoint`/`@Endpoints` macros (P3)
     // are declared here, with impls in the ADHTMLMacros plugin.
     package.products.append(.library(name: "ADHTMLActions", targets: ["ADHTMLActions"]))
@@ -271,7 +278,7 @@ if isActions {
         .target(
             name: "ADHTMLActions",
             dependencies: [
-                "ADHTMLCore", "ADHTMLNIO", "ADHTMLMacros", adfCore,
+                "ADHTMLCore", "ADHTMLServe", "ADHTMLMacros", adfCore,
                 .product(name: "ADServeCore", package: "ADServe"),
                 .product(name: "ADServeDSL", package: "ADServe")
             ],
@@ -287,14 +294,14 @@ if isAssets {
     // `manifest.json`, injects `<script type=module src integrity nonce>` for a page's `.module`
     // components, and pairs with ADServe `Static("/assets")`. SRI is computed at BUILD time by bun
     // (parity-pinned to `ADHTMLSRI` by the ClientRuntime test), so the bridge trusts the manifest's
-    // integrity — no swift-crypto runtime dep here. Builds on the NIO bridge for `ResponseContent` +
+    // integrity — no swift-crypto runtime dep here. Builds on the serve bridge for `ResponseContent` +
     // `CSPNonceKey`.
     package.products.append(.library(name: "ADHTMLAssets", targets: ["ADHTMLAssets"]))
     package.targets.append(
         .target(
             name: "ADHTMLAssets",
             dependencies: [
-                "ADHTMLCore", "ADHTMLNIO",
+                "ADHTMLCore", "ADHTMLServe",
                 .product(name: "ADServeCore", package: "ADServe")
             ],
             swiftSettings: strictSettings))

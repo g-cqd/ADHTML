@@ -99,7 +99,7 @@ them:
 ADHTML_DEV=1 swift build                       # build-time format enforcement (LintBuild plugin)
 ADHTML_DEV=1 swift package generate-documentation --target ADHTMLCore --target ADHTML
 ADHTML_DEV=1 swift package benchmark           # ordo-one/benchmark suite (Benchmarks/ADHTMLSuite)
-ADHTML_NIO=1 swift test --filter ADHTMLNIOTests
+ADHTML_SERVE=1 swift test --filter ADHTMLServeTests   # legacy alias: ADHTML_NIO
 ```
 
 `ADHTML_MARKDOWN`, `ADHTML_SRI`, and `ADHTML_OBS` gate the swift-markdown, swift-crypto (SRI only),

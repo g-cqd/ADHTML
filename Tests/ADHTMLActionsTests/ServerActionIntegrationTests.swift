@@ -1,5 +1,5 @@
 import ADHTMLCore  // div / form / button / .render
-import ADHTMLNIO  // ctx.view (the dual-mode page/fragment render a handler returns)
+import ADHTMLServe  // ctx.view (the dual-mode page/fragment render a handler returns)
 import ADServeCore  // ResponseContent
 import ADServeDSL  // StorageContext
 import Testing

@@ -13,7 +13,7 @@ compiles as one unit*. `swift build` is the template compiler.
 > format**, the `@Component`/`@State`/`#attr` **macros**, streaming, **SRI**, and the 2.2 KiB **client
 > runtime** are all implemented and covered by **61 Swift tests** + the JS runtime suite (`ADR-0013` is
 > the authoritative status; the design corpus is 7 RFCs + 15 ADRs under [`docs/`](docs/)). The one piece
-> still **planned** is the small **`ADHTMLNIO` bridge** — a thin forwarder to ADServe's *already-shipped*
+> still **planned** is the small **`ADHTMLServe` bridge** — a thin forwarder to ADServe's *already-shipped*
 > `.html` / `.stream` / `.sse` / `Static` / `CSPNonce` (a ground-truth audit found ADServe's transport
 > primitives complete; **no further ADServe work is required** — see [RFC-0007](docs/rfcs/0007-production-readiness-roadmap.md)).
 > **Adopt it today via buffered SSR:** render with `renderBytes()` (static) or `renderHydratable(arena:)`
@@ -74,13 +74,13 @@ Text is **escaped by default** in the correct context; raw insertion is the sing
 | `ADHTMLMacros` | `.macro` target (`@Component`/`@State`/`#attr`) | — | **implemented** |
 | `ADHTMLSRI` | Subresource-Integrity hashing of the client runtime (swift-crypto) | `ADHTML_SRI` | **implemented** (gated) |
 | `ADHTMLFuzz` | libFuzzer harness for the escaper (Linux) | `ADHTML_FUZZ` | **implemented** (gated) |
-| `ADHTMLNIO` | NIO `ByteBuffer` byte-sink + ADServe response/SSE bridge | `ADHTML_NIO` | planned — thin forwarder; ADServe transport ready (RFC-0007) |
+| `ADHTMLServe` | ADServe response/SSE bridge (no direct NIO import; né `ADHTMLNIO`) | `ADHTML_SERVE` (legacy alias: `ADHTML_NIO`) | planned — thin forwarder; ADServe transport ready (RFC-0007) |
 | `ADHTMLMarkdown` | Markdown → ADHTML nodes (swift-markdown) | `ADHTML_MARKDOWN` | planned (placeholder) |
 | `ADHTMLObservability` | Render-path logging/metrics/tracing | `ADHTML_OBS` | planned (placeholder) |
 
 Client interactivity (islands, signals, behaviors, bindings, computeds) and live SSE `patch`/`morph` are
 implemented on **both** sides (Swift wire serializer + the 2.2 KiB JS runtime); SSE can't be *driven*
-until the `ADHTMLNIO` bridge gives ADServe `text/event-stream`, so live updates are the one deferred
+until the `ADHTMLServe` bridge gives ADServe `text/event-stream`, so live updates are the one deferred
 capability. Buffered static + island SSR works now.
 
 ## Building locally
@@ -109,7 +109,7 @@ deliberately not adopted (they would raise the floor to the 2025 SDKs).
 | Variable | Enables |
 |---|---|
 | `ADHTML_DEV` | Lint/format plugins, DocC, the ordo-one benchmark suite |
-| `ADHTML_NIO` | `ADHTMLNIO` (swift-nio `ByteBuffer` sink + ADServe bridge) |
+| `ADHTML_SERVE` (legacy alias: `ADHTML_NIO`) | `ADHTMLServe` (the ADServe response bridge; NIO only transitively via ADServe) |
 | `ADHTML_MARKDOWN` | `ADHTMLMarkdown` (swift-markdown) |
 | `ADHTML_SRI` | `ADHTMLSRI` (swift-crypto SHA-256 for Subresource Integrity) |
 | `ADHTML_OBS` | `ADHTMLObservability` (swift-log / swift-metrics / swift-distributed-tracing) |

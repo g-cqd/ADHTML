@@ -27,7 +27,7 @@ Build on the family, do not re-roll:
   load/store if compact binary state is ever needed.
 - **`ADJSON`**: serialize the hydration state graph (`WireEncodable` → bytes) and emit SSE signal
   patches via `ADJSONCore.JSONMergePatch` (RFC 7396) — no bespoke JSON writer or merge-patch (ADR-0007).
-- **`ADServeCore`** (gated, via `ADHTMLNIO`): `sha256HexLower` for SRI/strong ETags, `pathHasTraversal`
+- **`ADServeCore`** (gated, via `ADHTMLServe`): `sha256HexLower` for SRI/strong ETags, `pathHasTraversal`
   for static-asset path safety, `ResponseContent`/`MediaType` for the response bridge (ADR-0012).
 
 **Crypto rule**: a real cryptographic digest (swift-crypto SHA-256) is required **only** for

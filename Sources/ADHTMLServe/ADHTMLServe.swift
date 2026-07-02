@@ -1,13 +1,16 @@
-// ADHTMLNIO (gated `ADHTML_NIO`) — the ADServe transport bridge (ADR-0012, RFC-0007 §3). ADServe already
-// ships the transport primitives (`.html` / `.stream` / `.sse` / `Static` / `CSPNonce`); this module is
-// the thin ADHTML-side forwarder. ADServe's `ResponseBodyWriter.write(_ [UInt8])` was shaped to match
-// ADHTML's `AsyncHTMLByteSink.write(_:)` 1:1, so the sink adapter is a direct pass-through and the
-// streaming bridge has no buffering/copy of its own.
+// ADHTMLServe (gated `ADHTML_SERVE`; formerly ADHTMLNIO/`ADHTML_NIO` — renamed because the module
+// imports no NIO at all: it is the ADServe RESPONSE BRIDGE, and NIO only ever arrived transitively
+// through ADServe, which is itself migrating off NIO) — the ADServe transport bridge (ADR-0012,
+// RFC-0007 §3). ADServe already ships the transport primitives (`.html` / `.stream` / `.sse` /
+// `Static` / `CSPNonce`); this module is the thin ADHTML-side forwarder. ADServe's
+// `ResponseBodyWriter.write(_ [UInt8])` was shaped to match ADHTML's `AsyncHTMLByteSink.write(_:)`
+// 1:1, so the sink adapter is a direct pass-through and the streaming bridge has no buffering/copy
+// of its own.
 public import ADHTMLCore
 public import ADServeCore
 
-/// Namespace for the NIO byte-sink + ADServe bridge (see ADR-0012).
-public enum ADHTMLNIO {}
+/// Namespace for the ADServe byte-sink + response bridge (see ADR-0012).
+public enum ADHTMLServe {}
 
 /// An `AsyncHTMLByteSink` that forwards every chunk to an ADServe `ResponseBodyWriter`. The render path
 /// writes here; the bytes go straight onto the channel (back-pressure is the `await` inside the writer).

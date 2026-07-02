@@ -4,7 +4,7 @@ import ADHTML
 // `swift run Storefront` prints the catalog page: a static perimeter (layout, cards) plus a resumable
 // `AddToCart` island per in-stock product, with the inline hydration state appended automatically.
 //
-// Serving it (with the ADHTMLNIO bridge, ADHTML_NIO): a handler returns the bytes through ADServe's typed
+// Serving it (with the ADHTMLServe bridge, ADHTML_SERVE): a handler returns the bytes through ADServe's typed
 // response — `.adhtml(CatalogPage(products:))` (buffered) or `.adhtmlStream(CatalogPage(products:))`
 // (streamed) — and `Static("/assets", root:)` serves the SRI-pinned runtime. No view code changes.
 

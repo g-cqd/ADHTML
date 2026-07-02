@@ -2,7 +2,7 @@
 
 - **Status**: ✅ **Satisfied** — a ground-truth audit of ADServe (`feat/production-complete`, 105 tests
   green, 2026-06-20) found **all six** capabilities below are **already implemented**. The remaining work
-  is the ADHTML-side **`ADHTMLNIO` bridge** (a thin forwarder), tracked in **RFC-0007** (production-
+  is the ADHTML-side **`ADHTMLServe` bridge** (a thin forwarder; né `ADHTMLNIO`), tracked in **RFC-0007** (production-
   readiness roadmap, §3). This document is kept as the capability contract + verification checklist.
 - **Date**: 2026-06-20 (status corrected after audit; the original draft listed these as "Missing").
 - **Related**: ADHTML ADR-0012, ADR-0006, RFC-0003, **RFC-0007**. Grounded in the actual ADServe
@@ -32,7 +32,7 @@ SSE, and static files.
 | 6 | Per-request CSP nonce | Inline state `<script>` + runtime under a strict CSP | ✅ `CSPNonce` middleware + `strictHydrationPolicy` + `CSPNonceKey` storage | read the nonce, stamp `<script nonce>` |
 
 **All six are implemented in ADServe.** Buffered SSR works today via `.html(_:)`; streaming, live SSE,
-and served runtime work as soon as the **`ADHTMLNIO` bridge** (RFC-0007 §3) forwards bytes — no ADServe
+and served runtime work as soon as the **`ADHTMLServe` bridge** (RFC-0007 §3) forwards bytes — no ADServe
 change required.
 
 ## 0. What already works (no ADServe change)
@@ -93,7 +93,7 @@ public enum ResponseContent {
 
 Requirements: honor back-pressure (suspend on un-writable channel); keep the configurable body cap for
 streamed bodies; ride the existing envelope (security headers, request-id); flush `<head>` before the
-body completes. `ADHTMLNIO` (gated `ADHTML_NIO`) adapts `ResponseStreamWriter` ⇄ `AsyncHTMLByteSink`
+body completes. `ADHTMLServe` (gated `ADHTML_SERVE`) adapts `ResponseStreamWriter` ⇄ `AsyncHTMLByteSink`
 (both are `write(_ ArraySlice<UInt8>) async throws`), drawing buffers from `ADFCore.ByteBufferPool`.
 
 ## 3. Server-Sent Events — P1
@@ -180,7 +180,7 @@ ADServe stays persistence- and view-agnostic; it gains *transport* primitives on
 5. **#6** (CSP nonce) — with the first real page that ships the runtime.
 
 All of this is the **ADServe-side** of ADR-0012 / spare-parts ADR-0046. The ADHTML-side bridge lives in
-the gated `ADHTMLNIO` target and is written against this contract once it lands. Coordinate with the
+the gated `ADHTMLServe` target and is written against this contract once it lands. Coordinate with the
 in-flight ADServe middleware/async refactor.
 
 ## Verification (per capability)

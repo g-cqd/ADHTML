@@ -1,5 +1,5 @@
 // The byte-sink contract (RFC-0002). The renderer writes through `HTMLByteSink`; `ArraySink` collects
-// into `[UInt8]`. A streaming `AsyncHTMLByteSink` over NIO `ByteBuffer` is the gated `ADHTMLNIO`
+// into `[UInt8]`. A streaming `AsyncHTMLByteSink` over NIO `ByteBuffer` is the gated `ADHTMLServe`
 // adapter (ADR-0012). Convenience writers (`writeStatic`/`writeUTF8`) are built on the two primitives.
 
 /// A destination for rendered HTML bytes.

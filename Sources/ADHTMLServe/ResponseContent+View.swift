@@ -2,7 +2,7 @@
 // is the view-first alias over the buffered hydratable render (`.adhtml`), and `ctx.view(page:fragment:)`
 // makes the page-vs-fragment choice IMPLICIT — driven by `ctx.isFragment` (RFC-0019 C1, the `ADH-Request`
 // header) — so a handler never hand-writes the `if ctx.isFragment { .fragment } else { .html }` branch.
-// Gated `ADHTML_NIO` like the rest of the bridge (ADServeCore can't depend on ADHTML, so `.view` lives
+// Gated `ADHTML_SERVE` like the rest of the bridge (ADServeCore can't depend on ADHTML, so `.view` lives
 // here, not in core). Reuses RFC-0019 transport unchanged — this is sugar over `.adhtml`/`.adhtmlFragment`.
 public import ADHTMLCore
 public import ADServeCore

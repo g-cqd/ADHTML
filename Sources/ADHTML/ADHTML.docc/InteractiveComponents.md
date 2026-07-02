@@ -123,7 +123,7 @@ The hydratable path returns the markup plus the inline state script for the isla
 let bytes = try view.renderHydratable(arena: CellArena())
 ```
 
-With the gated `ADHTMLNIO` bridge, ADServe's `ResponseContent` gains `.adhtml(_:)` (buffered) and
+With the gated `ADHTMLServe` bridge, ADServe's `ResponseContent` gains `.adhtml(_:)` (buffered) and
 `.adhtmlStream(_:)` (streamed, for time-to-first-byte) that call this for you.
 
 ## Server actions

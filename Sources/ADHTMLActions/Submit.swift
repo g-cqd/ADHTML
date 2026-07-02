@@ -5,7 +5,7 @@
 // the RFC-0019 `Action` + a native form fallback verbatim — no new wire token, no client/runtime change.
 
 public import ADHTMLCore  // HTML, form, the Action STRUCT, RegionID, Tags.Form
-internal import ADHTMLNIO  // ctx.view (the page/fragment render the action signer wraps)
+internal import ADHTMLServe  // ctx.view (the page/fragment render the action signer wraps)
 public import ADServeCore  // ResponseContent
 public import ADServeDSL  // HandlerContext
 

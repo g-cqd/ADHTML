@@ -6,8 +6,8 @@
 - **Implementation note**: the in-repo streaming primitive is implemented — `AsyncHTMLByteSink`
   (reference-semantic, typed `Failure`) + `AsyncRenderer` (chunked emit, cooperative cancellation,
   `Task.yield`) + `HTML.render(into:)` / `renderHydratable(into:arena:)`. The ADServe surface (the
-  ADR-0046 `text/html` MediaType, streaming response, SSE, static handler) and the gated `ADHTMLNIO`
-  bridge that consumes this sink are the remaining cross-repo work — see
+  ADR-0046 `text/html` MediaType, streaming response, SSE, static handler) and the gated `ADHTMLServe`
+  bridge (formerly `ADHTMLNIO`; renamed — it imports no NIO itself) that consumes this sink are the remaining cross-repo work — see
   `docs/integration/adserve-requirements.md`. Data-driven `AsyncForEach` is deferred (Sendable-opcode
   constraint).
 
@@ -26,7 +26,7 @@ Integrate behind a small seam, **sequenced behind ADServe ADR-0046**:
 - **Today (buffered)**: `ADHTML` renders to `[UInt8]` and returns
   `.raw(body:, contentType: "text/html; charset=utf-8", status:)`. Fully usable now; the core has **no**
   ADServe dependency.
-- **When ADR-0046 lands (gated `ADHTMLNIO`)**: an `AsyncHTMLByteSink` over NIO `ByteBuffer`
+- **When ADR-0046 lands (gated `ADHTMLServe`)**: an `AsyncHTMLByteSink` over NIO `ByteBuffer`
   (`ADFCore.ByteBufferPool`, channel-writability back-pressure) for streaming render (flush `<head>`
   early — TTFB); an SSE responder for `event: morph`/`patch` (RFC-0003); the runtime served via
   ADServe's guarded static handler (reusing `pathHasTraversal`, ETag, `Cache-Control`, SRI).
@@ -36,10 +36,10 @@ Integrate behind a small seam, **sequenced behind ADServe ADR-0046**:
 ## Consequences
 
 - **Positive**: ADHTML ships value immediately via the buffered path; the streaming/SSE/asset
-  capabilities slot in without touching the core (gated `ADHTMLNIO`); persistence-agnostic (views pull
+  capabilities slot in without touching the core (gated `ADHTMLServe`); persistence-agnostic (views pull
   from the app, not a DB in the engine).
 - **Negative**: the full stack depends on ADServe ADR-0046, which is proposed-not-built — a sequencing
-  risk, mitigated by the buffered fallback and by `ADHTMLNIO` being gated. Coordinate with the in-flight
+  risk, mitigated by the buffered fallback and by `ADHTMLServe` being gated. Coordinate with the in-flight
   ADServe middleware/async refactor so the bridge tracks the settled API.
 - **Security**: new surface (static traversal, SSE connection limits, streamed-body caps) is
   threat-modeled with ADServe's security baseline; SSE/asset handlers enforce `can()` where scoped.
