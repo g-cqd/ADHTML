@@ -49,7 +49,11 @@ public struct HTMLTape: Sendable {
         guard !source.isEmpty else { return HTMLTape(source: source, slots: []) }
         var scanner = Scanner(n: source.count)
         source.withUnsafeBufferPointer { buf in
-            unsafe scanner.run(buf.baseAddress!)
+            // `baseAddress` is nil only for an empty buffer, which the guard above already
+            // returned; bind instead of force-unwrapping so the impossible case is a no-op
+            // (empty tape) rather than a trap.
+            guard let base = buf.baseAddress else { return }
+            unsafe scanner.run(base)
         }
         return HTMLTape(source: source, slots: scanner.slots)
     }
