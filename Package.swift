@@ -25,10 +25,16 @@ let coreSettings: [SwiftSetting] =
 // Compile-time type-check timing warnings (flag slow expressions / function bodies). These use unsafe
 // flags, which would block version-based dependency resolution if placed on the library, so they live
 // only on internal (non-exported) test + benchmark + fuzz targets.
+// The budget is env-tunable because `treatAllWarnings(as: .error)` turns an overrun into a HARD build
+// error while the measured quantity is type-check WALL TIME — structurally flaky on shared CI runners
+// (observed 102–168 ms flips for bodies comfortably under 100 ms locally). CI exports
+// AD_TYPECHECK_BUDGET_MS=250 to calibrate for runner noise; unset (local builds) it stays 100 so
+// regressions still surface at developer-machine speed.
+let typeCheckBudgetMS = Context.environment["AD_TYPECHECK_BUDGET_MS"].flatMap { Int($0) } ?? 100
 let timingWarningFlags: [SwiftSetting] = [
     .unsafeFlags([
-        "-Xfrontend", "-warn-long-function-bodies=100",
-        "-Xfrontend", "-warn-long-expression-type-checking=100"
+        "-Xfrontend", "-warn-long-function-bodies=\(typeCheckBudgetMS)",
+        "-Xfrontend", "-warn-long-expression-type-checking=\(typeCheckBudgetMS)"
     ])
 ]
 // The benchmark target gets a LOOSER type-check budget than the library/tests: the ordo-one plugin
