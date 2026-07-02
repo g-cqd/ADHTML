@@ -3,6 +3,7 @@
 // comments, DOCTYPE, raw-text vs RCDATA) covers both, and a differential check pins them together on
 // a mixed document. The tape is the fast path tree construction walks; the reference is the oracle.
 
+import ADHTMLOracle
 import Testing
 
 @testable import ADHTMLCore

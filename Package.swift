@@ -155,9 +155,18 @@ let package = Package(
             swiftSettings: strictSettings,
             plugins: buildPlugins),
 
+        // The WHATWG reference tokenizer, used ONLY as a differential oracle by the parse tests and
+        // the dev perf probe. A plain internal target — NOT a product and NOT in `.adbuildtools.json`
+        // `shippedTargets` — so consumers of the shipped libraries never see its spec-shaped bulk,
+        // and the shipped tree stays free of size-gate exceptions. Reads ADHTMLCore's token types +
+        // the `package`-visible named-reference data table; its decode LOGIC stays independent.
+        .target(name: "ADHTMLOracle", dependencies: ["ADHTMLCore"], swiftSettings: strictSettings),
+
         .testTarget(
             name: "ADHTMLCoreTests",
-            dependencies: ["ADHTMLCore", .product(name: "ADTestKit", package: "ADFoundation")],
+            dependencies: [
+                "ADHTMLCore", "ADHTMLOracle", .product(name: "ADTestKit", package: "ADFoundation")
+            ],
             swiftSettings: testSettings),
         .testTarget(name: "ADHTMLTests", dependencies: ["ADHTML"], swiftSettings: testSettings),
         .testTarget(
@@ -190,7 +199,11 @@ let package = Package(
         // A lightweight, network-free release perf probe over ADHTMLCore (no swift-syntax / DEV deps).
         // Run: `swift run -c release ADHTMLPerfProbe`. Complements the ordo-one suite (the CI gate with
         // mallocCountTotal) for quick local before/after wall-clock measurement. Not a product.
-        .executableTarget(name: "ADHTMLPerfProbe", dependencies: ["ADHTMLCore"], swiftSettings: strictSettings),
+        // ADHTMLOracle backs its correctness cross-check (tape vs reference tokenizer).
+        .executableTarget(
+            name: "ADHTMLPerfProbe",
+            dependencies: ["ADHTMLCore", "ADHTMLOracle"],
+            swiftSettings: strictSettings),
 
         // A multi-file example app (RFC-0005 §7): components across files, implicit islands (@State ->
         // auto-island), a slotted layout, typed attribute enums + events. Built (not a product) so the

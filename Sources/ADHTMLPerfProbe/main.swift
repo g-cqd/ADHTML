@@ -1,5 +1,6 @@
 // TEMPORARY harness (restore with `git checkout -- Sources/ADHTMLPerfProbe/main.swift`).
 import ADHTMLCore
+import ADHTMLOracle
 
 func same(_ name: String, _ html: String) -> Bool {
     let got = HTMLTape.build(html).materialize()
@@ -23,7 +24,7 @@ for (name, html) in [
             + "<body class=\"main\" data-x><h1 id='x'>Hi &lt;there&gt; &#9731;</h1><p>line<br/>two</p>"
             + "<script>if(a<b){x('</p>')}</script><style>.c{color:red}</style><!-- n --><ul><li>a</li></ul>"
             + "</body></html>"
-    ),
+    )
 ] { ok = same(name, html) && ok }
 print(ok ? "ORACLE: ALL PASS" : "ORACLE: FAILURES")
 

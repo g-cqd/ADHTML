@@ -9,14 +9,23 @@
 // parsed as markup. The rarer states (CDATA sections, script-escape sub-states, the
 // full ~2200-entry named table) are deferred; the tree-construction stage layers on top.
 
+//
+// This target (`ADHTMLOracle`) is NOT a product and NOT in `.adbuildtools.json` `shippedTargets`:
+// the tokenizer exists only as the differential oracle for the shipping `HTMLTape` (HTMLTapeTests /
+// HTMLTapeRobustnessTests / HTMLTokenizerTests) and for the dev `ADHTMLPerfProbe`. Its entity
+// decoder is deliberately INDEPENDENT of `HTMLTape`'s (merging them would hollow out the
+// differential property); only the pure named-reference DATA table is shared (`ADHTMLCore`'s
+// `namedCharacterReferences`, `package`-visible) — shared data, independent decode logic.
+
+// The token types (`HTMLToken` / `HTMLAttribute`) are the shipping module's — the differential
+// compares values of the SAME type, so the oracle re-exports nothing of its own.
+public import ADHTMLCore
+
 // swiftlint:disable type_body_length file_length
-// GRANDFATHERED EXCEPTION (tracked). `HTMLTokenizer` is the WHATWG reference tokenizer used only as a
-// differential oracle (HTMLTapeTests / HTMLTapeRobustnessTests) and the dev ADHTMLPerfProbe — the
-// SHIPPING parse path is `HTMLTape`, not this. `Machine.step` (cyclomatic ~51, body ~291) plus the
-// entity decoder push `Machine` (~556) and this file (~576) past the size gates (the cyclomatic and
-// function-body gates on `step` are suppressed at its definition below). The clean fix is to RELOCATE
-// this oracle out of the gated library (a test-support target, or behind ADHTML_DEV): that removes
-// ~671 lines of unused public surface AND all of these violations at once — deferred, not lost.
+// Deliberate size exceptions (out of the shipped-tree gate): this file mirrors the WHATWG
+// tokenization states 1:1 — a spec-shaped single `Machine` is what makes it trustworthy as an
+// oracle, so it is not decomposed to fit the shipped metrics. `Machine.step`'s cyclomatic/body
+// suppression sits at its definition below for the same reason.
 public enum HTMLTokenizer {
     public static func tokenize(_ html: String) -> [HTMLToken] {
         let machine = Machine(html)
@@ -658,16 +667,3 @@ private final class Machine {
         (scalar >= "a" && scalar <= "z") || (scalar >= "A" && scalar <= "Z")
     }
 }
-
-/// The common named character references (the full ~2200-entry WHATWG table is a
-/// follow-up; these cover Apple developer-doc HTML). Shared with the byte-level tape
-/// tokenizer (`HTMLTape`).
-let namedCharacterReferences: [String: String] = [
-    "amp": "&", "lt": "<", "gt": ">", "quot": "\"", "apos": "'", "nbsp": "\u{A0}",
-    "copy": "\u{A9}", "reg": "\u{AE}", "trade": "\u{2122}", "hellip": "\u{2026}",
-    "mdash": "\u{2014}", "ndash": "\u{2013}", "lsquo": "\u{2018}", "rsquo": "\u{2019}",
-    "ldquo": "\u{201C}", "rdquo": "\u{201D}", "middot": "\u{B7}", "bull": "\u{2022}",
-    "deg": "\u{B0}", "times": "\u{D7}", "divide": "\u{F7}", "frac12": "\u{BD}",
-    "laquo": "\u{AB}", "raquo": "\u{BB}", "rarr": "\u{2192}", "larr": "\u{2190}",
-    "harr": "\u{2194}", "hearts": "\u{2665}", "check": "\u{2713}", "cross": "\u{2717}"
-]

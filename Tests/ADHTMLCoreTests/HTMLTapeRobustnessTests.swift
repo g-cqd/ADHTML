@@ -5,6 +5,7 @@
 // correctness on well-formed input is gated by HTMLTapeTests' differential check; here any non-crash
 // result is acceptable.
 
+import ADHTMLOracle
 import ADTestKit
 import Testing
 

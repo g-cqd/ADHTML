@@ -1,6 +1,7 @@
-// HTMLTape — the high-performance byte-level HTML tokenizer. Where `HTMLTokenizer` is the
-// correctness-first reference (a `[Unicode.Scalar]` state machine emitting `[HTMLToken]` with a
-// String per token), this scans the raw UTF-8 bytes ONCE into a single flat preorder tape of
+// HTMLTape — the high-performance byte-level HTML tokenizer. Where `HTMLTokenizer` (the
+// correctness-first reference, now in the non-shipped `ADHTMLOracle` target) is a
+// `[Unicode.Scalar]` state machine emitting `[HTMLToken]` with a String per token, this scans
+// the raw UTF-8 bytes ONCE into a single flat preorder tape of
 // `UInt64` slots holding zero-copy (offset, length) ranges — no per-token String, no scalar
 // expansion, and (crucially) NO side allocations: a start tag and its attributes are encoded inline
 // in the one tape (ADJSON's "everything in the tape" rule), so a build allocates exactly twice — the

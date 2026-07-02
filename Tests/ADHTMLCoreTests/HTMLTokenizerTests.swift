@@ -1,11 +1,12 @@
-// Gate for the pure-Swift WHATWG HTML tokenizer. Covers tags + attributes, character
-// references, comments, DOCTYPE, and the cases a real parser gets right where regex
-// can't: raw-text (<script>/<style>) content is NOT parsed as markup, and RCDATA
-// (<title>) decodes entities without parsing markup.
+// Gate for the pure-Swift WHATWG HTML tokenizer (the `ADHTMLOracle` differential reference — not
+// the shipping parse path, which is `HTMLTape`). Covers tags + attributes, character references,
+// comments, DOCTYPE, and the cases a real parser gets right where regex can't: raw-text
+// (<script>/<style>) content is NOT parsed as markup, and RCDATA (<title>) decodes entities
+// without parsing markup.
 
+import ADHTMLCore
+import ADHTMLOracle
 import Testing
-
-@testable import ADHTMLCore
 
 struct HTMLTokenizerTests {
     @Test func tagsAndAttributes() {
@@ -16,10 +17,10 @@ struct HTMLTokenizerTests {
                     name: "a",
                     attributes: [
                         .init(name: "href", value: "x"), .init(name: "class", value: "y"),
-                        .init(name: "disabled", value: ""),
+                        .init(name: "disabled", value: "")
                     ], selfClosing: false),
                 .text("text"),
-                .endTag(name: "a"),
+                .endTag(name: "a")
             ])
     }
 
@@ -47,7 +48,7 @@ struct HTMLTokenizerTests {
             tokens == [
                 .startTag(name: "script", attributes: [], selfClosing: false),
                 .text("if (a<b) x('</p>')"),
-                .endTag(name: "script"),
+                .endTag(name: "script")
             ])
     }
 
@@ -57,7 +58,7 @@ struct HTMLTokenizerTests {
             tokens == [
                 .startTag(name: "style", attributes: [], selfClosing: false),
                 .text("a{color:red}"),
-                .endTag(name: "style"),
+                .endTag(name: "style")
             ])
     }
 
@@ -68,7 +69,7 @@ struct HTMLTokenizerTests {
             tokens == [
                 .startTag(name: "title", attributes: [], selfClosing: false),
                 .text("A & B"),
-                .endTag(name: "title"),
+                .endTag(name: "title")
             ])
     }
 }
