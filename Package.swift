@@ -169,6 +169,28 @@ let package = Package(
             ],
             swiftSettings: testSettings),
         .testTarget(name: "ADHTMLTests", dependencies: ["ADHTML"], swiftSettings: testSettings),
+
+        // Expansion-assertion tests for the `.macro` target itself (the ADDB/URLBuilder idiom):
+        // SwiftSyntaxMacrosGenericTestSupport's `assertMacroExpansion` with failures routed into
+        // Swift Testing (the plain SwiftSyntaxMacrosTestSupport product is XCTest-bound). Behavioral
+        // macro coverage (declaration -> plugin -> runtime) stays in ADHTMLTests; this target pins
+        // the expansions + diagnostics of each macro implementation directly. `@testable import
+        // ADHTMLMacros` links the macro OBJECT (its `@main` CompilerPlugin entry and every
+        // SwiftSyntax reference) into the test bundle, so mirror the macro target's full
+        // swift-syntax product set here or the symbols are undefined at link on a clean build.
+        .testTarget(
+            name: "ADHTMLMacrosTests",
+            dependencies: [
+                "ADHTMLMacros",
+                .product(name: "SwiftSyntax", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
+                .product(name: "SwiftSyntaxMacrosGenericTestSupport", package: "swift-syntax"),
+                .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
+                .product(name: "SwiftDiagnostics", package: "swift-syntax")
+            ],
+            swiftSettings: testSettings),
         .testTarget(
             name: "ADHTMLXSSTests",
             dependencies: ["ADHTMLCore", .product(name: "ADTestKit", package: "ADFoundation")],
