@@ -91,6 +91,8 @@ jobs:
       - uses: actions/checkout@v6
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
+        uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Build the test bundle under the default (swiftbuild) engine
         id: probe
         continue-on-error: true
@@ -125,6 +127,8 @@ jobs:
       - uses: actions/checkout@v6
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
+        uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Build for ${{ matrix.platform }}
         run: >-
           xcodebuild build
@@ -145,6 +149,8 @@ jobs:
       - uses: actions/checkout@v6
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
+        uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Install jemalloc (package-benchmark malloc metrics)
         run: brew install jemalloc
       - name: Run the benchmark suite
@@ -217,6 +223,8 @@ jobs:
       - uses: actions/checkout@v6
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
+        uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Build & test the SRI target
         run: swift test --build-system native --filter ADHTMLSRITests
 
@@ -230,6 +238,8 @@ jobs:
       - uses: actions/checkout@v6
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
+        uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Build DocC (warnings as errors)
         run: |
           swift package --build-system native --allow-writing-to-directory "$PWD/_docs_check" \
@@ -260,6 +270,8 @@ jobs:
       - uses: actions/checkout@v6
       - name: Select latest Xcode
         run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
+      - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
+        uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Test under the ${{ matrix.name }} sanitizer
         run: swift test --build-system native ${{ matrix.flags }}
 
