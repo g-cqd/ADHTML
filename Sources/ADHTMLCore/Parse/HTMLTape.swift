@@ -318,7 +318,9 @@ extension HTMLTape {
             return k
         }
 
-        // Case-insensitive compare of p[off ..< off+lit.count] to an ASCII byte literal.
+        // Case-insensitive compare of p[off ..< off+lit.count] to an ASCII byte literal. Kept local:
+        // ADFCore.ByteCompare offers only case-SENSITIVE pointer equality, so there is no foundation
+        // primitive to dedup onto (the per-byte `lower` is already built on ADFCore.ASCII).
         func ciEqual(_ p: UnsafePointer<UInt8>, _ off: Int, _ lit: [UInt8]) -> Bool {
             for j in 0 ..< lit.count where lower(unsafe p[off + j]) != lit[j] { return false }
             return true
@@ -374,6 +376,10 @@ private let ampersand: UInt8 = 0x26  // &
 private let dquote: UInt8 = 0x22  // "
 private let squote: UInt8 = 0x27  // '
 
+/// HTML "ASCII whitespace" (WHATWG infra §4.7): TAB, LF, FF, CR, SPACE. Deliberately NOT deduped
+/// onto an `ADFCore.ASCII` predicate — the foundation has no whitespace classifier, and HTML's set
+/// differs from other formats' (e.g. JSON's insignificant whitespace has no FF), so encoding the
+/// spec's exact set here keeps the tokenizer's semantics local and spec-true.
 @inline(__always) private func isSpace(_ b: UInt8) -> Bool {
     b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0C || b == 0x0D
 }
@@ -469,7 +475,14 @@ extension HTMLTape {
     }
 
     /// Decode HTML entities in `source[off ..< off+len]`, copying non-entity byte runs verbatim
-    /// (UTF-8-correct) and resolving `&name;` / `&#nnn;` / `&#xhh;` via the shared reference table.
+    /// (UTF-8-correct) and resolving `&name;` / `&#nnn;` / `&#xhh;` via the shared
+    /// `namedCharacterReferences` DATA table.
+    ///
+    /// DEDUP BOUNDARY (deliberate): the `ADHTMLOracle` reference tokenizer carries its own,
+    /// independent entity decoder over `[Unicode.Scalar]`. Only the named-reference TABLE (pure
+    /// spec data, `NamedCharacterReferences.swift`) is shared — merging the decode LOGIC would
+    /// hollow out the differential property the HTMLTape tests rely on (two independent
+    /// implementations agreeing). Do not unify them.
     private func decodeEntities(_ off: Int, _ len: Int) -> String {
         var out = ""
         out.reserveCapacity(len)
@@ -505,16 +518,17 @@ extension HTMLTape {
             var value: UInt32 = 0
             var any = false
             while k < end {
+                // Digit classification/valuation via the ADFCore kernels (`Hex.value` is the family's
+                // one hex-digit decoder) instead of hand-rolled byte ranges; accumulation order and
+                // termination are unchanged.
                 let byte = source[k]
                 let digit: UInt32
-                if ASCII.isDigit(byte) {
-                    digit = UInt32(byte - 0x30)
-                } else if isHex, byte >= 0x61, byte <= 0x66 {
-                    digit = UInt32(byte - 0x61 + 10)
-                } else if isHex, byte >= 0x41, byte <= 0x46 {
-                    digit = UInt32(byte - 0x41 + 10)
+                if isHex {
+                    guard let nibble = Hex.value(byte) else { break }
+                    digit = UInt32(nibble)
                 } else {
-                    break
+                    guard ASCII.isDigit(byte) else { break }
+                    digit = UInt32(byte - 0x30)
                 }
                 value = value &* (isHex ? 16 : 10) &+ digit
                 any = true
