@@ -1,9 +1,8 @@
-import Testing
-
 import ADHTMLCore  // div / form / button / .render
 import ADHTMLNIO  // ctx.view (the dual-mode page/fragment render a handler returns)
 import ADServeCore  // ResponseContent
 import ADServeDSL  // StorageContext
+import Testing
 
 @testable import ADHTMLActions
 

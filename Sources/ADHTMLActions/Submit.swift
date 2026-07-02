@@ -5,10 +5,9 @@
 // the RFC-0019 `Action` + a native form fallback verbatim — no new wire token, no client/runtime change.
 
 public import ADHTMLCore  // HTML, form, the Action STRUCT, RegionID, Tags.Form
+internal import ADHTMLNIO  // ctx.view (the page/fragment render the action signer wraps)
 public import ADServeCore  // ResponseContent
 public import ADServeDSL  // HandlerContext
-
-internal import ADHTMLNIO  // ctx.view (the page/fragment render the action signer wraps)
 
 /// The per-request action-signing context installed around a render so `.submits(to:)` can mint a token.
 public enum ActionRenderContext {
@@ -23,12 +22,6 @@ public enum ActionRenderContext {
         let now: Int
         /// The default token lifetime (seconds) minted at the call site — short, to bound the replay window.
         static let ttl = 300
-
-        init(signer: ActionSigner, sessionCookie: String?, now: Int) {
-            self.signer = signer
-            self.sessionCookie = sessionCookie
-            self.now = now
-        }
 
         func token(for id: ActionID) -> String {
             signer.mint(id: id.raw, ttl: Self.ttl, sessionCookie: sessionCookie, now: now)

@@ -1,7 +1,6 @@
-import Testing
-
 import ADHTMLCore  // button / .render() (MemberImportVisibility needs the defining module)
 import ADServeCore  // ResponseContent for the dummy handler
+import Testing
 
 @testable import ADHTMLActions
 
@@ -39,28 +38,36 @@ import ADServeCore  // ResponseContent for the dummy handler
     @Test func `every failure mode is fail-closed`() throws {
         let (signer, table, id) = try fixture()
         let wire = signer.mint(id: id.raw, ttl: 900, sessionCookie: "sess1234", now: 1000)
-        #expect(table.resolve(pathID: nil, token: wire, sessionCookie: "sess1234", now: 1500, signer: signer)
-            == .forbidden("bad action"))  // missing path id
-        #expect(table.resolve(pathID: id.raw, token: "garbage", sessionCookie: "sess1234", now: 1500, signer: signer)
-            == .forbidden("bad token"))  // tampered token
-        #expect(table.resolve(pathID: id.raw, token: nil, sessionCookie: "sess1234", now: 1500, signer: signer)
-            == .forbidden("bad token"))  // absent token
-        #expect(table.resolve(pathID: "elsewhere", token: wire, sessionCookie: "sess1234", now: 1500, signer: signer)
-            == .forbidden("action mismatch"))  // confused deputy
-        #expect(table.resolve(pathID: id.raw, token: wire, sessionCookie: "sess1234", now: 2000, signer: signer)
-            == .forbidden("expired"))  // now > exp = 1000 + 900
-        #expect(table.resolve(pathID: id.raw, token: wire, sessionCookie: "attacker", now: 1500, signer: signer)
-            == .forbidden("csrf"))  // the request's session binding differs from the token's
+        #expect(
+            table.resolve(pathID: nil, token: wire, sessionCookie: "sess1234", now: 1500, signer: signer)
+                == .forbidden("bad action"))  // missing path id
+        #expect(
+            table.resolve(pathID: id.raw, token: "garbage", sessionCookie: "sess1234", now: 1500, signer: signer)
+                == .forbidden("bad token"))  // tampered token
+        #expect(
+            table.resolve(pathID: id.raw, token: nil, sessionCookie: "sess1234", now: 1500, signer: signer)
+                == .forbidden("bad token"))  // absent token
+        #expect(
+            table.resolve(pathID: "elsewhere", token: wire, sessionCookie: "sess1234", now: 1500, signer: signer)
+                == .forbidden("action mismatch"))  // confused deputy
+        #expect(
+            table.resolve(pathID: id.raw, token: wire, sessionCookie: "sess1234", now: 2000, signer: signer)
+                == .forbidden("expired"))  // now > exp = 1000 + 900
+        #expect(
+            table.resolve(pathID: id.raw, token: wire, sessionCookie: "attacker", now: 1500, signer: signer)
+                == .forbidden("csrf"))  // the request's session binding differs from the token's
     }
 
     @Test func `a session-required action rejects a session-less request`() throws {
         let (signer, table, id) = try fixture(requiresSession: true)
         let wire = signer.mint(id: id.raw, ttl: 900, sessionCookie: nil, now: 0)  // minted session-less
-        #expect(table.resolve(pathID: id.raw, token: wire, sessionCookie: nil, now: 1, signer: signer)
-            == .forbidden("session required"))
+        #expect(
+            table.resolve(pathID: id.raw, token: wire, sessionCookie: nil, now: 1, signer: signer)
+                == .forbidden("session required"))
         // with a session it runs
         let bound = signer.mint(id: id.raw, ttl: 900, sessionCookie: "abc.tag", now: 0)
-        #expect(table.resolve(pathID: id.raw, token: bound, sessionCookie: "abc.tag", now: 1, signer: signer) == .run(id))
+        #expect(
+            table.resolve(pathID: id.raw, token: bound, sessionCookie: "abc.tag", now: 1, signer: signer) == .run(id))
     }
 
     @Test func `a valid token for an UNREGISTERED action is 404, not 403`() throws {
@@ -91,7 +98,8 @@ import ADServeCore  // ResponseContent for the dummy handler
     @Test func `ServerActionForm lowers to a native form + the RFC-0019 Action + the signed field`() {
         let html = ServerActionForm(ActionID("xyz"), token: "T", target: "r") {
             button { "X" }.attribute("type", "submit")
-        }.render()
+        }
+        .render()
         #expect(
             html == #"<form method="post" action="/_adh/act/xyz" data-p="post" data-q="/_adh/act/xyz" "#
                 + #"data-u="r" data-v="a"><input type="hidden" name="_adh" value="T">"#

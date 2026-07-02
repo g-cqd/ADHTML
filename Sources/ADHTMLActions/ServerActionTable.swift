@@ -115,7 +115,8 @@ public struct ServerActionTable: Sendable {
 /// Constant-time UTF-8 equality (no early exit on the first differing byte → closes the timing oracle on the
 /// CSRF binding compare; the length difference is mixed in, so it is length-safe too).
 @usableFromInline func ctEqual(_ a: String, _ b: String) -> Bool {
-    let x = Array(a.utf8), y = Array(b.utf8)
+    let x = Array(a.utf8)
+    let y = Array(b.utf8)
     var diff = UInt8(x.count == y.count ? 0 : 1)
     for index in 0 ..< Swift.max(x.count, y.count) {
         diff |= (index < x.count ? x[index] : 0) ^ (index < y.count ? y[index] : 0)
