@@ -3,6 +3,7 @@
 // tags (list items, table cells/rows, omitted `</p>`), scoped auto-closing (a nested list's `<li>`
 // must not close the outer one), stray-end-tag recovery, and adjacent-text coalescing.
 
+import ADTestKit
 import Testing
 
 @testable import ADHTMLCore
@@ -148,13 +149,26 @@ struct HTMLTreeTests {
         // overflow the native stack. 20_000 nested <div> (well past any stack limit) parses, but the tree is
         // capped (over-deep opens coerce to childless leaves), and markdown()/plainText() complete WITHOUT
         // crashing and still surface the innermost text.
+        // The cap-legal ~128-deep walks recurse once per level, so they run on the kit's pinned
+        // depth-sweep stack (512 KiB uninstrumented — the family worker floor — scaled under a
+        // sanitizer, whose frame inflation overflowed the cooperative-pool stack here); the
+        // assertions stay on the test task.
         let n = 20_000
         let html = String(repeating: "<div>", count: n) + "DEEP" + String(repeating: "</div>", count: n)
-        let parsed = HTMLNode.parse(html)
+        let (depth, plainHasDeep, markdownHasDeep) = runOnConstrainedStack(
+            stackSize: DepthSweep.defaultStackSize
+        ) { () -> (Int, Bool, Bool) in
+            let parsed = HTMLNode.parse(html)
+            return (
+                self.treeDepth(parsed),
+                parsed.first?.plainText().contains("DEEP") == true,
+                parsed.first?.markdown().contains("DEEP") == true
+            )
+        }
 
         // Bounded far below the 20_000 input depth (the builder's cap + the leaf level) — proof the cap held.
-        #expect(treeDepth(parsed) <= 130)
-        #expect(parsed.first?.plainText().contains("DEEP") == true)  // walk completed; content preserved
-        #expect(parsed.first?.markdown().contains("DEEP") == true)  // the recursive markdown walk is safe
+        #expect(depth <= 130)
+        #expect(plainHasDeep)  // walk completed; content preserved
+        #expect(markdownHasDeep)  // the recursive markdown walk is safe
     }
 }
