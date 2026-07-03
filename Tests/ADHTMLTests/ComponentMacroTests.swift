@@ -5,7 +5,7 @@ import Testing
 // (declaration -> plugin -> expansion -> behavior). A component with `@State` is an InteractiveComponent:
 // it AUTO-WRAPS its body in a hydration island with an inferred scope, so the author writes NO `Island`,
 // `scope:`, or `.id` (RFC-0005 §3.0). Components are file-scope (extension macros cannot attach to nested
-// types). Build with `--build-system native` (see CONTRIBUTING).
+// types).
 
 @Component
 struct MacroCounter {

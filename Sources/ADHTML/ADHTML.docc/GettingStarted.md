@@ -23,11 +23,6 @@ Then depend on a product:
 - **`ADHTMLCore`** — the Foundation-free engine on its own (DOM DSL, renderer, escaping, reactivity), if you
   want no macros.
 
-> Important: build with **`--build-system native`**. ADHTML ships a `.macro` target; on current toolchains
-> the newer `swiftbuild` engine mislinks the macro module into dependent test bundles. The classic `native`
-> build system handles macros correctly, so all `swift build` / `swift test` / `swift package` commands take
-> `--build-system native`.
-
 ## Optional, gated products
 
 Heavier or host-coupling features are gated by an environment variable, so consumers of the default products
@@ -42,7 +37,7 @@ never resolve their dependencies. Set the variable when resolving/building to op
 | `ADHTMLSRI` | `ADHTML_SRI` | Subresource Integrity tokens for the client runtime |
 
 ```sh
-ADHTML_MARKDOWN=1 swift build --build-system native
+ADHTML_MARKDOWN=1 swift build
 ```
 
 > Note: the core component-scoped-asset *surface* (`ScopedStyle` / `Script`) is always available in
@@ -107,7 +102,7 @@ reference covers how the wire works.
 The DocC plugin is dev-gated. To generate this documentation locally:
 
 ```sh
-ADHTML_DEV=1 swift package --build-system native generate-documentation \
+ADHTML_DEV=1 swift package generate-documentation \
     --target ADHTMLCore --target ADHTML
 ```
 

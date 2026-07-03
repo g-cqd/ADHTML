@@ -29,12 +29,12 @@ The toolchain's bundled `swift format` powers the plugins; no extra tools needed
 
 ## Build system & toolchain
 
-**Build with `--build-system native`.** ADHTML has a `.macro` target (`ADHTMLMacros`). The newer
-default `swiftbuild` engine on the current Xcode-beta toolchain mislinks the macro module into
-dependent test bundles (`swift test` fails to link with undefined `SwiftSyntax` symbols) — a
-SwiftPM/toolchain bug, not an ADHTML one. The classic **`native`** build system handles macros
-correctly, so all `swift build` / `swift test` / `swift package` commands take `--build-system native`
-(CI does too). Drop the flag once the swiftbuild macro/test-link bug is fixed (ADR-0008).
+**Build with the default engine — plain `swift build` / `swift test` / `swift package`.** ADHTML has a
+`.macro` target (`ADHTMLMacros`). The default `swiftbuild` engine once mislinked the macro module into
+dependent test bundles (`swift test` failed to link with undefined `SwiftSyntax` symbols) — a
+SwiftPM/toolchain bug, not an ADHTML one — which forced `--build-system native`. That bug is **fixed**
+on the pinned Swift 6.4 snapshot (2026-06-15; ADR-0008), so no build-system flag is needed: the default
+engine builds and tests the whole package, macro test bundles included (CI does too).
 
 **After changing parameter ownership (`borrowing` ↔ `consuming`), do a clean build** (`swift package
 clean`). That changes the calling convention (an ABI change), and an *incremental* build can leave the
@@ -47,9 +47,9 @@ The toolchain is pinned to **Swift 6.4** via [`.swift-version`](.swift-version).
 ## Everyday commands
 
 ```sh
-swift build --build-system native                          # build (see "Build system" above)
-swift test  --build-system native                          # run the test suite
-swift test  --build-system native --enable-code-coverage
+swift build                                 # build
+swift test                                  # run the test suite
+swift test --enable-code-coverage
 
 swift package format        # format in place (add --allow-writing-to-package-directory if prompted)
 swift package lint          # formatting gate + shipped-library discipline (what CI runs)

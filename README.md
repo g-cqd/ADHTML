@@ -91,14 +91,14 @@ resolves them from `github.com/g-cqd`):
 ```sh
 export ADFOUNDATION_PATH=../ADFoundation
 export ADJSON_PATH=../ADJSON
-swift build --build-system native
-swift test  --build-system native
+swift build
+swift test
 ```
 
-**Use `--build-system native`.** ADHTML has a `.macro` target; the newer default `swiftbuild` engine on
-the current toolchain mislinks the macro module into test bundles, while the classic `native` build
-system handles macros correctly (see [CONTRIBUTING](CONTRIBUTING.md); drop the flag once the swiftbuild
-bug is fixed). The toolchain is pinned to **Swift 6.4** via [`.swift-version`](.swift-version).
+The default `swiftbuild` engine builds and tests the whole package — including the `.macro` target's
+test bundles — cleanly; no `--build-system native` is needed (the swiftbuild macro/test-link bug that
+once required it is fixed on the pinned snapshot — see [CONTRIBUTING](CONTRIBUTING.md) / ADR-0008). The
+toolchain is pinned to **Swift 6.4** via [`.swift-version`](.swift-version).
 
 Deployment floor: macOS 15 / iOS 18 / tvOS 18 / watchOS 11 / visionOS 2 (pinned by stdlib
 `Synchronization.Mutex`). `Span` is adopted (it back-deploys); `InlineArray`/`UTF8Span` are
@@ -124,7 +124,7 @@ components, derived state (`@Bound`), Markdown-in-builder, and component-scoped 
 reactivity specs. Build it locally:
 
 ```sh
-ADHTML_DEV=1 swift package --build-system native generate-documentation --target ADHTMLCore --target ADHTML
+ADHTML_DEV=1 swift package generate-documentation --target ADHTMLCore --target ADHTML
 ```
 
 ## Design corpus

@@ -7,7 +7,8 @@
   `<name>Signal` accessor backed by an ambient `ADHTMLRenderContext`), `@Component` (extension macro
   adding `Component` conformance; per-instance render scoping is intrinsic to `Component._render`). The
   surface stayed lean — no `#html` tokenizer macro yet (deferred). swift-syntax confined to the `.macro`
-  target; built with `--build-system native`.
+  target; built with the default `swiftbuild` engine (the bug that once forced `--build-system native`
+  is resolved — see the build-system note).
 
 ## Context
 
@@ -44,7 +45,15 @@ swift-syntax gating are locked.
 - `@dynamicMemberLookup` is used only where it genuinely improves ergonomics (e.g. typed environment
   access), never as a stringly back door that would defeat ADR-0009's compile-time guarantees.
 
-## Build-system note — swiftbuild macro-in-test-bundle mislink (2026-06-20 investigation, RFC-0020)
+## Build-system note — swiftbuild macro-in-test-bundle mislink (2026-06-20 investigation, RFC-0020) — RESOLVED (2026-07-03)
+
+> **RESOLVED (2026-07-03).** The swiftbuild macro/test-link bug described below is **fixed** on the
+> pinned Swift 6.4 snapshot (2026-06-15): `swift build --build-system swiftbuild --build-tests` links
+> the test bundle clean and `swift test` passes on the default engine (215 tests, 35 suites). The
+> `swiftbuild-macro-canary` fired on 2026-07-03 (its "good red"), so `--build-system native` was dropped
+> from `Package.swift`, `.github/workflows/ci.yml`, `README.md`, `CONTRIBUTING.md`, the macro-test
+> headers, and the DocC guides, and the canary job was retired — the default-engine build/test legs are
+> now themselves the regression guard. The historical analysis below is retained for the record.
 
 The reason every build takes `--build-system native` is a **swiftbuild bug, not an ADHTML structuring
 problem** — confirmed by isolating the failure on the pinned toolchain:

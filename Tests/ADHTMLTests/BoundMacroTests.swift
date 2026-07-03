@@ -6,7 +6,7 @@ import Testing
 // registers the author's `Reactive` expression as a CLIENT-RECOMPUTABLE computed cell — it serializes a
 // `WireExpr` (`e`), so the browser re-derives it with no server round-trip (RFC-0005 §3.5 / ADR-0015
 // Phase D, the rename of `@Derived`). A `@Bound` member alone makes the component an island. Components
-// are file-scope (extension macros cannot attach to nested types). Build with `--build-system native`.
+// are file-scope (extension macros cannot attach to nested types).
 
 @Component
 struct BoundDouble {

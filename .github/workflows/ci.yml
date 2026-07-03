@@ -6,12 +6,13 @@
 # (the manifest default when <DEP>_PATH is unset), so the resolution-dependent legs gate on
 # AD_SWIFT_SIBLINGS_PUBLISHED.
 #
-# ADHTML's macro target needs `swift build/test --build-system native` (the classic build system) to
-# avoid the swiftbuild macro/test-link bug (ADR-0008). RESOLVED: the reusable workflow now takes a
-# `build-system` input (ADBuildTools swift-quality.yml), and the `quality:` job below passes
-# `build-system: native`, so its macOS/Linux build/test/lint legs use the classic engine too. The
-# package-unique jobs below also keep `--build-system native`. The `swiftbuild-macro-canary` job is
-# the signal to drop all of this once the upstream toolchain bug is fixed.
+# ADHTML's macro target (`ADHTMLMacros`, a `.macro` plugin) once needed `swift build/test
+# --build-system native` (the classic build system) to dodge a swiftbuild macro/test-link bug
+# (ADR-0008). RESOLVED (2026-07-03): that bug was fixed on the 2026-06-15 Swift 6.4 snapshot — the
+# `swiftbuild-macro-canary` fired on 2026-07-03 (swiftbuild built the test bundle CLEAN) — so
+# `--build-system native` was dropped everywhere and the canary retired. The common legs (the
+# reusable ADBuildTools swift-quality.yml) and every package-unique job below now build/test on the
+# DEFAULT (swiftbuild) engine, which is itself the regression guard.
 name: CI
 
 on:
@@ -51,18 +52,13 @@ jobs:
       sanitizers: "address thread"
       enable-coverage: true
       requires-published-siblings: true
-      # ADR-0008: the macro/test-link bug forces the classic engine on every build/test, so the
-      # reusable legs run under `--build-system native` too. Effective once siblings are published
-      # (the resolution-dependent legs are gated on AD_SWIFT_SIBLINGS_PUBLISHED). The
-      # `swiftbuild-macro-canary` job below flags when this can be dropped.
-      build-system: native
 
   linux:
     name: Build & test (Linux, Foundation-free core)
     needs: quality
     # ADHTMLCore is Foundation-free; building it in isolation on Linux guards portability — a check
     # the reusable's whole-package Linux leg doesn't make. Advisory while the tools-version tracks a
-    # toolchain only the nightly container ships. Uses `--build-system native` (ADR-0008 macro bug).
+    # toolchain only the nightly container ships.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     # Dated nightly pins the toolchain for reproducible CI; bump deliberately like a dependency (#14).
@@ -73,52 +69,9 @@ jobs:
       - name: Show toolchain
         run: swift --version
       - name: Build Foundation-free core
-        run: swift build --build-system native --target ADHTMLCore
+        run: swift build --target ADHTMLCore
       - name: Build & test full package
-        run: swift test --build-system native
-
-  swiftbuild-macro-canary:
-    name: swiftbuild macro canary (ADR-0008)
-    needs: quality
-    # ADR-0008: every ADHTML build takes `--build-system native` because the default `swiftbuild`
-    # engine mislinks the `.macro` plugin (ADHTMLMacros) into TEST bundles on the pinned toolchain
-    # (undefined SwiftSyntax symbols at link time). This canary builds the test bundle under the
-    # DEFAULT (swiftbuild) engine and is GREEN only while the bug persists; it turns RED on purpose
-    # the day swiftbuild links macros correctly — the signal to drop `--build-system native`
-    # everywhere and close ADR-0008's build-system note. This is the "run both build systems in CI
-    # so the workaround can't silently rot" guard (mirrors the `sri` job's never-rot doctrine,
-    # inverted: it guards a workaround, not a feature). A resolution failure (unpublished siblings)
-    # also keeps it green — a real fix can only surface as a clean BUILD, so a false-green just
-    # retains the workaround (the safe direction). Filable upstream repro:
-    # docs/upstream/swiftbuild-macro-test-bundle-mislink.md.
-    if: github.event_name != 'pull_request'
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v6
-      - name: Select latest Xcode
-        run: sudo xcode-select -s "$(ls -d /Applications/Xcode_*.app | sort -V | tail -1)"
-      - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
-        uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
-      - name: Build the test bundle under the default (swiftbuild) engine
-        id: probe
-        continue-on-error: true
-        run: swift build --build-system swiftbuild --build-tests
-      - name: Assert the bug still requires the workaround
-        env:
-          OUTCOME: ${{ steps.probe.outcome }}
-        run: |
-          if [ "$OUTCOME" = "success" ]; then
-            echo "::error title=ADR-0008::swiftbuild built the ADHTML test bundle CLEAN — the macro/test-link bug appears FIXED. Drop '--build-system native' across Package.swift comments, ci.yml, and CONTRIBUTING.md, and mark ADR-0008's build-system note resolved."
-            {
-              echo "### 🟢 swiftbuild macro/test-link bug appears FIXED"
-              echo "\`swift build --build-system swiftbuild --build-tests\` succeeded on this toolchain."
-              echo ""
-              echo "**Action:** drop \`--build-system native\` from Package.swift comments, \`ci.yml\`, and \`CONTRIBUTING.md\`; mark ADR-0008's build-system note **resolved**."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "swiftbuild test-bundle build still fails (expected — ADR-0008). '--build-system native' remains required."
-          echo "### 🔴 swiftbuild macro/test-link bug persists (expected) — \`--build-system native\` still required (ADR-0008)." >> "$GITHUB_STEP_SUMMARY"
+        run: swift test
 
   platforms:
     name: Build (${{ matrix.platform }})
@@ -164,7 +117,7 @@ jobs:
           ADHTML_DEV: "1"
         run: |
           set -o pipefail
-          swift package --build-system native --allow-writing-to-package-directory benchmark --format markdown | tee bench.md
+          swift package --allow-writing-to-package-directory benchmark --format markdown | tee bench.md
       - name: Regression check vs committed baseline
         # Advisory (the job is continue-on-error) and guarded: a no-op until a baseline is captured on this
         # runner class (hosted timings miscalibrate against a dev machine — capture via
@@ -176,7 +129,7 @@ jobs:
           ADHTML_DEV: "1"
         run: |
           if ls -d .benchmarkBaselines/*/main >/dev/null 2>&1; then
-            swift package --build-system native --allow-writing-to-package-directory benchmark baseline check main
+            swift package --allow-writing-to-package-directory benchmark baseline check main
           else
             echo "No committed baseline yet — capture one on this runner class, then commit .benchmarkBaselines/main/."
           fi
@@ -200,12 +153,12 @@ jobs:
       - name: Build fuzz target
         env:
           ADHTML_FUZZ: "1"
-        run: swift build --build-system native --product ADHTMLFuzz
+        run: swift build --product ADHTMLFuzz
       - name: Run fuzzer (time-boxed)
         env:
           ADHTML_FUZZ: "1"
         run: |
-          BIN="$(swift build --build-system native --product ADHTMLFuzz --show-bin-path)/ADHTMLFuzz"
+          BIN="$(swift build --product ADHTMLFuzz --show-bin-path)/ADHTMLFuzz"
           mkdir -p corpus
           printf '<a href="javascript:alert(1)">x</a>' > corpus/seed.html
           "$BIN" corpus -max_total_time=180 -timeout=10 -rss_limit_mb=2048 -artifact_prefix=crash-
@@ -232,7 +185,7 @@ jobs:
       - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
         uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Build & test the SRI target
-        run: swift test --build-system native --filter ADHTMLSRITests
+        run: swift test --filter ADHTMLSRITests
 
   docs-check:
     name: Build docs (link check)
@@ -248,7 +201,7 @@ jobs:
         uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Build DocC (warnings as errors)
         run: |
-          swift package --build-system native --allow-writing-to-directory "$PWD/_docs_check" \
+          swift package --allow-writing-to-directory "$PWD/_docs_check" \
             generate-documentation \
             --enable-experimental-combined-documentation \
             --target ADHTMLCore --target ADHTML \
@@ -260,8 +213,8 @@ jobs:
     needs: quality
     # ASan+UBSan and TSan over the engine's unsafe surface (Escape/**, Render/**) and the Mutex-backed
     # concurrency layer (CellArena, AsyncByteSink). Slow (TSan ~5-15×), so main / dispatch only, advisory
-    # for now — promote to a hard gate once stable. `--build-system native` (the macro/test-link caveat,
-    # ADR-0008). The two passes are mutually exclusive (ASan and TSan can't combine).
+    # for now — promote to a hard gate once stable. The two passes are mutually exclusive (ASan and
+    # TSan can't combine).
     if: github.event_name != 'pull_request'
     runs-on: macos-26
     continue-on-error: true
@@ -279,7 +232,7 @@ jobs:
       - name: Install Swift 6.4 dev toolchain (no hosted macOS image ships 6.4)
         uses: g-cqd/ADBuildTools/.github/actions/setup-swift@v1
       - name: Test under the ${{ matrix.name }} sanitizer
-        run: swift test --build-system native ${{ matrix.flags }}
+        run: swift test ${{ matrix.flags }}
 
   runtime:
     name: Client runtime (bun)

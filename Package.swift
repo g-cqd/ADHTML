@@ -157,9 +157,9 @@ let package = Package(
             plugins: buildPlugins),
 
         // Umbrella: re-exports the core, declares the macros (impl in ADHTMLMacros), adds document
-        // assembly. Build with `--build-system native`: the newer `swiftbuild` engine on the current
-        // Xcode-beta toolchain mislinks the `.macro` module into dependent test bundles (a SwiftPM/
-        // toolchain issue, not ADHTML's). `native` handles macros correctly (ADR-0008; CONTRIBUTING).
+        // assembly. Builds under the default `swiftbuild` engine: the macro/test-link bug that once
+        // forced `--build-system native` (`swiftbuild` mislinking the `.macro` module into dependent
+        // test bundles) is fixed on the pinned Swift 6.4 snapshot (ADR-0008; CONTRIBUTING).
         .target(
             name: "ADHTML",
             dependencies: ["ADHTMLCore", "ADHTMLMacros"],
@@ -241,7 +241,7 @@ let package = Package(
         // A multi-file example app (RFC-0005 §7): components across files, implicit islands (@State ->
         // auto-island), a slotted layout, typed attribute enums + events. Built (not a product) so the
         // authoring DSL stays compilable; `swift run Storefront` prints the catalog page. Uses the
-        // umbrella (macros) -> build with `--build-system native`.
+        // umbrella (macros); builds under the default engine (no `--build-system native` — ADR-0008).
         .executableTarget(
             name: "Storefront", dependencies: ["ADHTML"], path: "Examples/Storefront",
             swiftSettings: strictSettings)

@@ -13,7 +13,7 @@ the engine's escaper, so untrusted Markdown can't inject markup.
 Enable the gate when resolving/building:
 
 ```sh
-ADHTML_MARKDOWN=1 swift build --build-system native
+ADHTML_MARKDOWN=1 swift build
 ```
 
 ```swift
