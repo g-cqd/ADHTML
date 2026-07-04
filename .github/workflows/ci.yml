@@ -78,6 +78,12 @@ jobs:
     needs: quality
     if: github.event_name != 'pull_request'
     runs-on: macos-26
+    # ADVISORY until an Xcode with SwiftPM >= 6.4 ships on runner images: xcodebuild resolves packages
+    # with its OWN embedded SwiftPM (Xcode 26.x = Swift 6.3.x), which cannot parse this package's
+    # swift-tools-version 6.4 manifest, so every leg dies at "Could not resolve package dependencies"
+    # (the installed 6.4 snapshot swaps compilers, not xcodebuild's resolver). Structural — never
+    # passable on this image generation; re-promote when Xcode 27 lands. Mirrors the ADJSON gate.
+    continue-on-error: true
     strategy:
       fail-fast: false
       matrix:
