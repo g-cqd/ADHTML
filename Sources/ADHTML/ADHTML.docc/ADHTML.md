@@ -66,4 +66,4 @@ hydration scope from the cells the component touches, and wraps the body in isla
 
 ### Document assembly
 
-- ``HTMLDocument``
+- ``HTMLDocument-struct``

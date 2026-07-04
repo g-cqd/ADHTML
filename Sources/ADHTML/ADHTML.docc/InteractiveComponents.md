@@ -102,7 +102,7 @@ nothing extra.
 
 ## Assembling a page
 
-`Page` builds the document scaffold from a head slot and a content slot; ``HTMLDocument`` is the lower-level
+`Page` builds the document scaffold from a head slot and a content slot; ``HTMLDocument-struct`` is the lower-level
 wrapper it uses:
 
 ```swift
