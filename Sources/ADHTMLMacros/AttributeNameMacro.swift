@@ -33,16 +33,18 @@ extension StringLiteralExprSyntax {
     }
 }
 
-/// A valid HTML attribute name: non-empty, no control characters, and none of space `"` `'` `>` `/` `=`
-/// (the HTML attribute-name grammar).
-func isValidAttributeName(_ name: String) -> Bool {
-    if name.isEmpty { return false }
-    for scalar in name.unicodeScalars {
-        if scalar.value <= 0x1F || scalar.value == 0x7F { return false }
-        switch scalar {
-            case " ", "\"", "'", ">", "/", "=": return false
-            default: continue
+extension AttributeNameMacro {
+    /// A valid HTML attribute name: non-empty, no control characters, and none of space `"` `'` `>` `/`
+    /// `=` (the HTML attribute-name grammar).
+    private static func isValidAttributeName(_ name: String) -> Bool {
+        if name.isEmpty { return false }
+        for scalar in name.unicodeScalars {
+            if scalar.value <= 0x1F || scalar.value == 0x7F { return false }
+            switch scalar {
+                case " ", "\"", "'", ">", "/", "=": return false
+                default: continue
+            }
         }
+        return true
     }
-    return true
 }

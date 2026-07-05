@@ -78,10 +78,10 @@ import Testing
     }
 
     @Test func `the CSRF binding compare is constant-time-equal`() {
-        #expect(ctEqual("abc123", "abc123"))
-        #expect(!ctEqual("abc123", "abc124"))  // last-byte diff
-        #expect(!ctEqual("abc", "abcd"))  // length diff
-        #expect(ctEqual("-", "-"))  // both session-less
+        #expect(ConstantTime.equal("abc123", "abc123"))
+        #expect(!ConstantTime.equal("abc123", "abc124"))  // last-byte diff
+        #expect(!ConstantTime.equal("abc", "abcd"))  // length diff
+        #expect(ConstantTime.equal("-", "-"))  // both session-less
     }
 
     // MARK: ActionID

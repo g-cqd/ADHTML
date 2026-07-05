@@ -56,7 +56,8 @@ extension HTML {
     /// The state is serialized up front (so a `.wire` failure surfaces before any bytes flush); the body
     /// streams for TTFB, then the state script is written as the final chunk.
     public consuming func renderHydratable<Sink: AsyncHTMLByteSink>(
-        into sink: Sink, arena: CellArena, chunkBytes: Int = 16 * 1024
+        into sink: Sink, arena: CellArena, maxDepth: Int = Renderer.defaultMaxDepth,
+        chunkBytes: Int = 16 * 1024
     ) async throws(StreamRenderError<Sink.Failure>) {
         var program = HTMLProgram()
         let node = self
@@ -66,12 +67,27 @@ extension HTML {
             Self._render(node, into: &program)
         }
 
+        // Collect islands AND enforce the open-tag-depth ceiling in one iterative pass — parity with the
+        // sync `renderHydratable` (RenderHydratable.swift), so an adversarial deeply-nested dynamic program
+        // is bounded here too (the emit is already iterative + cancellable; this bounds the lowering work).
         var islands: [WireIsland] = []
+        var depth = 0
         for op in program.ops {
-            if case .islandOpen(let id, let on, let scope, _, _) = op {
-                // Re-derive a `@Component` island's scope post-render (includes nested non-island helper
-                // cells); an explicit/Region island keeps its hand-listed `scope`.
-                islands.append(WireIsland(id: id, on: on, scope: arena.derivedIslandScope(forID: id) ?? scope))
+            switch op {
+                case .openTagStart:
+                    depth += 1
+                case .islandOpen(let id, let on, let scope, _, _):
+                    depth += 1
+                    // Re-derive a `@Component` island's scope post-render (includes nested non-island helper
+                    // cells); an explicit/Region island keeps its hand-listed `scope`.
+                    islands.append(WireIsland(id: id, on: on, scope: arena.derivedIslandScope(forID: id) ?? scope))
+                case .voidTagEnd, .closeTag, .islandClose:
+                    depth -= 1
+                default:
+                    break
+            }
+            if depth > maxDepth {
+                throw StreamRenderError.wire(.encoding("open-tag nesting exceeded maxDepth \(maxDepth)"))
             }
         }
 

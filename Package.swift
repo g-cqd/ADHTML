@@ -115,6 +115,8 @@ if isSRI {
 
 let orderedCollections: Target.Dependency = .product(name: "OrderedCollections", package: "swift-collections")
 let adfCore: Target.Dependency = .product(name: "ADFCore", package: "ADFoundation")
+// Runtime-dispatched SIMD byte kernels (the HTML escaper's stop scan).
+let adfKernels: Target.Dependency = .product(name: "ADFKernels", package: "ADFoundation")
 let adjsonCore: Target.Dependency = .product(name: "ADJSONCore", package: "ADJSON")
 
 // Build-time formatting enforcement attaches to the library only in dev/CI (gated like ADJSON).
@@ -152,7 +154,7 @@ let package = Package(
         // (ASCII/hash/byte primitives) — both Foundation-free with no transitive package deps.
         .target(
             name: "ADHTMLCore",
-            dependencies: [orderedCollections, adfCore, adjsonCore],
+            dependencies: [orderedCollections, adfCore, adfKernels, adjsonCore],
             swiftSettings: coreSettings,
             plugins: buildPlugins),
 

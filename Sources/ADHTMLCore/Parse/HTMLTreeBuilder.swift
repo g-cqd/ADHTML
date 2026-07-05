@@ -37,6 +37,11 @@ private struct TreeBuilder {
 
     private var stack: [Frame] = []
     private var roots: [HTMLNode] = []
+    /// Text accumulated since the last real node / stack change, flushed as ONE coalesced `.text` node.
+    /// Growing this buffer in place is amortized O(1); the previous `.text(prev + value)` coalescing
+    /// reallocated the whole accumulator each token — O(n²) over a run of text tokens separated by
+    /// no-node tokens (stray end tags, DOCTYPE), a CPU-DoS on untrusted HTML.
+    private var pendingText = ""
 
     /// Maximum element-nesting depth: beyond it a start tag is coerced to a childless LEAF instead of
     /// opening a new frame, so the built tree can never be deeper than this. The tokenizer + this builder
@@ -56,29 +61,34 @@ private struct TreeBuilder {
                 if selfClosing || voidElements.contains(name) || stack.count >= Self.maxDepth {
                     append(.element(tag: name, attributes: attrs, children: []))
                 } else {
+                    flushText()  // pending text belongs to the current parent, before the child opens
                     stack.append(Frame(tag: name, attributes: attrs, children: []))
                 }
             case .endTag(let name):
-                close(name)
+                close(name)  // a real close flushes via popFrame; a stray end tag keeps text coalescing
             case .text(let value):
-                appendText(value)
+                pendingText += value  // amortized O(1); flushed as one coalesced node on the next real event
             case .comment(let value):
                 append(.comment(value))
             case .doctype:
-                break  // DOCTYPE carries no DOM node
+                break  // DOCTYPE carries no DOM node — pending text keeps coalescing across it
         }
     }
 
     /// Close any still-open elements at end of input, outermost last, and return the roots.
     mutating func finish() -> [HTMLNode] {
+        flushText()
         while !stack.isEmpty { popFrame() }
         return roots
     }
 
     // MARK: - stack operations
 
-    /// Append a finished node to the current open element (or to the roots if none is open).
+    /// Append a finished node to the current open element (or to the roots if none is open). Any
+    /// accumulated text is flushed first so it precedes this node at the same level (a real node ends a
+    /// text run); flushing itself re-enters with a `.text` node, appended without re-flushing.
     private mutating func append(_ node: HTMLNode) {
+        if case .text = node {} else { flushText() }
         if stack.isEmpty {
             roots.append(node)
         } else {
@@ -86,27 +96,19 @@ private struct TreeBuilder {
         }
     }
 
-    /// Append text, coalescing with an immediately preceding text sibling.
-    private mutating func appendText(_ value: String) {
-        if value.isEmpty { return }
-        if stack.isEmpty {
-            if case .text(let prev) = roots.last {
-                roots[roots.count - 1] = .text(prev + value)
-            } else {
-                roots.append(.text(value))
-            }
-        } else {
-            let top = stack.count - 1
-            if case .text(let prev) = stack[top].children.last {
-                stack[top].children[stack[top].children.count - 1] = .text(prev + value)
-            } else {
-                stack[top].children.append(.text(value))
-            }
-        }
+    /// Flush the accumulated `pendingText` as a single coalesced `.text` node into the current insertion
+    /// point, then reset. Handing the buffer to the node (not copying) keeps accumulation O(n) overall.
+    private mutating func flushText() {
+        guard !pendingText.isEmpty else { return }
+        let text = pendingText
+        pendingText = ""
+        append(.text(text))
     }
 
-    /// Pop the innermost frame and nest it into its parent (or the roots).
+    /// Pop the innermost frame and nest it into its parent (or the roots). Pending text is flushed into
+    /// the frame FIRST (it was accumulated while this frame was the insertion point), before it closes.
     private mutating func popFrame() {
+        flushText()
         let frame = stack.removeLast()
         append(.element(tag: frame.tag, attributes: frame.attributes, children: frame.children))
     }
@@ -126,21 +128,21 @@ private struct TreeBuilder {
     private mutating func impliedClose(before name: String) {
         switch name {
             case "li":
-                closeToNearest(["li"], barrier: ["ul", "ol", "menu"])
+                closeToNearest(liTargets, barrier: listBarrier)
             case "dt", "dd":
-                closeToNearest(["dt", "dd"], barrier: ["dl"])
+                closeToNearest(defItemTargets, barrier: defListBarrier)
             case "option":
-                closeToNearest(["option"], barrier: ["select", "datalist", "optgroup"])
+                closeToNearest(optionTargets, barrier: optionBarrier)
             case "optgroup":
-                closeToNearest(["optgroup", "option"], barrier: ["select"])
+                closeToNearest(optgroupTargets, barrier: selectBarrier)
             case "tr":
-                closeToNearest(["tr"], barrier: ["table"])
+                closeToNearest(rowTargets, barrier: tableBarrier)
             case "td", "th":
-                closeToNearest(["td", "th"], barrier: ["tr", "table"])
+                closeToNearest(cellTargets, barrier: cellBarrier)
             case "thead", "tbody", "tfoot":
-                closeToNearest(["thead", "tbody", "tfoot"], barrier: ["table"])
+                closeToNearest(sectionTargets, barrier: tableBarrier)
             default:
-                if blockElements.contains(name) { closeToNearest(["p"], barrier: []) }
+                if blockElements.contains(name) { closeToNearest(paragraphTargets, barrier: noBarrier) }
         }
     }
 
@@ -182,3 +184,22 @@ private let blockElements: Set<String> = [
     "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hgroup", "hr", "main",
     "menu", "nav", "ol", "p", "pre", "section", "table", "ul"
 ]
+
+// Implied-end-tag close targets + scope barriers, hoisted to module constants so `impliedClose` does not
+// heap-allocate a fresh `Set` per structural start tag (`li`/`tr`/`td`/… — thousands of them in a large
+// table). A WHATWG element-scope approximation.
+private let liTargets: Set<String> = ["li"]
+private let listBarrier: Set<String> = ["ul", "ol", "menu"]
+private let defItemTargets: Set<String> = ["dt", "dd"]
+private let defListBarrier: Set<String> = ["dl"]
+private let optionTargets: Set<String> = ["option"]
+private let optionBarrier: Set<String> = ["select", "datalist", "optgroup"]
+private let optgroupTargets: Set<String> = ["optgroup", "option"]
+private let selectBarrier: Set<String> = ["select"]
+private let rowTargets: Set<String> = ["tr"]
+private let tableBarrier: Set<String> = ["table"]
+private let cellTargets: Set<String> = ["td", "th"]
+private let cellBarrier: Set<String> = ["tr", "table"]
+private let sectionTargets: Set<String> = ["thead", "tbody", "tfoot"]
+private let paragraphTargets: Set<String> = ["p"]
+private let noBarrier: Set<String> = []

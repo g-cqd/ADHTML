@@ -74,4 +74,26 @@ struct HTMLParseRobustnessTests {
             }
         }
     }
+
+    @Test func adjacentTextCoalescingIsLinearNotQuadratic() {
+        // An adversarial run of text tokens separated by NO-NODE tokens: `a</z>` repeated. Each `</z>`
+        // matches no open element (ignored, appends nothing), so the `a` runs stay adjacent siblings the
+        // builder coalesces. The old `.text(prev + value)` coalescing reallocated the whole growing
+        // accumulator per token → O(n²): N=200_000 (~1 MB) took tens of seconds — a remote CPU-DoS on the
+        // untrusted crawl input. The pending-text accumulator makes accumulation amortized O(1) / O(n) total.
+        // Two locks: (1) correctness — the whole run collapses to ONE `.text` node of N 'a's (coalescing
+        // across stray end tags preserved); (2) linearity — it finishes far under a budget the quadratic
+        // would exceed by orders of magnitude (linear ≈ a few ms; quadratic ≈ tens of seconds).
+        let n = 200_000
+        let html = String(repeating: "a</z>", count: n)
+        var tree: [HTMLNode] = []
+        let elapsed = ContinuousClock().measure { tree = HTMLNode.parse(html) }
+        #expect(tree.count == 1)
+        if case .text(let coalesced) = tree.first {
+            #expect(coalesced.count == n)  // all N 'a's coalesced into a single node
+        } else {
+            Issue.record("expected a single coalesced .text root, got \(tree.count) node(s)")
+        }
+        #expect(elapsed < .seconds(3), "tree-build text coalescing looks quadratic again: \(elapsed) for N=\(n)")
+    }
 }

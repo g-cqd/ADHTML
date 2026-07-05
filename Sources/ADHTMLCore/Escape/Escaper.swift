@@ -9,6 +9,7 @@
 // The SWAR kernel lives in `ADFCore.SWAR` (the shared foundation home, also used by ADJSON's encoder).
 
 internal import ADFCore
+internal import ADFKernels
 
 /// Escapes interpolated values per ``EscapeContext`` into an ``HTMLByteSink``.
 public enum Escaper {
@@ -39,19 +40,32 @@ public enum Escaper {
         var copy = value
         copy.withUTF8 { buffer in
             let count = buffer.count
+            guard let base = buffer.baseAddress else { return }
             let raw = UnsafeRawBufferPointer(buffer)
             var runStart = 0
             var index = 0
             while index < count {
-                // SWAR: skip whole 8-byte words with no escapable byte; jump straight to the first one.
-                while index + 8 <= count {
-                    let mask = Self.escapeStopMask(unsafe raw.loadLE64(index), escapeQuotes: escapeQuotes)
-                    if mask == 0 {
-                        index += 8
-                        continue
+                let remaining = count - index
+                if remaining >= Self.kernelEscapeMinBytes {
+                    // Long safe run: SIMD fast-forward (runtime-dispatched NEON/SSE2/AVX2) to the next
+                    // escapable byte — `& < >` plus `" '` in attribute context. Same set as
+                    // `escapeStopMask`; `n3`/`n4` repeat `&` in text context (a harmless re-compare).
+                    let quoteNeedle: UInt8 = escapeQuotes ? 0x22 : 0x26
+                    let aposNeedle: UInt8 = escapeQuotes ? 0x27 : 0x26
+                    index += unsafe ADFKernels.firstIndexOfAny(
+                        base: base + index, count: remaining, 0x26, 0x3C, 0x3E, quoteNeedle, aposNeedle)
+                } else {
+                    // Short remainder: the inline 8-byte SWAR (no call overhead), exactly as before.
+                    while index + 8 <= count {
+                        let mask = Self.escapeStopMask(
+                            unsafe raw.loadLE64(index), escapeQuotes: escapeQuotes)
+                        if mask == 0 {
+                            index += 8
+                            continue
+                        }
+                        index += mask.trailingZeroBitCount >> 3
+                        break
                     }
-                    index += mask.trailingZeroBitCount >> 3
-                    break
                 }
                 guard index < count else { break }
 
@@ -83,6 +97,11 @@ public enum Escaper {
     /// `" '` in attribute context. Unifies the per-word escapable-byte test in one place (mirrors ADJSON's
     /// `JSONOutput` factoring); `@inline(__always)` so the word loop pays no call. The `escapeQuotes`
     /// branch is loop-invariant, so this is a structural clarification, not a behavior or cost change.
+    /// Minimum remaining bytes for the SIMD escape scan to beat the inline SWAR (below it the C-call
+    /// overhead dominates); short interpolated values keep the branch-predictable inline path. Tune
+    /// from a benchmark crossover like `UTF8Validation.simdMinBytes`.
+    @usableFromInline static let kernelEscapeMinBytes = 32
+
     @inline(__always)
     private static func escapeStopMask(_ word: UInt64, escapeQuotes: Bool) -> UInt64 {
         let core = SWAR.equals(word, 0x26) | SWAR.equals(word, 0x3C) | SWAR.equals(word, 0x3E)

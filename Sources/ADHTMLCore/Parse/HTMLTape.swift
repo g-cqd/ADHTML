@@ -151,7 +151,7 @@ extension HTMLTape {
             var k = ns
             while k < n {
                 let c = unsafe p[k]
-                if isSpace(c) || c == slash || c == gt { break }
+                if TapeByte.isSpace(c) || c == slash || c == gt { break }
                 k &+= 1
             }
             let nameLen = k - ns
@@ -161,7 +161,7 @@ extension HTMLTape {
             var selfClosing = false
 
             while k < n {
-                while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+                while k < n, TapeByte.isSpace(unsafe p[k]) { k &+= 1 }
                 if k >= n { break }
                 let c = unsafe p[k]
                 if c == gt {
@@ -198,7 +198,7 @@ extension HTMLTape {
             let anStart = k
             while k < n {
                 let a = unsafe p[k]
-                if isSpace(a) || a == eq || a == slash || a == gt { break }
+                if TapeByte.isSpace(a) || a == eq || a == slash || a == gt { break }
                 k &+= 1
             }
             let anLen = k - anStart
@@ -215,10 +215,10 @@ extension HTMLTape {
         private mutating func scanAttributeValue(
             _ p: UnsafePointer<UInt8>, _ k: inout Int
         ) -> (off: Int, len: Int, decode: Bool) {
-            while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+            while k < n, TapeByte.isSpace(unsafe p[k]) { k &+= 1 }
             guard k < n, unsafe (p[k] == eq) else { return (0, 0, false) }
             k &+= 1
-            while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+            while k < n, TapeByte.isSpace(unsafe p[k]) { k &+= 1 }
             var avDecode = false
             if k < n, unsafe (p[k] == dquote || p[k] == squote) {
                 let q = unsafe p[k]
@@ -237,7 +237,7 @@ extension HTMLTape {
             let avOff = k
             while k < n {
                 let v = unsafe p[k]
-                if isSpace(v) || v == gt { break }
+                if TapeByte.isSpace(v) || v == gt { break }
                 if v == ampersand { avDecode = true }
                 k &+= 1
             }
@@ -276,7 +276,7 @@ extension HTMLTape {
             var k = ns
             while k < n {
                 let c = unsafe p[k]
-                if isSpace(c) || c == slash || c == gt { break }
+                if TapeByte.isSpace(c) || c == slash || c == gt { break }
                 k &+= 1
             }
             let nameLen = k - ns
@@ -308,11 +308,11 @@ extension HTMLTape {
 
         mutating func scanDoctype(_ p: UnsafePointer<UInt8>, _ after: Int) -> Int {
             var k = after
-            while k < n, isSpace(unsafe p[k]) { k &+= 1 }
+            while k < n, TapeByte.isSpace(unsafe p[k]) { k &+= 1 }
             let nameStart = k
             while k < n {
                 let c = unsafe p[k]
-                if isSpace(c) || c == gt { break }
+                if TapeByte.isSpace(c) || c == gt { break }
                 k &+= 1
             }
             let nameLen = k - nameStart
@@ -326,7 +326,7 @@ extension HTMLTape {
         // ADFCore.ByteCompare offers only case-SENSITIVE pointer equality, so there is no foundation
         // primitive to dedup onto (the per-byte `lower` is already built on ADFCore.ASCII).
         func ciEqual(_ p: UnsafePointer<UInt8>, _ off: Int, _ lit: [UInt8]) -> Bool {
-            for j in 0 ..< lit.count where lower(unsafe p[off + j]) != lit[j] { return false }
+            for j in 0 ..< lit.count where TapeByte.lower(unsafe p[off + j]) != lit[j] { return false }
             return true
         }
         func matchesDoctype(_ p: UnsafePointer<UInt8>, _ off: Int) -> Bool {
@@ -336,13 +336,13 @@ extension HTMLTape {
         // `</name` matches when the name equals (case-insensitive) and the next byte ends the tag.
         func matchesEndName(_ p: UnsafePointer<UInt8>, _ at: Int, _ nameOff: Int, _ nameLen: Int) -> Bool {
             guard at + nameLen <= n else { return false }
-            for j in 0 ..< nameLen where lower(unsafe p[at + j]) != lower(unsafe p[nameOff + j]) {
+            for j in 0 ..< nameLen where TapeByte.lower(unsafe p[at + j]) != TapeByte.lower(unsafe p[nameOff + j]) {
                 return false
             }
             let after = at + nameLen
             if after >= n { return true }
             let c = unsafe p[after]
-            return isSpace(c) || c == gt || c == slash
+            return TapeByte.isSpace(c) || c == gt || c == slash
         }
         // Raw-text / RCDATA element? Returns the "decode entities" flag (true = RCDATA), or nil. A
         // length switch rejects ordinary tags before any byte compare.
@@ -384,10 +384,15 @@ private let squote: UInt8 = 0x27  // '
 /// onto an `ADFCore.ASCII` predicate — the foundation has no whitespace classifier, and HTML's set
 /// differs from other formats' (e.g. JSON's insignificant whitespace has no FF), so encoding the
 /// spec's exact set here keeps the tokenizer's semantics local and spec-true.
-@inline(__always) private func isSpace(_ b: UInt8) -> Bool {
-    b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0C || b == 0x0D
+/// Byte classification for the HTML tape tokenizer — a caseless-enum namespace.
+enum TapeByte {
+    /// An HTML whitespace byte (space, tab, LF, FF, CR).
+    @inline(__always) static func isSpace(_ b: UInt8) -> Bool {
+        b == 0x20 || b == 0x09 || b == 0x0A || b == 0x0C || b == 0x0D
+    }
+    /// ASCII lowercase of `b` (`A`–`Z` → `a`–`z`, else unchanged).
+    @inline(__always) static func lower(_ b: UInt8) -> UInt8 { ASCII.isUppercase(b) ? b &+ 0x20 : b }
 }
-@inline(__always) private func lower(_ b: UInt8) -> UInt8 { ASCII.isUppercase(b) ? b &+ 0x20 : b }
 
 private let rawScript = Array("script".utf8)
 private let rawStyle = Array("style".utf8)
@@ -471,7 +476,7 @@ extension HTMLTape {
     private func lowerName(_ off: Int, _ len: Int) -> String {
         var bytes: [UInt8] = []
         bytes.reserveCapacity(len)
-        for k in off ..< off + len { bytes.append(lower(source[k])) }
+        for k in off ..< off + len { bytes.append(TapeByte.lower(source[k])) }
         return String(decoding: bytes, as: UTF8.self)
     }
     private func text(_ off: Int, _ len: Int, decode: Bool) -> String {

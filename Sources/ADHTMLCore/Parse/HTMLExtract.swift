@@ -126,60 +126,60 @@ public enum HTMLDocument {
         let sections = splitSections(body, preserveStructure: preserveStructure, linkResolver: linkResolver)
         return HTMLExtractedContent(title: title, description: description, sections: sections)
     }
-}
 
-// MARK: - Internals
+    // MARK: - Internals
 
-/// A `<meta name=… content=…>` value.
-private func metaContent(_ roots: [HTMLNode], name: String) -> String? {
-    meta(roots) { $0.attribute("name") == name }
-}
-/// A `<meta property=… content=…>` value (Open Graph).
-private func metaContent(_ roots: [HTMLNode], property: String) -> String? {
-    meta(roots) { $0.attribute("property") == property }
-}
-private func meta(_ roots: [HTMLNode], _ match: (HTMLNode) -> Bool) -> String? {
-    for element in roots.elements(tag: "meta") where match(element) {
-        if let content = element.attribute("content"), !content.isEmpty { return content }
+    /// A `<meta name=… content=…>` value.
+    private static func metaContent(_ roots: [HTMLNode], name: String) -> String? {
+        meta(roots) { $0.attribute("name") == name }
     }
-    return nil
-}
-
-/// Split a body (the content container's children) at h2 (h3 fallback) into sections.
-private func splitSections(
-    _ body: [HTMLNode], preserveStructure: Bool, linkResolver: ((String) -> String?)?
-) -> [HTMLSection] {
-    let splitTag = body.elements(tag: "h2").isEmpty ? "h3" : "h2"
-
-    func render(_ nodes: [HTMLNode]) -> String {
-        preserveStructure ? nodes.markdown(linkResolver: linkResolver) : nodes.plainText()
+    /// A `<meta property=… content=…>` value (Open Graph).
+    private static func metaContent(_ roots: [HTMLNode], property: String) -> String? {
+        meta(roots) { $0.attribute("property") == property }
     }
-
-    var sections: [HTMLSection] = []
-    var heading: String?
-    var nodes: [HTMLNode] = []
-
-    func flush() {
-        let content = render(nodes)
-        if heading != nil || !content.isEmpty {
-            sections.append(HTMLSection(heading: heading, content: content))
+    private static func meta(_ roots: [HTMLNode], _ match: (HTMLNode) -> Bool) -> String? {
+        for element in roots.elements(tag: "meta") where match(element) {
+            if let content = element.attribute("content"), !content.isEmpty { return content }
         }
-        nodes = []
+        return nil
     }
 
-    for node in body {
-        if node.tag == splitTag {
-            flush()
-            let text = node.plainText()
-            heading = text.isEmpty ? nil : text
-        } else {
-            nodes.append(node)
+    /// Split a body (the content container's children) at h2 (h3 fallback) into sections.
+    private static func splitSections(
+        _ body: [HTMLNode], preserveStructure: Bool, linkResolver: ((String) -> String?)?
+    ) -> [HTMLSection] {
+        let splitTag = body.elements(tag: "h2").isEmpty ? "h3" : "h2"
+
+        func render(_ nodes: [HTMLNode]) -> String {
+            preserveStructure ? nodes.markdown(linkResolver: linkResolver) : nodes.plainText()
         }
-    }
-    flush()
 
-    if sections.isEmpty {
-        sections.append(HTMLSection(heading: nil, content: render(body)))
+        var sections: [HTMLSection] = []
+        var heading: String?
+        var nodes: [HTMLNode] = []
+
+        func flush() {
+            let content = render(nodes)
+            if heading != nil || !content.isEmpty {
+                sections.append(HTMLSection(heading: heading, content: content))
+            }
+            nodes = []
+        }
+
+        for node in body {
+            if node.tag == splitTag {
+                flush()
+                let text = node.plainText()
+                heading = text.isEmpty ? nil : text
+            } else {
+                nodes.append(node)
+            }
+        }
+        flush()
+
+        if sections.isEmpty {
+            sections.append(HTMLSection(heading: nil, content: render(body)))
+        }
+        return sections
     }
-    return sections
 }

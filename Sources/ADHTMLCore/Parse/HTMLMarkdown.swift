@@ -12,7 +12,7 @@ extension HTMLNode {
     public func plainText() -> String {
         var out = ""
         appendPlainText(to: &out)
-        return normalizePlain(out)
+        return MarkdownNormalize.normalizePlain(out)
     }
 
     /// Convert to Markdown, preserving the structure `plainText()` discards. `linkResolver` rewrites
@@ -20,7 +20,7 @@ extension HTMLNode {
     public func markdown(linkResolver: ((String) -> String?)? = nil) -> String {
         var out = ""
         appendMarkdown(to: &out, linkResolver)
-        return normalize(out, fenceAware: true)
+        return MarkdownNormalize.normalize(out, fenceAware: true)
     }
 
     private func appendPlainText(to out: inout String) {
@@ -59,7 +59,7 @@ extension HTMLNode {
                         let text = inlineText(children)
                         if !text.isEmpty { out += "\n\n" + String(repeating: "#", count: level) + " " + text + "\n\n" }
                     case "pre":
-                        out += "\n\n```\n" + trimNewlines(rawText(children)) + "\n```\n\n"
+                        out += "\n\n```\n" + MarkdownNormalize.trimNewlines(rawText(children)) + "\n```\n\n"
                     case "code":
                         let text = inlineText(children)
                         if !text.isEmpty { out += "`" + String(text.map { $0 == "`" ? "'" : $0 }) + "`" }
@@ -90,7 +90,7 @@ extension HTMLNode {
                     case "blockquote":
                         var inner = ""
                         for child in children { child.appendMarkdown(to: &inner, linkResolver) }
-                        out += "\n\n" + quote(normalize(inner, fenceAware: true)) + "\n\n"
+                        out += "\n\n" + MarkdownNormalize.quote(MarkdownNormalize.normalize(inner, fenceAware: true)) + "\n\n"
                     default:
                         let block = blockTags.contains(tag)
                         if block { out += "\n\n" }
@@ -104,7 +104,7 @@ extension HTMLNode {
     private func inlineText(_ nodes: [HTMLNode]) -> String {
         var s = ""
         for node in nodes { s += node.textContent }
-        return collapseInline(s)
+        return MarkdownNormalize.collapseInline(s)
     }
 
     /// Raw concatenated text content (no whitespace collapsing — for code blocks).
@@ -123,7 +123,7 @@ extension HTMLNode {
         for child in children where child.tag == "li" {
             var item = ""
             for node in child.children { node.appendMarkdown(to: &item, linkResolver) }
-            let line = collapseInline(item)
+            let line = MarkdownNormalize.collapseInline(item)
             if line.isEmpty { continue }
             items.append((ordered ? "\(index). " : "- ") + line)
             index += 1
@@ -137,13 +137,13 @@ extension Array where Element == HTMLNode {
     public func plainText() -> String {
         var out = ""
         for node in self { out += node.plainText() + "\n\n" }
-        return normalizeJoined(out)
+        return MarkdownNormalize.normalizeJoined(out)
     }
     /// Markdown of a forest.
     public func markdown(linkResolver: ((String) -> String?)? = nil) -> String {
         var out = ""
         for node in self { out += node.markdown(linkResolver: linkResolver) + "\n\n" }
-        return normalizeJoined(out)
+        return MarkdownNormalize.normalizeJoined(out)
     }
 }
 
@@ -160,123 +160,126 @@ private let stripTags: Set<String> = ["nav", "header", "footer", "script", "styl
 
 // MARK: - Whitespace normalization (Foundation-free)
 
-/// Collapse runs of spaces/tabs to one, trim each line, and collapse 2+ blank lines to one. When
-/// `fenceAware`, lines inside ```` ``` ```` fences are preserved verbatim (code indentation intact).
-private func normalize(_ s: String, fenceAware: Bool) -> String {
-    var out: [String] = []
-    var blankRun = 0
-    var inFence = false
-    for rawLine in s.split(separator: "\n", omittingEmptySubsequences: false) {
-        let line = String(rawLine)
-        if fenceAware, trim(line) == "```" {
-            if !out.isEmpty, blankRun > 0 { out.append("") }
-            out.append("```")
-            blankRun = 0
-            inFence.toggle()
-            continue
+/// Whitespace normalization for the Markdown renderer — a caseless-enum namespace (was free functions).
+enum MarkdownNormalize {
+    /// Collapse runs of spaces/tabs to one, trim each line, and collapse 2+ blank lines to one. When
+    /// `fenceAware`, lines inside ```` ``` ```` fences are preserved verbatim (code indentation intact).
+    static func normalize(_ s: String, fenceAware: Bool) -> String {
+        var out: [String] = []
+        var blankRun = 0
+        var inFence = false
+        for rawLine in s.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = String(rawLine)
+            if fenceAware, trim(line) == "```" {
+                if !out.isEmpty, blankRun > 0 { out.append("") }
+                out.append("```")
+                blankRun = 0
+                inFence.toggle()
+                continue
+            }
+            if inFence {
+                out.append(line)  // verbatim
+                blankRun = 0
+                continue
+            }
+            let collapsed = collapseSpaces(line)
+            if collapsed.isEmpty {
+                blankRun += 1
+            } else {
+                if !out.isEmpty, blankRun > 0 { out.append("") }
+                out.append(collapsed)
+                blankRun = 0
+            }
         }
-        if inFence {
-            out.append(line)  // verbatim
-            blankRun = 0
-            continue
+        return out.joined(separator: "\n")
+    }
+
+    /// Normalize the already-converted pieces joined in `plainText()`/`markdown()` forest helpers.
+    static func normalizeJoined(_ s: String) -> String { normalize(s, fenceAware: true) }
+
+    /// Plain-text normalization: collapse ALL whitespace (incl. newlines) to single spaces, then turn
+    /// NUL block-boundary sentinels into paragraph breaks (so inline newlines become spaces, and only
+    /// block boundaries break lines).
+    static func normalizePlain(_ s: String) -> String {
+        var collapsed = ""
+        var lastSpace = false
+        for ch in s {
+            if ch == "\u{0}" {
+                collapsed.append(ch)
+                lastSpace = false
+            } else if ch == " " || ch == "\t" || ch == "\n" || ch == "\r" || ch == "\u{0C}" {
+                if !lastSpace { collapsed.append(" ") }
+                lastSpace = true
+            } else {
+                collapsed.append(ch)
+                lastSpace = false
+            }
         }
-        let collapsed = collapseSpaces(line)
-        if collapsed.isEmpty {
-            blankRun += 1
-        } else {
-            if !out.isEmpty, blankRun > 0 { out.append("") }
-            out.append(collapsed)
-            blankRun = 0
+        return collapsed.split(separator: "\u{0}").map { trim(String($0)) }.filter { !$0.isEmpty }
+            .joined(separator: "\n\n")
+    }
+
+    /// Collapse all whitespace (incl. newlines) to single spaces, trimmed — for inline contexts.
+    static func collapseInline(_ s: String) -> String {
+        var result = ""
+        var lastSpace = true  // leading-trim: treat start as if preceded by space
+        for ch in s {
+            if ch == " " || ch == "\t" || ch == "\n" || ch == "\r" || ch == "\u{0C}" {
+                if !lastSpace { result.append(" ") }
+                lastSpace = true
+            } else {
+                result.append(ch)
+                lastSpace = false
+            }
         }
+        if result.hasSuffix(" ") { result.removeLast() }
+        return result
     }
-    return out.joined(separator: "\n")
-}
 
-/// Normalize the already-converted pieces joined in `plainText()`/`markdown()` forest helpers.
-private func normalizeJoined(_ s: String) -> String { normalize(s, fenceAware: true) }
-
-/// Plain-text normalization: collapse ALL whitespace (incl. newlines) to single spaces, then turn
-/// NUL block-boundary sentinels into paragraph breaks (so inline newlines become spaces, and only
-/// block boundaries break lines).
-private func normalizePlain(_ s: String) -> String {
-    var collapsed = ""
-    var lastSpace = false
-    for ch in s {
-        if ch == "\u{0}" {
-            collapsed.append(ch)
-            lastSpace = false
-        } else if ch == " " || ch == "\t" || ch == "\n" || ch == "\r" || ch == "\u{0C}" {
-            if !lastSpace { collapsed.append(" ") }
-            lastSpace = true
-        } else {
-            collapsed.append(ch)
-            lastSpace = false
+    /// Collapse runs of spaces/tabs to one and trim the line (newlines already split out).
+    static func collapseSpaces(_ line: String) -> String {
+        var result = ""
+        var lastSpace = true
+        for ch in line {
+            if ch == " " || ch == "\t" {
+                if !lastSpace { result.append(" ") }
+                lastSpace = true
+            } else {
+                result.append(ch)
+                lastSpace = false
+            }
         }
+        if result.hasSuffix(" ") { result.removeLast() }
+        return result
     }
-    return collapsed.split(separator: "\u{0}").map { trim(String($0)) }.filter { !$0.isEmpty }
-        .joined(separator: "\n\n")
-}
 
-/// Collapse all whitespace (incl. newlines) to single spaces, trimmed — for inline contexts.
-private func collapseInline(_ s: String) -> String {
-    var result = ""
-    var lastSpace = true  // leading-trim: treat start as if preceded by space
-    for ch in s {
-        if ch == " " || ch == "\t" || ch == "\n" || ch == "\r" || ch == "\u{0C}" {
-            if !lastSpace { result.append(" ") }
-            lastSpace = true
-        } else {
-            result.append(ch)
-            lastSpace = false
+    static func trim(_ s: String) -> String {
+        var start = s.startIndex
+        var end = s.endIndex
+        while start < end, s[start] == " " || s[start] == "\t" { start = s.index(after: start) }
+        while end > start {
+            let prev = s.index(before: end)
+            guard s[prev] == " " || s[prev] == "\t" else { break }
+            end = prev
         }
+        return String(s[start ..< end])
     }
-    if result.hasSuffix(" ") { result.removeLast() }
-    return result
-}
 
-/// Collapse runs of spaces/tabs to one and trim the line (newlines already split out).
-private func collapseSpaces(_ line: String) -> String {
-    var result = ""
-    var lastSpace = true
-    for ch in line {
-        if ch == " " || ch == "\t" {
-            if !lastSpace { result.append(" ") }
-            lastSpace = true
-        } else {
-            result.append(ch)
-            lastSpace = false
+    static func trimNewlines(_ s: String) -> String {
+        var start = s.startIndex
+        var end = s.endIndex
+        while start < end, s[start] == "\n" || s[start] == "\r" { start = s.index(after: start) }
+        while end > start {
+            let prev = s.index(before: end)
+            guard s[prev] == "\n" || s[prev] == "\r" else { break }
+            end = prev
         }
+        return String(s[start ..< end])
     }
-    if result.hasSuffix(" ") { result.removeLast() }
-    return result
-}
 
-private func trim(_ s: String) -> String {
-    var start = s.startIndex
-    var end = s.endIndex
-    while start < end, s[start] == " " || s[start] == "\t" { start = s.index(after: start) }
-    while end > start {
-        let prev = s.index(before: end)
-        guard s[prev] == " " || s[prev] == "\t" else { break }
-        end = prev
+    static func quote(_ s: String) -> String {
+        s.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { $0.isEmpty ? ">" : "> " + $0 }
+            .joined(separator: "\n")
     }
-    return String(s[start ..< end])
-}
-
-private func trimNewlines(_ s: String) -> String {
-    var start = s.startIndex
-    var end = s.endIndex
-    while start < end, s[start] == "\n" || s[start] == "\r" { start = s.index(after: start) }
-    while end > start {
-        let prev = s.index(before: end)
-        guard s[prev] == "\n" || s[prev] == "\r" else { break }
-        end = prev
-    }
-    return String(s[start ..< end])
-}
-
-private func quote(_ s: String) -> String {
-    s.split(separator: "\n", omittingEmptySubsequences: false)
-        .map { $0.isEmpty ? ">" : "> " + $0 }
-        .joined(separator: "\n")
 }

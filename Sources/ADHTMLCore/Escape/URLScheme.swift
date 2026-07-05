@@ -35,22 +35,34 @@ public enum URLScheme {
         }
     }
 
-    /// Case-insensitively compare `buffer[start..<end]` against the scheme allowlist.
+    /// Case-insensitively compare `buffer[start..<end]` against the scheme allowlist. Allocation-free: a
+    /// length dispatch then a case-folded byte compare, so an absolute-URL attribute on the render hot
+    /// path no longer builds a `[UInt8]` + `String` just to `switch` over four fixed schemes.
     private static func schemeIsAllowed(
         _ buffer: UnsafeBufferPointer<UInt8>, start: Int, end: Int
     ) -> Bool {
-        var lowered: [UInt8] = []
-        lowered.reserveCapacity(end - start)
-        var index = start
-        while index < end {
-            let byte = unsafe buffer[index]
-            lowered.append(ASCII.isUppercase(byte) ? byte &+ 0x20 : byte)
-            index += 1
-        }
-        let scheme = String(decoding: lowered, as: UTF8.self)
-        switch scheme {
-            case "http", "https", "mailto", "tel": return true
+        switch end - start {
+            case 3: return unsafe matches(buffer, start, "tel")
+            case 4: return unsafe matches(buffer, start, "http")
+            case 5: return unsafe matches(buffer, start, "https")
+            case 6: return unsafe matches(buffer, start, "mailto")
             default: return false
+        }
+    }
+
+    /// Whether `buffer[start...]` equals the (already lowercase, ASCII) `scheme`, comparing each source
+    /// byte case-folded — no allocation. The caller has length-matched, so `scheme.count` bytes are read.
+    private static func matches(
+        _ buffer: UnsafeBufferPointer<UInt8>, _ start: Int, _ scheme: StaticString
+    ) -> Bool {
+        scheme.withUTF8Buffer { expected in
+            for offset in 0 ..< expected.count {
+                let source = unsafe buffer[start + offset]
+                let lower = ASCII.isUppercase(source) ? source &+ 0x20 : source
+                let want = unsafe expected[offset]
+                if lower != want { return false }
+            }
+            return true
         }
     }
 }

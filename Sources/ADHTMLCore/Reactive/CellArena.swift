@@ -6,7 +6,9 @@ private import Synchronization
 // the client runtime's job. Sendable: cells live behind a `Mutex` so a streaming (async) render is
 // data-race-free. Dependency capture uses a "currently collecting" slot toggled around a computed's
 // body (the body runs OUTSIDE the lock; each read briefly locks to append) — the alien-signals /
-// Vue "current computation" idea, single-slot because computeds evaluate eagerly (no nested eval).
+// Vue "current computation" idea, kept as a STACK so a computed created inside another computed's body
+// composes: each body pushes its own frame and reads attribute to the innermost one, so a nested eval
+// no longer clobbers the outer's already-collected dependencies.
 
 /// Owns the reactive-cell graph for one render and records it for hydration serialization.
 public final class CellArena: Sendable {
@@ -36,8 +38,10 @@ public final class CellArena: Sendable {
     private struct State {
         var cells: [Cell] = []
         var nextIndex: UInt64 = 0
-        /// Non-nil while a computed's body evaluates; reads append their `CellID` here.
-        var collecting: [CellID]?
+        /// A stack of dependency-collection frames — one per computed body currently evaluating. Reads
+        /// append their `CellID` to the innermost (top) frame; a nested `computed` pushes/pops its own
+        /// frame so the outer's deps survive. Empty when no computed is evaluating.
+        var collecting: [[CellID]] = []
         /// Monotonic per-render component scope counter (see ``freshScope()``).
         var nextScope: UInt64 = 0
         /// `(scope, key)` → the cell backing a `@State` property, so repeated reads dedup (see
@@ -63,13 +67,9 @@ public final class CellArena: Sendable {
     /// render pass); reads of other cells during it become this cell's recorded dependencies. The client
     /// cannot re-run the closure, so the cell's value is server-fixed (updated by SSE patch).
     public func computed<Value: WireEncodable>(_ body: () -> Value) -> Computed<Value> {
-        state.withLock { $0.collecting = [] }
-        let result = body()
-        let dependencies = state.withLock { lock -> [CellID] in
-            let deps = lock.collecting ?? []
-            lock.collecting = nil
-            return deps
-        }
+        state.withLock { $0.collecting.append([]) }  // push this body's dependency frame
+        let result = body()  // runs OUTSIDE the lock; a nested computed pushes/pops its own frame
+        let dependencies = state.withLock { $0.collecting.removeLast() }
         let id = register(.computed(dependencies: dependencies, expr: nil), value: result.wireValue)
         return Computed(arena: self, id: id, stored: result)
     }
@@ -87,7 +87,10 @@ public final class CellArena: Sendable {
 
     /// Record that the currently-evaluating computed (if any) read cell `id`.
     func recordRead(_ id: CellID) {
-        state.withLock { if $0.collecting != nil { $0.collecting?.append(id) } }
+        state.withLock { lock in
+            guard !lock.collecting.isEmpty else { return }
+            lock.collecting[lock.collecting.count - 1].append(id)  // innermost computed's frame
+        }
     }
 
     /// A fresh per-render component scope id (monotonic within this render). ``Component`` rendering

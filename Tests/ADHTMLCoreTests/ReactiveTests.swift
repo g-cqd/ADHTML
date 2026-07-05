@@ -56,4 +56,33 @@ struct ReactiveTests {
         }
         #expect(deps == [doubled.id])
     }
+
+    @Test
+    func `a computed created inside another computed's body keeps the outer's dependencies`() {
+        // Regression: the dependency-collection state is a STACK, not one slot. When the outer body
+        // creates a nested computed, the nested eval must not discard the outer's already-collected deps
+        // NOR silence the outer's reads that follow it. The old single-slot code reset `collecting = nil`
+        // at the end of the nested eval, so the outer recorded ZERO dependencies (it read `sig` and
+        // `inner` AFTER the reset) → a wrong client invalidation graph.
+        let arena = CellArena()
+        let sig = arena.signal(1)
+        let outer = arena.computed { () -> Int in
+            let inner = arena.computed { sig.value + 1 }  // nested; its own dep frame is [sig]
+            return sig.value + inner.value  // outer reads sig AND inner — both must be recorded
+        }
+        #expect(outer.value == 3)  // sig(1) + inner(2)
+
+        let cells = arena.cells  // registration order: [sig, inner, outer]
+        #expect(cells.count == 3)
+        guard case .computed(let innerDeps, _) = cells[1].kind else {
+            Issue.record("expected the nested cell to be a computed")
+            return
+        }
+        #expect(innerDeps == [sig.id])  // the nested computed depends only on sig
+        guard case .computed(let outerDeps, _) = cells[2].kind else {
+            Issue.record("expected the outer cell to be a computed")
+            return
+        }
+        #expect(outerDeps == [sig.id, cells[1].id])  // outer depends on sig AND the nested computed
+    }
 }

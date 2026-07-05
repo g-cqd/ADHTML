@@ -69,9 +69,9 @@ struct AssetsTests {
 
     @Test
     func `base36 encodes compactly`() {
-        #expect(base36(0) == "0")
-        #expect(base36(35) == "z")
-        #expect(base36(36) == "10")
+        #expect(ComponentAssets.base36(0) == "0")
+        #expect(ComponentAssets.base36(35) == "z")
+        #expect(ComponentAssets.base36(36) == "10")
     }
 }
 

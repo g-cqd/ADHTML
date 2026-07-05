@@ -71,6 +71,9 @@ public final class AssetSink: Sendable {
     private struct State {
         var order: [String] = []
         var byScope: [String: Entry] = [:]
+        /// typeName → scope, so a repeated instance of one component type dedups BEFORE the CSS copy +
+        /// hash (a type's CSS/script are fixed → its scope is stable).
+        var scopeByType: [String: String] = [:]
     }
     private let state = Mutex(State())
 
@@ -88,6 +91,15 @@ public final class AssetSink: Sendable {
 
     /// Whether an entry for `scope` is already recorded — lets a repeated instance skip re-scoping its CSS.
     func contains(_ scope: String) -> Bool { state.withLock { $0.byScope[scope] != nil } }
+
+    /// The scope already assigned to a component TYPE this render, if any — lets a repeated instance skip
+    /// the CSS copy + XXH64 hash (type names are unique, a type's CSS/script fixed, so its scope is stable).
+    func scope(forType typeName: String) -> String? { state.withLock { $0.scopeByType[typeName] } }
+
+    /// Memoize `typeName` → `scope` so subsequent instances of the same type dedup before the hash.
+    func rememberType(_ typeName: String, scope: String) {
+        state.withLock { $0.scopeByType[typeName] = scope }
+    }
 
     /// The deduped entries in first-seen order — deterministic output.
     public var entries: [Entry] {
@@ -142,13 +154,18 @@ enum ComponentAssets {
     /// with different scripts, still scope distinctly), dedup-record the scoped CSS + inline script into
     /// `sink`, and return the base36 scope hash.
     static func record(style: ScopedStyle?, script: Script?, typeName: String, into sink: AssetSink) -> String {
+        // Dedup by type name FIRST: names are unique and a type's CSS/script are fixed, so its scope is
+        // stable across instances — a repeated instance skips the full CSS copy + XXH64 hash below.
+        if let scope = sink.scope(forType: typeName) { return scope }
+
         let cssBytes = style.map { $0.css.withUTF8Buffer { unsafe Array($0) } } ?? []
         var keyBytes = Array(typeName.utf8)
         keyBytes.append(contentsOf: cssBytes)
         if let script { keyBytes.append(contentsOf: script.identityBytes) }
         let scope = base36(XXH64.hash(keyBytes))
+        sink.rememberType(typeName, scope: scope)  // memoize so future instances of this type skip the hash
 
-        // Dedup BEFORE scoping: a repeated instance of the same type skips the (otherwise wasted) scope pass.
+        // Dedup the scoped entry by scope hash too (distinct types collide only astronomically).
         guard !sink.contains(scope) else { return scope }
 
         let renderedCSS: [UInt8]
@@ -168,17 +185,17 @@ enum ComponentAssets {
         sink.record(AssetSink.Entry(scope: scope, css: renderedCSS, inlineScript: inlineScript, module: module))
         return scope
     }
-}
 
-/// A `UInt64` as lowercase base36 — the compact `data-scope` hash (matches the wire-token alphabet).
-func base36(_ value: UInt64) -> String {
-    guard value != 0 else { return "0" }
-    let digits = Array("0123456789abcdefghijklmnopqrstuvwxyz".utf8)
-    var remaining = value
-    var out: [UInt8] = []
-    while remaining > 0 {
-        out.append(digits[Int(remaining % 36)])
-        remaining /= 36
+    /// A `UInt64` as lowercase base36 — the compact `data-scope` hash (matches the wire-token alphabet).
+    static func base36(_ value: UInt64) -> String {
+        guard value != 0 else { return "0" }
+        let digits = Array("0123456789abcdefghijklmnopqrstuvwxyz".utf8)
+        var remaining = value
+        var out: [UInt8] = []
+        while remaining > 0 {
+            out.append(digits[Int(remaining % 36)])
+            remaining /= 36
+        }
+        return String(decoding: out.reversed(), as: UTF8.self)
     }
-    return String(decoding: out.reversed(), as: UTF8.self)
 }
